@@ -1,25 +1,53 @@
 'use client'
 
 import { useState } from 'react'
+import { createClient } from '@supabase/supabase-js'
+
+// Inisialisasi klien Supabase mandiri yang aman untuk build Vercel
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 export default function LandingPage() {
     const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
     const [isLoading, setIsLoading] = useState(false)
+    const [errorMessage, setErrorMessage] = useState('')
 
-    // URL dinamis berbasis Environment Variable dengan fallback lokal
-    const adminUrl = process.env.NEXT_PUBLIC_ADMIN_URL || 'http://localhost:3000'
-    const managementUrl = process.env.NEXT_PUBLIC_MANAGEMENT_URL || 'http://localhost:3001'
+    // URL dinamis berbasis Environment Variable dengan fallback
+    const adminUrl = process.env.NEXT_PUBLIC_ADMIN_URL || 'https://admin-pied-pi-57.vercel.app'
+    const managementUrl = process.env.NEXT_PUBLIC_MANAGEMENT_URL || 'https://pt-jeep-management.vercel.app'
 
-    const handleLogin = (e: React.FormEvent) => {
+    const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault()
         setIsLoading(true)
+        setErrorMessage('')
 
-        // Arahkan ke modul Manajemen / Lapangan
-        setTimeout(() => {
-            window.location.href = managementUrl
-        }, 1000)
+        try {
+            // Autentikasi langsung ke Supabase
+            const { data, error } = await supabase.auth.signInWithPassword({
+                email,
+                password,
+            })
+
+            if (error) {
+                setErrorMessage(error.message || 'Email atau kata sandi tidak valid.')
+                setIsLoading(false)
+                return
+            }
+
+            // Oper sesi cross-domain menggunakan URL hash
+            if (data.session) {
+                const { access_token, refresh_token } = data.session
+                window.location.href = `${managementUrl}#access_token=${access_token}&refresh_token=${refresh_token}`
+            } else {
+                window.location.href = managementUrl
+            }
+        } catch (err: any) {
+            setErrorMessage(err.message || 'Terjadi kesalahan sistem otentikasi.')
+            setIsLoading(false)
+        }
     }
 
     return (
@@ -62,7 +90,7 @@ export default function LandingPage() {
                 <div className="flex flex-col sm:flex-row justify-center gap-4">
                     <button
                         onClick={() => setIsLoginModalOpen(true)}
-                        className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold px-6 py-3 rounded-xl text-sm transition"
+                        className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold px-6 py-3 rounded-xl text-sm transition cursor-pointer"
                     >
                         Buka Aplikasi Lapangan (User)
                     </button>
@@ -115,6 +143,12 @@ export default function LandingPage() {
                             <p className="text-xs text-slate-400 mt-1">Silakan masuk untuk mencatat ritase</p>
                         </div>
 
+                        {errorMessage && (
+                            <div className="mb-4 p-3 bg-rose-950/60 border border-rose-800/40 rounded-lg text-rose-300 text-xs text-center">
+                                {errorMessage}
+                            </div>
+                        )}
+
                         <form onSubmit={handleLogin} className="space-y-4">
                             <div>
                                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Email Petugas</label>
@@ -144,7 +178,7 @@ export default function LandingPage() {
                                 <button
                                     type="submit"
                                     disabled={isLoading}
-                                    className="w-full bg-amber-500 hover:bg-amber-600 text-black py-3 rounded-lg text-sm transition font-bold flex justify-center items-center"
+                                    className="w-full bg-amber-500 hover:bg-amber-600 text-black py-3 rounded-lg text-sm transition font-bold flex justify-center items-center cursor-pointer"
                                 >
                                     {isLoading ? (
                                         <span className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin"></span>
@@ -156,8 +190,11 @@ export default function LandingPage() {
 
                             <button
                                 type="button"
-                                onClick={() => setIsLoginModalOpen(false)}
-                                className="w-full text-slate-500 hover:text-slate-300 text-xs py-2 transition mt-2"
+                                onClick={() => {
+                                    setIsLoginModalOpen(false)
+                                    setErrorMessage('')
+                                }}
+                                className="w-full text-slate-500 hover:text-slate-300 text-xs py-2 transition mt-2 cursor-pointer"
                             >
                                 Batal & Kembali
                             </button>
