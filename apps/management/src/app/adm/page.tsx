@@ -1,9 +1,157 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
+import { createClient } from '@supabase/supabase-js'
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+const supabase = createClient(supabaseUrl, supabaseAnonKey)
+
+interface DocumentLog {
+    id: string
+    created_at: string
+    agenda_no: string
+    title: string
+    sender: string
+    category: string
+    status: string
+}
 
 export default function AdmDashboard() {
+    const [loading, setLoading] = useState(true)
+    const [userName, setUserName] = useState('Petugas ADM')
     const [activeTab, setActiveTab] = useState('surat')
+    const [documents, setDocuments] = useState<DocumentLog[]>([])
+
+    // Modal Input Dokumen Baru
+    const [showModal, setShowModal] = useState(false)
+    const [agendaNo, setAgendaNo] = useState('')
+    const [title, setTitle] = useState('')
+    const [sender, setSender] = useState('')
+    const [category, setCategory] = useState('Surat Jalan')
+    const [submitting, setSubmitting] = useState(false)
+
+    const landingUrl = process.env.NEXT_PUBLIC_LANDING_URL || 'https://pt-jeep.vercel.app'
+
+    useEffect(() => {
+        async function initAdm() {
+            try {
+                // 1. Proteksi Sesi Supabase
+                const { data: { session } } = await supabase.auth.getSession()
+                if (!session) {
+                    window.location.href = landingUrl
+                    return
+                }
+
+                // 2. Verifikasi Profil
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('full_name, role, status')
+                    .eq('id', session.user.id)
+                    .single()
+
+                if (!profile || profile.status !== 'Aktif') {
+                    await supabase.auth.signOut()
+                    window.location.href = landingUrl
+                    return
+                }
+
+                setUserName(profile.full_name || 'Petugas ADM')
+
+                // 3. Ambil data dokumen dari tabel adm_documents jika ada
+                const { data: docData } = await supabase
+                    .from('adm_documents')
+                    .select('*')
+                    .order('created_at', { ascending: false })
+                    .limit(10)
+
+                if (docData && docData.length > 0) {
+                    setDocuments(docData)
+                } else {
+                    // Data cadangan lokal jika tabel belum di-migrate
+                    setDocuments([
+                        {
+                            id: '1',
+                            created_at: new Date().toISOString(),
+                            agenda_no: 'ADM/2026/09/012',
+                            title: 'Surat Jalan Pengiriman Solar 16.000L',
+                            sender: 'PT Solar Pasifik',
+                            category: 'Surat Jalan',
+                            status: 'Tervalidasi',
+                        },
+                        {
+                            id: '2',
+                            created_at: new Date().toISOString(),
+                            agenda_no: 'ADM/2026/09/011',
+                            title: 'Permohonan Izin Masuk Pit (SIMP Site)',
+                            sender: 'PT United Tractors',
+                            category: 'SIMP',
+                            status: 'Diproses K3',
+                        },
+                    ])
+                }
+
+                setLoading(false)
+            } catch (err) {
+                console.error('Error in ADM init:', err)
+                setLoading(false)
+            }
+        }
+
+        initAdm()
+    }, [landingUrl])
+
+    // Submit Dokumen Baru
+    const handleAddDocument = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!title || !sender) return
+
+        setSubmitting(true)
+        const generatedNo = agendaNo || `ADM/${new Date().getFullYear()}/${Date.now().toString().slice(-4)}`
+
+        const newDoc: DocumentLog = {
+            id: Date.now().toString(),
+            created_at: new Date().toISOString(),
+            agenda_no: generatedNo,
+            title,
+            sender,
+            category,
+            status: 'Tercatat',
+        }
+
+        // Coba simpan ke Supabase jika tabel sudah ada
+        const { data, error } = await supabase
+            .from('adm_documents')
+            .insert([newDoc])
+            .select()
+
+        if (!error && data) {
+            setDocuments([data[0], ...documents])
+        } else {
+            // Fallback state lokal
+            setDocuments([newDoc, ...documents])
+        }
+
+        setShowModal(false)
+        setTitle('')
+        setSender('')
+        setAgendaNo('')
+        setSubmitting(false)
+    }
+
+    const handleLogout = async () => {
+        await supabase.auth.signOut()
+        window.location.href = landingUrl
+    }
+
+    if (loading) {
+        return (
+            <div className="min-h-screen bg-[#060c14] flex flex-col items-center justify-center text-white font-sans">
+                <div className="w-10 h-10 border-4 border-sky-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+                <p className="text-xs text-slate-400">Sinkronisasi Dokumen ADM...</p>
+            </div>
+        )
+    }
 
     return (
         <div className="min-h-screen bg-[#060c14] text-slate-100 font-sans p-4 md:p-6 select-none">
@@ -17,13 +165,13 @@ export default function AdmDashboard() {
                         </h1>
                         <p className="text-xs text-sky-400 flex items-center gap-1.5 mt-0.5">
                             <span className="w-2 h-2 rounded-full bg-sky-500 animate-pulse"></span>
-                            Pusat Arsip Surat, Logistik Dokumen, & Administrasi Operasional Site
+                            Live Sync Dokumen & Surat Jalan • {userName}
                         </p>
                     </div>
                 </div>
 
                 <button
-                    onClick={() => (window.location.href = 'https://pt-jeep.vercel.app')}
+                    onClick={handleLogout}
                     className="bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/50 text-rose-300 text-xs px-4 py-2 rounded-lg transition"
                 >
                     Keluar ke Beranda
@@ -33,11 +181,10 @@ export default function AdmDashboard() {
             {/* Nav Tabs Atas */}
             <nav className="flex flex-wrap gap-2 mb-6">
                 {[
-                    { id: 'surat', label: 'SURAT MASUK & KELUAR', badge: '12 BARU' },
+                    { id: 'surat', label: 'SURAT MASUK & KELUAR', badge: `${documents.length} DOKUMEN` },
                     { id: 'suratjalan', label: 'SURAT JALAN & RITASE', badge: '' },
-                    { id: 'po', label: 'PURCHASE ORDER (PO)', badge: '5 PENDING' },
-                    { id: 'arsip', label: 'ARSIP KONTRAK & LEGAL', badge: '' },
-                    { id: 'tamu', label: 'BUKU TAMU & SIMP', badge: '' },
+                    { id: 'po', label: 'PURCHASE ORDER (PO)', badge: '' },
+                    { id: 'simp', label: 'BUKU TAMU & SIMP', badge: '' },
                 ].map((tab) => (
                     <button
                         key={tab.id}
@@ -57,117 +204,157 @@ export default function AdmDashboard() {
                 ))}
             </nav>
 
-            {/* Grid Konten Utama */}
+            {/* Konten Utama */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                {/* Kolom Kiri: Menu Fitur ADM */}
+                {/* Kolom Kiri: Tombol Aksi Cepat */}
                 <aside className="lg:col-span-3 space-y-3">
-                    {[
-                        { id: 'surat', icon: '✉️', title: 'Korespondensi & Memo Internal' },
-                        { id: 'suratjalan', icon: '🚚', title: 'Verifikasi Surat Jalan (Delivery)' },
-                        { id: 'po', icon: '📝', title: 'Administrasi PO & PR Pit' },
-                        { id: 'tamu', icon: '🛂', title: 'Izin Masuk Site (SIMP / Visitor)' },
-                        { id: 'rekap', icon: '📊', title: 'Rekap Laporan Harian Site (DOR)' },
-                    ].map((item) => (
-                        <div
-                            key={item.id}
-                            onClick={() => setActiveTab(item.id)}
-                            className={`p-4 rounded-xl border flex items-center justify-between cursor-pointer transition ${activeTab === item.id
-                                    ? 'bg-[#142942] border-sky-500 text-white'
-                                    : 'bg-[#0a1625] border-[#16273c] text-slate-400 hover:bg-[#0f2035] hover:text-slate-200'
-                                }`}
-                        >
-                            <div className="flex items-center gap-3">
-                                <span className="text-xl">{item.icon}</span>
-                                <span className="text-xs font-semibold">{item.title}</span>
-                            </div>
-                        </div>
-                    ))}
-                </aside>
-
-                {/* Kolom Kanan: Panel Metrik & Tabel Dokumen */}
-                <main className="lg:col-span-9 space-y-6">
-                    {/* Row Atas: Ringkasan Metrik ADM */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
-                            <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">Total Dokumen Masuk (Bulan Ini)</h3>
-                            <div className="flex items-baseline gap-2">
-                                <span className="text-3xl font-black text-white">284</span>
-                                <span className="text-xs text-sky-400 font-semibold">+18 Hari Ini</span>
-                            </div>
-                            <div className="mt-3 text-[11px] text-slate-400 flex justify-between">
-                                <span>Surat Masuk: 196</span>
-                                <span>Memo/PO: 88</span>
-                            </div>
-                        </div>
-
-                        <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
-                            <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">Surat Jalan Terverifikasi</h3>
-                            <div className="flex items-baseline gap-2">
-                                <span className="text-3xl font-black text-emerald-400">1.420</span>
-                                <span className="text-xs text-slate-400">Ritase</span>
-                            </div>
-                            <p className="mt-3 text-[11px] text-emerald-400 font-medium">✓ Sesuai Timbangan Jembatan</p>
-                        </div>
-
-                        <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
-                            <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">Pengajuan Izin Tamu (SIMP)</h3>
-                            <div className="flex items-baseline gap-2">
-                                <span className="text-3xl font-black text-amber-400">7</span>
-                                <span className="text-xs text-slate-400">Menunggu Approval</span>
-                            </div>
-                            <p className="mt-3 text-[11px] text-amber-400 font-medium">Inspeksi Vendor & Tamu Vendor</p>
+                    <div
+                        onClick={() => setShowModal(true)}
+                        className="p-4 rounded-xl border border-dashed border-sky-500/50 bg-sky-950/20 hover:bg-sky-900/30 text-sky-400 cursor-pointer transition flex items-center gap-3"
+                    >
+                        <span className="text-xl">➕</span>
+                        <div>
+                            <div className="text-xs font-bold">Catat Dokumen Baru</div>
+                            <div className="text-[10px] text-slate-400">Surat Jalan, Memo, atau SIMP</div>
                         </div>
                     </div>
 
-                    {/* Tabel Dokumen & Surat Jalan Terbaru */}
+                    <div className="p-4 rounded-xl border border-[#16273c] bg-[#0a1625] text-slate-400 space-y-2">
+                        <span className="text-xs font-bold text-white uppercase tracking-wider block">Status Berkas</span>
+                        <div className="text-[11px] flex justify-between">
+                            <span>Total Terarsip</span>
+                            <span className="text-slate-200">{documents.length} berkas</span>
+                        </div>
+                        <div className="text-[11px] flex justify-between">
+                            <span>Portal Terhubung</span>
+                            <span className="text-emerald-400 font-semibold">Aktif</span>
+                        </div>
+                    </div>
+                </aside>
+
+                {/* Kolom Kanan: Tabel Log Dokumen */}
+                <main className="lg:col-span-9 space-y-6">
                     <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
-                        <div className="flex justify-between items-center mb-3">
+                        <div className="flex justify-between items-center mb-4">
                             <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider">
-                                Log Surat & Dokumen Masuk Terakhir
+                                Log Surat & Berkas Masuk Lapangan
                             </h3>
-                            <button className="bg-sky-600 hover:bg-sky-500 text-white text-[11px] font-bold px-3 py-1.5 rounded-lg transition">
-                                + Catat Dokumen Baru
+                            <button
+                                onClick={() => setShowModal(true)}
+                                className="bg-sky-500 hover:bg-sky-600 text-slate-950 font-bold text-xs px-3 py-1.5 rounded-lg transition"
+                            >
+                                + Dokumen Baru
                             </button>
                         </div>
+
                         <div className="overflow-x-auto">
                             <table className="w-full text-left text-xs">
                                 <thead>
                                     <tr className="border-b border-[#1b2e46] text-slate-400">
                                         <th className="pb-2">No. Agenda</th>
-                                        <th className="pb-2">Perihal / Dokumen</th>
-                                        <th className="pb-2">Pengirim / Divisi</th>
-                                        <th className="pb-2">Tanggal</th>
+                                        <th className="pb-2">Perihal / Berkas</th>
+                                        <th className="pb-2">Pengirim / Pihak Luar</th>
+                                        <th className="pb-2">Kategori</th>
                                         <th className="pb-2">Status</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-[#16273c] text-slate-300">
-                                    <tr>
-                                        <td className="py-2.5 font-mono text-[11px]">ADM/2026/09/012</td>
-                                        <td className="font-semibold text-white">Surat Jalan Pengiriman Solar 16.000L</td>
-                                        <td>PT Solar Pasifik</td>
-                                        <td>Hari ini, 04:15</td>
-                                        <td><span className="text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800/40 text-[10px]">Tervalidasi</span></td>
-                                    </tr>
-                                    <tr>
-                                        <td className="py-2.5 font-mono text-[11px]">ADM/2026/09/011</td>
-                                        <td className="font-semibold text-white">Permohonan Izin Masuk Pit (SIMP Site)</td>
-                                        <td>PT United Tractors</td>
-                                        <td>Kemarin</td>
-                                        <td><span className="text-amber-400 bg-amber-950/60 px-2 py-0.5 rounded border border-amber-800/40 text-[10px]">Diproses K3</span></td>
-                                    </tr>
-                                    <tr>
-                                        <td className="py-2.5 font-mono text-[11px]">ADM/2026/09/010</td>
-                                        <td className="font-semibold text-white">Purchase Request Sparepart Filter HD</td>
-                                        <td>Divisi Maintenance Unit</td>
-                                        <td>07 Sep 2026</td>
-                                        <td><span className="text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800/40 text-[10px]">Diarsipkan</span></td>
-                                    </tr>
+                                    {documents.map((doc) => (
+                                        <tr key={doc.id}>
+                                            <td className="py-2.5 font-mono text-[11px] text-sky-400">{doc.agenda_no}</td>
+                                            <td className="font-semibold text-white">{doc.title}</td>
+                                            <td className="text-slate-400">{doc.sender}</td>
+                                            <td>
+                                                <span className="bg-[#112233] border border-[#1e3a5f] text-slate-300 text-[10px] px-2 py-0.5 rounded">
+                                                    {doc.category}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <span className="text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800/40 text-[10px]">
+                                                    {doc.status}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    ))}
                                 </tbody>
                             </table>
                         </div>
                     </div>
                 </main>
             </div>
+
+            {/* Modal Input Dokumen */}
+            {showModal && (
+                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+                    <div className="bg-[#0a1625] border border-[#1b2e46] rounded-xl p-6 w-full max-w-md shadow-2xl space-y-4">
+                        <h2 className="text-sm font-bold text-white uppercase tracking-wider">Catat Dokumen / Surat Masuk</h2>
+                        <form onSubmit={handleAddDocument} className="space-y-3">
+                            <div>
+                                <label className="text-[11px] text-slate-400 block mb-1">Nomor Agenda (Opsional)</label>
+                                <input
+                                    type="text"
+                                    value={agendaNo}
+                                    onChange={(e) => setAgendaNo(e.target.value)}
+                                    placeholder="Otomatis jika kosong"
+                                    className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-sky-400 font-mono"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[11px] text-slate-400 block mb-1">Perihal Dokumen / Surat</label>
+                                <input
+                                    type="text"
+                                    required
+                                    value={title}
+                                    onChange={(e) => setTitle(e.target.value)}
+                                    placeholder="Contoh: Surat Jalan Batubara Ritase 4"
+                                    className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-sky-400"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[11px] text-slate-400 block mb-1">Pengirim / Vendor / Divisi</label>
+                                <input
+                                    type="text"
+                                    required
+                                    value={sender}
+                                    onChange={(e) => setSender(e.target.value)}
+                                    placeholder="Contoh: PT Surya Jaya Transport"
+                                    className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-sky-400"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[11px] text-slate-400 block mb-1">Kategori Dokumen</label>
+                                <select
+                                    value={category}
+                                    onChange={(e) => setCategory(e.target.value)}
+                                    className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-sky-400"
+                                >
+                                    <option value="Surat Jalan">Surat Jalan (Delivery Order)</option>
+                                    <option value="SIMP">Izin Masuk Site (SIMP)</option>
+                                    <option value="Surat Dinas">Surat Masuk / Memo Internal</option>
+                                    <option value="PO & Invoice">PO & Administrasi Vendor</option>
+                                </select>
+                            </div>
+
+                            <div className="flex justify-end gap-2 pt-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowModal(false)}
+                                    className="px-4 py-2 rounded-lg border border-[#1b2e46] text-slate-400 hover:text-white text-xs transition"
+                                >
+                                    Batal
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={submitting}
+                                    className="px-4 py-2 rounded-lg bg-sky-500 hover:bg-sky-600 text-slate-950 font-bold text-xs transition"
+                                >
+                                    {submitting ? 'Menyimpan...' : 'Simpan Berkas'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }
