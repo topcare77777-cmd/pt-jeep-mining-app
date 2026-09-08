@@ -19,7 +19,6 @@ export default function ManagementDispatcher() {
     useEffect(() => {
         async function checkUserRole() {
             try {
-                // 1. Ambil token lintas domain dari URL hash jika ada
                 if (typeof window !== 'undefined' && window.location.hash.includes('access_token')) {
                     const hashParams = new URLSearchParams(window.location.hash.replace('#', '?'))
                     const accessToken = hashParams.get('access_token')
@@ -34,7 +33,6 @@ export default function ManagementDispatcher() {
                     }
                 }
 
-                // 2. Periksa sesi Supabase
                 const { data: { session } } = await supabase.auth.getSession()
 
                 if (!session) {
@@ -44,7 +42,6 @@ export default function ManagementDispatcher() {
 
                 setStatusText('Mengecek profil divisi...')
 
-                // 3. Ambil data profil berdasarkan UID
                 const { data: profile, error } = await supabase
                     .from('profiles')
                     .select('role, status')
@@ -66,8 +63,12 @@ export default function ManagementDispatcher() {
 
                 const role = (profile.role || '').toLowerCase()
 
-                // 4. Pengalihan cerdas sesuai divisi
-                if (role.includes('finance') || role.includes('keuangan')) {
+                // Perutean Lengkap Seluruh Divisi
+                if (role.includes('direktur') || role.includes('director') || role.includes('ceo')) {
+                    router.replace('/direktur')
+                } else if (role.includes('manager site') || role.includes('site manager') || role.includes('ktt') || role.includes('project manager')) {
+                    router.replace('/manager-site')
+                } else if (role.includes('finance') || role.includes('keuangan')) {
                     router.replace('/finance')
                 } else if (role.includes('hrd') || role.includes('human resources') || role.includes('personalia')) {
                     router.replace('/hrd')
@@ -110,7 +111,7 @@ export default function ManagementDispatcher() {
                         await supabase.auth.signOut()
                         window.location.href = landingUrl
                     }}
-                    className="w-full bg-rose-950/60 hover:bg-rose-900 border border-rose-800/50 text-rose-300 text-xs py-2.5 rounded-lg transition font-semibold"
+                    className="w-full bg-rose-950/60 hover:bg-rose-900 border border-rose-800/50 text-rose-300 text-xs py-2.5 rounded-lg transition font-semibold cursor-pointer"
                 >
                     Keluar ke Beranda
                 </button>
