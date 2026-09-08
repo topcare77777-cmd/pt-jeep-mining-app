@@ -3,11 +3,6 @@
 import { useState } from 'react'
 import { createClient } from '@supabase/supabase-js'
 
-// Inisialisasi klien Supabase mandiri yang aman untuk build Vercel
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-const supabase = createClient(supabaseUrl, supabaseAnonKey)
-
 export default function LandingPage() {
     const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
     const [email, setEmail] = useState('')
@@ -15,7 +10,6 @@ export default function LandingPage() {
     const [isLoading, setIsLoading] = useState(false)
     const [errorMessage, setErrorMessage] = useState('')
 
-    // URL dinamis berbasis Environment Variable dengan fallback
     const adminUrl = process.env.NEXT_PUBLIC_ADMIN_URL || 'https://admin-pied-pi-57.vercel.app'
     const managementUrl = process.env.NEXT_PUBLIC_MANAGEMENT_URL || 'https://pt-jeep-management.vercel.app'
 
@@ -25,7 +19,15 @@ export default function LandingPage() {
         setErrorMessage('')
 
         try {
-            // Autentikasi langsung ke Supabase
+            const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+            const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+
+            if (!supabaseUrl || !supabaseAnonKey) {
+                throw new Error('Konfigurasi Supabase belum lengkap di sistem.')
+            }
+
+            const supabase = createClient(supabaseUrl, supabaseAnonKey)
+
             const { data, error } = await supabase.auth.signInWithPassword({
                 email,
                 password,
@@ -37,7 +39,6 @@ export default function LandingPage() {
                 return
             }
 
-            // Oper sesi cross-domain menggunakan URL hash
             if (data.session) {
                 const { access_token, refresh_token } = data.session
                 window.location.href = `${managementUrl}#access_token=${access_token}&refresh_token=${refresh_token}`
@@ -129,7 +130,7 @@ export default function LandingPage() {
                 <p>&copy; 2026 PT. Jangkar Energi Eka Perkasa Operasi Tambang. Hak Cipta Dilindungi Undang-Undang.</p>
             </footer>
 
-            {/* Overlay Modal Login Lapangan */}
+            {/* Modal Login Lapangan */}
             {isLoginModalOpen && (
                 <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                     <div className="bg-slate-950 border border-slate-800 rounded-2xl w-full max-w-sm p-8 shadow-2xl relative overflow-hidden">
@@ -202,7 +203,6 @@ export default function LandingPage() {
                     </div>
                 </div>
             )}
-
         </div>
     )
 }
