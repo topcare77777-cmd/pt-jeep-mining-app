@@ -262,8 +262,10 @@ export default function SuperAdminConsole() {
     }
 
     // Handler Keluar (Logout)
-    const handleLogout = () => {
-        window.location.href = 'http://localhost:3003'
+    const handleLogout = async () => {
+        await supabase.auth.signOut()
+        const landingUrl = process.env.NEXT_PUBLIC_LANDING_URL || 'https://pt-jeep.vercel.app'
+        window.location.href = landingUrl
     }
 
     return (
@@ -300,7 +302,7 @@ export default function SuperAdminConsole() {
                     </div>
                     <button
                         onClick={handleLogout}
-                        className="w-full flex items-center justify-center space-x-2 bg-rose-950/30 hover:bg-rose-900/50 text-rose-400 border border-rose-900/50 py-2 rounded-md text-sm transition font-medium"
+                        className="w-full flex items-center justify-center space-x-2 bg-rose-950/30 hover:bg-rose-900/50 text-rose-400 border border-rose-900/50 py-2 rounded-md text-sm transition font-medium cursor-pointer"
                     >
                         <span>🚪</span> <span>Keluar</span>
                     </button>
@@ -318,7 +320,7 @@ export default function SuperAdminConsole() {
                             </div>
                             <button
                                 onClick={() => setIsModalOpen(true)}
-                                className="bg-amber-500 hover:bg-amber-600 text-black font-bold px-4 py-2 rounded text-sm transition"
+                                className="bg-amber-500 hover:bg-amber-600 text-black font-bold px-4 py-2 rounded text-sm transition cursor-pointer"
                             >
                                 + Buat Pengguna Baru
                             </button>
@@ -357,7 +359,7 @@ export default function SuperAdminConsole() {
                                                     <td className="p-4">
                                                         <button
                                                             onClick={() => handleToggleStatus(u.id, u.status)}
-                                                            className={`flex items-center space-x-2 text-xs px-2.5 py-1 rounded-full border transition ${u.status === 'Aktif'
+                                                            className={`flex items-center space-x-2 text-xs px-2.5 py-1 rounded-full border transition cursor-pointer ${u.status === 'Aktif'
                                                                 ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20'
                                                                 : 'bg-rose-500/10 border-rose-500/30 text-rose-400 hover:bg-rose-500/20'
                                                                 }`}
@@ -370,13 +372,13 @@ export default function SuperAdminConsole() {
                                                     <td className="p-4 text-right space-x-2">
                                                         <button
                                                             onClick={() => openEditUserModal(u)}
-                                                            className="text-slate-300 hover:text-white transition text-xs bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 px-2.5 py-1 rounded"
+                                                            className="text-slate-300 hover:text-white transition text-xs bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 px-2.5 py-1 rounded cursor-pointer"
                                                         >
                                                             Edit
                                                         </button>
                                                         <button
                                                             onClick={() => handleDeleteUser(u.id, u.email)}
-                                                            className="text-rose-500 hover:text-rose-400 transition text-xs bg-rose-950/30 border border-rose-900/50 px-2.5 py-1 rounded"
+                                                            className="text-rose-500 hover:text-rose-400 transition text-xs bg-rose-950/30 border border-rose-900/50 px-2.5 py-1 rounded cursor-pointer"
                                                         >
                                                             Hapus
                                                         </button>
@@ -439,7 +441,7 @@ export default function SuperAdminConsole() {
                                         </select>
                                         <button
                                             type="submit"
-                                            className="bg-amber-500 hover:bg-amber-600 text-black px-4 py-2 rounded text-sm font-bold transition whitespace-nowrap"
+                                            className="bg-amber-500 hover:bg-amber-600 text-black px-4 py-2 rounded text-sm font-bold transition whitespace-nowrap cursor-pointer"
                                         >
                                             Simpan
                                         </button>
@@ -481,13 +483,13 @@ export default function SuperAdminConsole() {
                                                 <td className="py-4 px-6 text-right space-x-2">
                                                     <button
                                                         onClick={() => openEditRoleModal(r)}
-                                                        className="text-slate-300 hover:text-white transition text-xs bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 px-2.5 py-1 rounded"
+                                                        className="text-slate-300 hover:text-white transition text-xs bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 px-2.5 py-1 rounded cursor-pointer"
                                                     >
                                                         Edit
                                                     </button>
                                                     <button
                                                         onClick={() => handleDeleteRole(r.id)}
-                                                        className="text-rose-500 hover:text-rose-400 text-xs font-medium transition px-2.5 py-1 bg-rose-950/30 rounded border border-rose-900/30"
+                                                        className="text-rose-500 hover:text-rose-400 text-xs font-medium transition px-2.5 py-1 bg-rose-950/30 rounded border border-rose-900/30 cursor-pointer"
                                                     >
                                                         Hapus
                                                     </button>
@@ -583,14 +585,14 @@ export default function SuperAdminConsole() {
                                 <button
                                     type="button"
                                     onClick={() => setIsModalOpen(false)}
-                                    className="flex-1 bg-[#222] hover:bg-[#333] border border-[#444] text-white py-2.5 rounded text-sm transition font-medium"
+                                    className="flex-1 bg-[#222] hover:bg-[#333] border border-[#444] text-white py-2.5 rounded text-sm transition font-medium cursor-pointer"
                                 >
                                     Batal
                                 </button>
                                 <button
                                     type="submit"
                                     disabled={isSubmitting}
-                                    className="flex-1 bg-amber-500 hover:bg-amber-600 text-black py-2.5 rounded text-sm transition font-bold flex justify-center items-center"
+                                    className="flex-1 bg-amber-500 hover:bg-amber-600 text-black py-2.5 rounded text-sm transition font-bold flex justify-center items-center cursor-pointer"
                                 >
                                     {isSubmitting ? (
                                         <span className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"></span>
@@ -654,13 +656,13 @@ export default function SuperAdminConsole() {
                                 <button
                                     type="button"
                                     onClick={() => setIsEditUserModalOpen(false)}
-                                    className="flex-1 bg-[#222] hover:bg-[#333] border border-[#444] text-white py-2.5 rounded text-sm transition font-medium"
+                                    className="flex-1 bg-[#222] hover:bg-[#333] border border-[#444] text-white py-2.5 rounded text-sm transition font-medium cursor-pointer"
                                 >
                                     Batal
                                 </button>
                                 <button
                                     type="submit"
-                                    className="flex-1 bg-amber-500 hover:bg-amber-600 text-black py-2.5 rounded text-sm transition font-bold"
+                                    className="flex-1 bg-amber-500 hover:bg-amber-600 text-black py-2.5 rounded text-sm transition font-bold cursor-pointer"
                                 >
                                     Simpan Perubahan
                                 </button>
@@ -714,13 +716,13 @@ export default function SuperAdminConsole() {
                                 <button
                                     type="button"
                                     onClick={() => setIsEditRoleModalOpen(false)}
-                                    className="flex-1 bg-[#222] hover:bg-[#333] border border-[#444] text-white py-2.5 rounded text-sm transition font-medium"
+                                    className="flex-1 bg-[#222] hover:bg-[#333] border border-[#444] text-white py-2.5 rounded text-sm transition font-medium cursor-pointer"
                                 >
                                     Batal
                                 </button>
                                 <button
                                     type="submit"
-                                    className="flex-1 bg-amber-500 hover:bg-amber-600 text-black py-2.5 rounded text-sm transition font-bold"
+                                    className="flex-1 bg-amber-500 hover:bg-amber-600 text-black py-2.5 rounded text-sm transition font-bold cursor-pointer"
                                 >
                                     Simpan Perubahan
                                 </button>
