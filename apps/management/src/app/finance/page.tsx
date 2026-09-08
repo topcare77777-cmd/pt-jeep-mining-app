@@ -2,7 +2,12 @@
 
 import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '../../lib/supabase'
+import { createClient } from '@supabase/supabase-js'
+
+// Inisialisasi Supabase mandiri yang aman untuk build Vercel
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 export default function FinanceDashboard() {
     const router = useRouter()
@@ -14,11 +19,20 @@ export default function FinanceDashboard() {
 
     useEffect(() => {
         async function getUser() {
-            const { data: { user } } = await supabase.auth.getUser()
-            if (user) {
-                const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single()
-                setCurrentUser(profile || { full_name: 'Divisi Finance', role: 'Finance' })
-            } else {
+            try {
+                const { data: { user } } = await supabase.auth.getUser()
+                if (user) {
+                    const { data: profile } = await supabase
+                        .from('profiles')
+                        .select('*')
+                        .eq('id', user.id)
+                        .single()
+                    setCurrentUser(profile || { full_name: 'Divisi Finance', role: 'Finance' })
+                } else {
+                    setCurrentUser({ full_name: 'Officer Finance', role: 'Finance & Accounting' })
+                }
+            } catch (err) {
+                console.error(err)
                 setCurrentUser({ full_name: 'Officer Finance', role: 'Finance & Accounting' })
             }
         }
@@ -58,8 +72,8 @@ export default function FinanceDashboard() {
                         <button
                             onClick={() => setActiveTab('ringkasan')}
                             className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-lg font-medium transition text-left ${activeTab === 'ringkasan'
-                                    ? 'bg-amber-500 text-slate-950 font-bold shadow-lg shadow-amber-500/20'
-                                    : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'
+                                ? 'bg-amber-500 text-slate-950 font-bold shadow-lg shadow-amber-500/20'
+                                : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'
                                 }`}
                         >
                             <span className="text-base">📊</span>
@@ -69,8 +83,8 @@ export default function FinanceDashboard() {
                         <button
                             onClick={() => setActiveTab('anggaran')}
                             className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg font-medium transition text-left ${activeTab === 'anggaran'
-                                    ? 'bg-amber-500 text-slate-950 font-bold shadow-lg shadow-amber-500/20'
-                                    : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'
+                                ? 'bg-amber-500 text-slate-950 font-bold shadow-lg shadow-amber-500/20'
+                                : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'
                                 }`}
                         >
                             <span className="text-base">📉</span>
@@ -80,8 +94,8 @@ export default function FinanceDashboard() {
                         <button
                             onClick={() => setActiveTab('bbm')}
                             className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg font-medium transition text-left ${activeTab === 'bbm'
-                                    ? 'bg-amber-500 text-slate-950 font-bold shadow-lg shadow-amber-500/20'
-                                    : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'
+                                ? 'bg-amber-500 text-slate-950 font-bold shadow-lg shadow-amber-500/20'
+                                : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'
                                 }`}
                         >
                             <span className="text-base">⛽</span>
@@ -91,8 +105,8 @@ export default function FinanceDashboard() {
                         <button
                             onClick={() => setActiveTab('vendor')}
                             className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg font-medium transition text-left ${activeTab === 'vendor'
-                                    ? 'bg-amber-500 text-slate-950 font-bold shadow-lg shadow-amber-500/20'
-                                    : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'
+                                ? 'bg-amber-500 text-slate-950 font-bold shadow-lg shadow-amber-500/20'
+                                : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'
                                 }`}
                         >
                             <span className="text-base">💵</span>
@@ -102,8 +116,8 @@ export default function FinanceDashboard() {
                         <button
                             onClick={() => setActiveTab('pnl')}
                             className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg font-medium transition text-left ${activeTab === 'pnl'
-                                    ? 'bg-amber-500 text-slate-950 font-bold shadow-lg shadow-amber-500/20'
-                                    : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'
+                                ? 'bg-amber-500 text-slate-950 font-bold shadow-lg shadow-amber-500/20'
+                                : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'
                                 }`}
                         >
                             <span className="text-base">📈</span>
@@ -113,8 +127,8 @@ export default function FinanceDashboard() {
                         <button
                             onClick={() => setActiveTab('pajak')}
                             className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg font-medium transition text-left ${activeTab === 'pajak'
-                                    ? 'bg-amber-500 text-slate-950 font-bold shadow-lg shadow-amber-500/20'
-                                    : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'
+                                ? 'bg-amber-500 text-slate-950 font-bold shadow-lg shadow-amber-500/20'
+                                : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'
                                 }`}
                         >
                             <div className="flex items-center gap-3">
@@ -127,8 +141,8 @@ export default function FinanceDashboard() {
                         <button
                             onClick={() => setActiveTab('sewa')}
                             className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg font-medium transition text-left ${activeTab === 'sewa'
-                                    ? 'bg-amber-500 text-slate-950 font-bold shadow-lg shadow-amber-500/20'
-                                    : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'
+                                ? 'bg-amber-500 text-slate-950 font-bold shadow-lg shadow-amber-500/20'
+                                : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'
                                 }`}
                         >
                             <div className="flex items-center gap-3">
@@ -149,7 +163,7 @@ export default function FinanceDashboard() {
                     <button
                         onClick={handleLogout}
                         disabled={isLoggingOut}
-                        className="w-full flex items-center justify-center gap-2 bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/40 text-rose-300 py-2 rounded-lg text-xs font-semibold transition"
+                        className="w-full flex items-center justify-center gap-2 bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/40 text-rose-300 py-2 rounded-lg text-xs font-semibold transition cursor-pointer"
                     >
                         🚪 {isLoggingOut ? 'Keluar...' : 'Keluar ke Beranda'}
                     </button>
@@ -176,9 +190,9 @@ export default function FinanceDashboard() {
                             <button
                                 key={tab}
                                 onClick={() => setActiveTab(tab)}
-                                className={`px-3 py-1.5 rounded font-bold uppercase transition text-[11px] ${activeTab === tab
-                                        ? 'bg-amber-500 text-slate-950'
-                                        : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                                className={`px-3 py-1.5 rounded font-bold uppercase transition text-[11px] cursor-pointer ${activeTab === tab
+                                    ? 'bg-amber-500 text-slate-950'
+                                    : 'text-slate-400 hover:text-white hover:bg-slate-800'
                                     }`}
                             >
                                 {tab === 'pnl' ? 'P&L' : tab}
@@ -303,7 +317,7 @@ export default function FinanceDashboard() {
 
                             <button
                                 onClick={() => setActiveTab('pajak')}
-                                className="w-full mt-4 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-2 rounded-lg text-xs transition"
+                                className="w-full mt-4 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-2 rounded-lg text-xs transition cursor-pointer"
                             >
                                 Buat Laporan Pajak Baru
                             </button>
@@ -378,7 +392,7 @@ export default function FinanceDashboard() {
                             <div>
                                 <div className="flex justify-between items-center mb-3">
                                     <h3 className="text-sm font-bold text-white">Pembayaran Vendor</h3>
-                                    <button className="text-[11px] text-amber-400 hover:underline">Lihat Semua</button>
+                                    <button className="text-[11px] text-amber-400 hover:underline cursor-pointer">Lihat Semua</button>
                                 </div>
 
                                 <div className="overflow-x-auto">
@@ -467,7 +481,7 @@ export default function FinanceDashboard() {
 
                             <div className="p-3 bg-slate-950/60 rounded border border-slate-800/80 text-[11px] text-slate-400 flex justify-between items-center">
                                 <span>Status Audit Internal: <strong className="text-white">Lolos Kualifikasi Kuartal II</strong></span>
-                                <button className="text-amber-400 hover:underline">Unduh Laporan P&L (.PDF)</button>
+                                <button className="text-amber-400 hover:underline cursor-pointer">Unduh Laporan P&L (.PDF)</button>
                             </div>
                         </section>
 
@@ -478,7 +492,7 @@ export default function FinanceDashboard() {
                                     <h3 className="text-sm font-bold text-white tracking-wide">Manajemen Sewa Alat Berat</h3>
                                     <p className="text-[11px] text-slate-400">Monitoring billing unit excavator, dozer & hauler</p>
                                 </div>
-                                <button className="text-xs bg-slate-800 hover:bg-slate-700 text-white px-2.5 py-1 rounded transition">
+                                <button className="text-xs bg-slate-800 hover:bg-slate-700 text-white px-2.5 py-1 rounded transition cursor-pointer">
                                     + Tambah Kontrak
                                 </button>
                             </div>
