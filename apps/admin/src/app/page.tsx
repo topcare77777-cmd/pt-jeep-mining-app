@@ -19,6 +19,13 @@ export default function SuperAdminConsole() {
     const [role, setRole] = useState('')
     const [isSubmitting, setIsSubmitting] = useState(false)
 
+    // State untuk Modal Edit Pengguna
+    const [isEditUserModalOpen, setIsEditUserModalOpen] = useState(false)
+    const [editUserId, setEditUserId] = useState('')
+    const [editFullName, setEditFullName] = useState('')
+    const [editUsername, setEditUsername] = useState('')
+    const [editRole, setEditRole] = useState('')
+
     // State tambahan untuk modul Divisi & Jabatan (Terintegrasi HRD/Keuangan/Payroll)
     const [roles, setRoles] = useState<any[]>([
         { id: '1', division: 'Administrator', position: 'Super Administrator', access_level: 'Full' },
@@ -29,6 +36,13 @@ export default function SuperAdminConsole() {
     const [divisionName, setDivisionName] = useState('')
     const [positionName, setPositionName] = useState('')
     const [accessLevel, setAccessLevel] = useState('Standard')
+
+    // State untuk Modal Edit Divisi & Jabatan
+    const [isEditRoleModalOpen, setIsEditRoleModalOpen] = useState(false)
+    const [editRoleId, setEditRoleId] = useState('')
+    const [editDivisionName, setEditDivisionName] = useState('')
+    const [editPositionName, setEditPositionName] = useState('')
+    const [editAccessLevel, setEditAccessLevel] = useState('Standard')
 
     // Ambil data pengguna asli dari Supabase saat halaman dimuat
     useEffect(() => {
@@ -69,7 +83,6 @@ export default function SuperAdminConsole() {
         setIsSubmitting(true)
 
         try {
-            // 1. Daftarkan akun ke Supabase Auth agar bisa login
             const { data: authData, error: authError } = await supabase.auth.signUp({
                 email,
                 password,
@@ -80,7 +93,6 @@ export default function SuperAdminConsole() {
             const userId = authData.user?.id
 
             if (userId) {
-                // 2. Simpan detail profil tambahan ke tabel 'profiles'
                 const { error: profileError } = await supabase
                     .from('profiles')
                     .insert([
@@ -100,15 +112,12 @@ export default function SuperAdminConsole() {
             alert('Pengguna baru berhasil didaftarkan ke sistem Supabase!')
             setIsModalOpen(false)
 
-            // Reset form
             setFullName('')
             setUsername('')
             setEmail('')
             setPassword('')
 
-            // Muat ulang daftar pengguna
             fetchUsers()
-
         } catch (error: any) {
             alert('Terjadi kesalahan: ' + error.message)
         } finally {
@@ -116,7 +125,66 @@ export default function SuperAdminConsole() {
         }
     }
 
-    // Handler Tambah Divisi & Jabatan Baru (Terhubung HRD/Payroll/Keuangan)
+    // Handler Buka Modal Edit Pengguna
+    const openEditUserModal = (u: any) => {
+        setEditUserId(u.id)
+        setEditFullName(u.full_name || '')
+        setEditUsername(u.username || '')
+        setEditRole(u.role || '')
+        setIsEditUserModalOpen(true)
+    }
+
+    // Handler Update Pengguna
+    const handleUpdateUser = async (e: React.FormEvent) => {
+        e.preventDefault()
+        const { error } = await supabase
+            .from('profiles')
+            .update({
+                full_name: editFullName,
+                username: editUsername,
+                role: editRole,
+            })
+            .eq('id', editUserId)
+
+        if (error) {
+            alert('Gagal memperbarui pengguna: ' + error.message)
+        } else {
+            alert('Data pengguna berhasil diperbarui!')
+            setIsEditUserModalOpen(false)
+            fetchUsers()
+        }
+    }
+
+    // Handler Hapus Pengguna
+    const handleDeleteUser = async (id: string, emailUser: string) => {
+        if (!confirm(`Yakin ingin menghapus pengguna ${emailUser} dari database?`)) return
+
+        const { error } = await supabase.from('profiles').delete().eq('id', id)
+        if (error) {
+            alert('Gagal menghapus pengguna: ' + error.message)
+        } else {
+            alert('Pengguna berhasil dihapus.')
+            fetchUsers()
+        }
+    }
+
+    // Handler Ubah Status Aktif / Non-Aktif
+    const handleToggleStatus = async (id: string, currentStatus: string) => {
+        const newStatus = currentStatus === 'Aktif' ? 'Non-Aktif' : 'Aktif'
+
+        const { error } = await supabase
+            .from('profiles')
+            .update({ status: newStatus })
+            .eq('id', id)
+
+        if (error) {
+            alert('Gagal mengubah status: ' + error.message)
+        } else {
+            fetchUsers()
+        }
+    }
+
+    // Handler Tambah Divisi & Jabatan Baru
     const handleAddRole = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!divisionName) return
@@ -125,13 +193,13 @@ export default function SuperAdminConsole() {
             id: Date.now().toString(),
             division: divisionName,
             position: positionName || 'Staff Umum',
-            access_level: accessLevel
+            access_level: accessLevel,
         }
 
         const { error } = await supabase.from('roles').insert([{
             division: divisionName,
             position: positionName,
-            access_level: accessLevel
+            access_level: accessLevel,
         }])
 
         if (error) {
@@ -147,12 +215,47 @@ export default function SuperAdminConsole() {
         setAccessLevel('Standard')
     }
 
+    // Handler Buka Modal Edit Divisi
+    const openEditRoleModal = (r: any) => {
+        setEditRoleId(r.id)
+        setEditDivisionName(r.division || r.name || '')
+        setEditPositionName(r.position || r.description || '')
+        setEditAccessLevel(r.access_level || 'Standard')
+        setIsEditRoleModalOpen(true)
+    }
+
+    // Handler Update Divisi & Jabatan
+    const handleUpdateRole = async (e: React.FormEvent) => {
+        e.preventDefault()
+        const { error } = await supabase
+            .from('roles')
+            .update({
+                division: editDivisionName,
+                position: editPositionName,
+                access_level: editAccessLevel,
+            })
+            .eq('id', editRoleId)
+
+        if (error) {
+            setRoles(roles.map((item) => (
+                item.id === editRoleId
+                    ? { ...item, division: editDivisionName, position: editPositionName, access_level: editAccessLevel }
+                    : item
+            )))
+            alert('Data diperbarui secara lokal.')
+        } else {
+            alert('Data Divisi & Jabatan berhasil diperbarui di database!')
+            fetchRoles()
+        }
+        setIsEditRoleModalOpen(false)
+    }
+
     // Handler Hapus Divisi/Jabatan
     const handleDeleteRole = async (id: string) => {
         if (!confirm('Yakin ingin menghapus data ini?')) return
         const { error } = await supabase.from('roles').delete().eq('id', id)
         if (error) {
-            setRoles(roles.filter(r => r.id !== id))
+            setRoles(roles.filter((r) => r.id !== id))
         } else {
             fetchRoles()
         }
@@ -252,14 +355,31 @@ export default function SuperAdminConsole() {
                                                         <span className="bg-[#222] border border-[#444] px-2 py-1 rounded text-xs text-amber-400">{u.role}</span>
                                                     </td>
                                                     <td className="p-4">
-                                                        <span className={`flex items-center space-x-2 text-xs ${u.status === 'Aktif' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                                        <button
+                                                            onClick={() => handleToggleStatus(u.id, u.status)}
+                                                            className={`flex items-center space-x-2 text-xs px-2.5 py-1 rounded-full border transition ${u.status === 'Aktif'
+                                                                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20'
+                                                                : 'bg-rose-500/10 border-rose-500/30 text-rose-400 hover:bg-rose-500/20'
+                                                                }`}
+                                                            title="Klik untuk mengubah status Aktif / Non-Aktif"
+                                                        >
                                                             <span className={`w-2 h-2 rounded-full ${u.status === 'Aktif' ? 'bg-emerald-400' : 'bg-rose-400'}`}></span>
-                                                            <span>{u.status}</span>
-                                                        </span>
+                                                            <span>{u.status || 'Aktif'}</span>
+                                                        </button>
                                                     </td>
-                                                    <td className="p-4 text-right space-x-3">
-                                                        <button className="text-slate-400 hover:text-white transition">Edit</button>
-                                                        <button className="text-rose-500 hover:text-rose-400 transition">Cabut</button>
+                                                    <td className="p-4 text-right space-x-2">
+                                                        <button
+                                                            onClick={() => openEditUserModal(u)}
+                                                            className="text-slate-300 hover:text-white transition text-xs bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 px-2.5 py-1 rounded"
+                                                        >
+                                                            Edit
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDeleteUser(u.id, u.email)}
+                                                            className="text-rose-500 hover:text-rose-400 transition text-xs bg-rose-950/30 border border-rose-900/50 px-2.5 py-1 rounded"
+                                                        >
+                                                            Hapus
+                                                        </button>
                                                     </td>
                                                 </tr>
                                             ))
@@ -358,10 +478,16 @@ export default function SuperAdminConsole() {
                                                         {r.access_level}
                                                     </span>
                                                 </td>
-                                                <td className="py-4 px-6 text-right">
+                                                <td className="py-4 px-6 text-right space-x-2">
+                                                    <button
+                                                        onClick={() => openEditRoleModal(r)}
+                                                        className="text-slate-300 hover:text-white transition text-xs bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 px-2.5 py-1 rounded"
+                                                    >
+                                                        Edit
+                                                    </button>
                                                     <button
                                                         onClick={() => handleDeleteRole(r.id)}
-                                                        className="text-rose-500 hover:text-rose-400 text-xs font-medium transition px-2 py-1 bg-rose-950/30 rounded border border-rose-900/30"
+                                                        className="text-rose-500 hover:text-rose-400 text-xs font-medium transition px-2.5 py-1 bg-rose-950/30 rounded border border-rose-900/30"
                                                     >
                                                         Hapus
                                                     </button>
@@ -438,7 +564,7 @@ export default function SuperAdminConsole() {
                                     <select
                                         value={role}
                                         onChange={(e) => setRole(e.target.value)}
-                                        className="w-full bg-[#0a0a0a] border border-[#333] rounded p-2.5 text-white text-sm focus:outline-none focus:border-amber-500"
+                                        className="w-full bg-black border border-zinc-700 rounded p-2.5 text-sm text-white focus:outline-none focus:border-amber-500"
                                     >
                                         {roles.map((r) => {
                                             const divName = r.division || r.name
@@ -471,6 +597,132 @@ export default function SuperAdminConsole() {
                                     ) : (
                                         'Simpan ke Database'
                                     )}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Overlay Modal Edit Pengguna */}
+            {isEditUserModalOpen && (
+                <div className="absolute inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-[#111] border border-[#333] rounded-xl w-full max-w-lg p-6 shadow-2xl">
+                        <h3 className="text-xl font-bold text-white mb-4">Edit Data Pengguna</h3>
+
+                        <form onSubmit={handleUpdateUser} className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Nama Lengkap</label>
+                                <input
+                                    type="text"
+                                    required
+                                    value={editFullName}
+                                    onChange={(e) => setEditFullName(e.target.value)}
+                                    className="w-full bg-[#0a0a0a] border border-[#333] rounded p-2.5 text-white text-sm focus:outline-none focus:border-amber-500"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Username</label>
+                                <input
+                                    type="text"
+                                    required
+                                    value={editUsername}
+                                    onChange={(e) => setEditUsername(e.target.value)}
+                                    className="w-full bg-[#0a0a0a] border border-[#333] rounded p-2.5 text-white text-sm focus:outline-none focus:border-amber-500 font-mono"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Divisi / Peran</label>
+                                <select
+                                    value={editRole}
+                                    onChange={(e) => setEditRole(e.target.value)}
+                                    className="w-full bg-black border border-zinc-700 rounded p-2.5 text-sm text-white focus:outline-none focus:border-amber-500"
+                                >
+                                    {roles.map((r) => {
+                                        const divName = r.division || r.name
+                                        const posName = r.position || r.description
+                                        return (
+                                            <option key={r.id} value={divName}>
+                                                {divName} {posName ? `(${posName})` : ''}
+                                            </option>
+                                        )
+                                    })}
+                                </select>
+                            </div>
+
+                            <div className="flex space-x-3 pt-4">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsEditUserModalOpen(false)}
+                                    className="flex-1 bg-[#222] hover:bg-[#333] border border-[#444] text-white py-2.5 rounded text-sm transition font-medium"
+                                >
+                                    Batal
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="flex-1 bg-amber-500 hover:bg-amber-600 text-black py-2.5 rounded text-sm transition font-bold"
+                                >
+                                    Simpan Perubahan
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Overlay Modal Edit Divisi & Jabatan */}
+            {isEditRoleModalOpen && (
+                <div className="absolute inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-[#111] border border-[#333] rounded-xl w-full max-w-lg p-6 shadow-2xl">
+                        <h3 className="text-xl font-bold text-white mb-4">Edit Divisi & Jabatan</h3>
+
+                        <form onSubmit={handleUpdateRole} className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Divisi</label>
+                                <input
+                                    type="text"
+                                    required
+                                    value={editDivisionName}
+                                    onChange={(e) => setEditDivisionName(e.target.value)}
+                                    className="w-full bg-[#0a0a0a] border border-[#333] rounded p-2.5 text-white text-sm focus:outline-none focus:border-amber-500"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Jabatan</label>
+                                <input
+                                    type="text"
+                                    required
+                                    value={editPositionName}
+                                    onChange={(e) => setEditPositionName(e.target.value)}
+                                    className="w-full bg-[#0a0a0a] border border-[#333] rounded p-2.5 text-white text-sm focus:outline-none focus:border-amber-500"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Tingkat Akses Sistem</label>
+                                <select
+                                    value={editAccessLevel}
+                                    onChange={(e) => setEditAccessLevel(e.target.value)}
+                                    className="w-full bg-black border border-zinc-700 rounded p-2.5 text-sm text-white focus:outline-none focus:border-amber-500"
+                                >
+                                    <option value="Full">Full (Penuh)</option>
+                                    <option value="Standard">Standard</option>
+                                    <option value="Read-Only">Read-Only (Baca Saja)</option>
+                                </select>
+                            </div>
+
+                            <div className="flex space-x-3 pt-4">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsEditRoleModalOpen(false)}
+                                    className="flex-1 bg-[#222] hover:bg-[#333] border border-[#444] text-white py-2.5 rounded text-sm transition font-medium"
+                                >
+                                    Batal
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="flex-1 bg-amber-500 hover:bg-amber-600 text-black py-2.5 rounded text-sm transition font-bold"
+                                >
+                                    Simpan Perubahan
                                 </button>
                             </div>
                         </form>
