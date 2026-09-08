@@ -19,7 +19,7 @@ export default function ManagementDispatcher() {
     useEffect(() => {
         async function checkUserRole() {
             try {
-                // 1. Ambil token lintas domain dari URL hash
+                // 1. Ambil token lintas domain dari URL hash jika ada
                 if (typeof window !== 'undefined' && window.location.hash.includes('access_token')) {
                     const hashParams = new URLSearchParams(window.location.hash.replace('#', '?'))
                     const accessToken = hashParams.get('access_token')
@@ -34,7 +34,7 @@ export default function ManagementDispatcher() {
                     }
                 }
 
-                // 2. Periksa status sesi aktif
+                // 2. Periksa status sesi Supabase
                 const { data: { session } } = await supabase.auth.getSession()
 
                 if (!session) {
@@ -44,7 +44,7 @@ export default function ManagementDispatcher() {
 
                 setStatusText('Mengecek profil divisi...')
 
-                // 3. Ambil data peran dan status pengguna
+                // 3. Ambil profil user
                 const { data: profile, error } = await supabase
                     .from('profiles')
                     .select('role, status')
@@ -64,16 +64,16 @@ export default function ManagementDispatcher() {
                     return
                 }
 
-                const role = profile.role?.toLowerCase() || ''
+                const role = (profile.role || '').toLowerCase()
 
-                // 4. Arahkan pengguna sesuai divisi/peran
-                if (role === 'finance') {
+                // 4. Pencocokan fleksibel untuk semua format penamaan divisi
+                if (role.includes('finance') || role.includes('keuangan')) {
                     router.replace('/finance')
-                } else if (role === 'hrd') {
+                } else if (role.includes('hrd') || role.includes('human resources') || role.includes('personalia')) {
                     router.replace('/hrd')
-                } else if (role === 'ga' || role === 'umum' || role === 'general affair') {
+                } else if (role.includes('ga') || role.includes('umum') || role.includes('general affair')) {
                     router.replace('/ga')
-                } else if (role === 'developer' || role === 'superadmin' || role === 'divadmin') {
+                } else if (role.includes('developer') || role.includes('admin')) {
                     window.location.href = adminUrl
                 } else {
                     setStatusText(`Role [${profile.role}] belum memiliki dashboard khusus.`)
