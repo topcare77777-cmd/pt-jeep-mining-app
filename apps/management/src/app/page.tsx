@@ -34,7 +34,7 @@ export default function ManagementDispatcher() {
                     }
                 }
 
-                // 2. Periksa status sesi Supabase
+                // 2. Periksa sesi Supabase
                 const { data: { session } } = await supabase.auth.getSession()
 
                 if (!session) {
@@ -44,7 +44,7 @@ export default function ManagementDispatcher() {
 
                 setStatusText('Mengecek profil divisi...')
 
-                // 3. Ambil profil user
+                // 3. Ambil data profil berdasarkan UID
                 const { data: profile, error } = await supabase
                     .from('profiles')
                     .select('role, status')
@@ -66,14 +66,16 @@ export default function ManagementDispatcher() {
 
                 const role = (profile.role || '').toLowerCase()
 
-                // 4. Pencocokan fleksibel untuk semua format penamaan divisi
+                // 4. Pengalihan cerdas sesuai divisi
                 if (role.includes('finance') || role.includes('keuangan')) {
                     router.replace('/finance')
                 } else if (role.includes('hrd') || role.includes('human resources') || role.includes('personalia')) {
                     router.replace('/hrd')
                 } else if (role.includes('ga') || role.includes('umum') || role.includes('general affair')) {
                     router.replace('/ga')
-                } else if (role.includes('developer') || role.includes('admin')) {
+                } else if (role === 'adm' || role.includes('administrasi') || role.includes('admin site')) {
+                    router.replace('/adm')
+                } else if (role.includes('developer') || role.includes('superadmin') || role === 'divadmin') {
                     window.location.href = adminUrl
                 } else {
                     setStatusText(`Role [${profile.role}] belum memiliki dashboard khusus.`)
