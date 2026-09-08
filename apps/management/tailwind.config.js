@@ -6,17 +6,7 @@ module.exports = {
         './src/components/**/*.{js,ts,jsx,tsx,mdx}',
     ],
     theme: {
-        extend: {
-            colors: {
-                brand: {
-                    navy: '#0d1b2a',
-                    dark: '#08121e',
-                    card: '#112233',
-                    border: '#1e3a5f',
-                    gold: '#f59e0b',
-                }
-            }
-        },
+        extend: {},
     },
     plugins: [],
 }
