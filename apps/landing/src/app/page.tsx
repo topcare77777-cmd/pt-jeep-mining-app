@@ -8,13 +8,17 @@ export default function LandingPage() {
     const [password, setPassword] = useState('')
     const [isLoading, setIsLoading] = useState(false)
 
+    // URL dinamis berbasis Environment Variable dengan fallback lokal
+    const adminUrl = process.env.NEXT_PUBLIC_ADMIN_URL || 'http://localhost:3000'
+    const managementUrl = process.env.NEXT_PUBLIC_MANAGEMENT_URL || 'http://localhost:3001'
+
     const handleLogin = (e: React.FormEvent) => {
         e.preventDefault()
         setIsLoading(true)
 
-        // Simulasi proses login selama 1 detik, lalu arahkan ke modul User (Port 3001)
+        // Arahkan ke modul Manajemen / Lapangan
         setTimeout(() => {
-            window.location.href = 'http://localhost:3001'
+            window.location.href = managementUrl
         }, 1000)
     }
 
@@ -32,7 +36,12 @@ export default function LandingPage() {
                     <a href="#about" className="hover:text-amber-400 transition">Tentang Kami</a>
                 </div>
                 <div>
-                    <a href="http://localhost:3000" target="_blank" className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold px-4 py-2 rounded-lg text-sm transition shadow-lg shadow-amber-500/10">
+                    <a
+                        href={adminUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold px-4 py-2 rounded-lg text-sm transition shadow-lg shadow-amber-500/10 inline-block"
+                    >
                         Masuk Dasbor Admin
                     </a>
                 </div>
@@ -51,7 +60,6 @@ export default function LandingPage() {
                     Solusi digital tangguh untuk pemantauan ritase pengangkutan, manajemen armada dump truck, dan pelaporan operasional lapangan secara real-time bahkan di wilayah site terpencil.
                 </p>
                 <div className="flex flex-col sm:flex-row justify-center gap-4">
-                    {/* Tombol ini sekarang membuka Modal Login */}
                     <button
                         onClick={() => setIsLoginModalOpen(true)}
                         className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold px-6 py-3 rounded-xl text-sm transition"
@@ -97,7 +105,6 @@ export default function LandingPage() {
             {isLoginModalOpen && (
                 <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                     <div className="bg-slate-950 border border-slate-800 rounded-2xl w-full max-w-sm p-8 shadow-2xl relative overflow-hidden">
-                        {/* Ornamen Desain */}
                         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-500 to-orange-600"></div>
 
                         <div className="text-center mb-6">
