@@ -22,7 +22,7 @@ export default function HrdDashboard() {
     const [activeTab, setActiveTab] = useState('karyawan')
     const [employees, setEmployees] = useState<Employee[]>([])
 
-    // Modal Pencatatan Personel / Shift Baru
+    // State Modal Tambah Karyawan / Shift
     const [showModal, setShowModal] = useState(false)
     const [nrp, setNrp] = useState('')
     const [name, setName] = useState('')
@@ -57,7 +57,7 @@ export default function HrdDashboard() {
 
                 setUserName(profile.full_name || 'Petugas HRD')
 
-                // 3. Ambil data personel dari tabel profiles atau hrd_manpower
+                // 3. Ambil data personil dari Supabase
                 const { data: profilesData } = await supabase
                     .from('profiles')
                     .select('id, full_name, role, status')
@@ -67,14 +67,13 @@ export default function HrdDashboard() {
                     const mappedEmployees: Employee[] = profilesData.map((p, idx) => ({
                         id: p.id,
                         nrp: `NRP-2026-${String(idx + 1).padStart(3, '0')}`,
-                        name: p.full_name || 'Personel Tanpa Nama',
-                        role: p.role || 'Staff Operasional',
+                        name: p.full_name || 'Personel Pit',
+                        role: p.role || 'Operator Tambang',
                         shift: idx % 2 === 0 ? 'Shift 1 (Pagi)' : 'Shift 2 (Malam)',
                         status: p.status || 'Aktif',
                     }))
                     setEmployees(mappedEmployees)
                 } else {
-                    // Fallback lokal jika data kosong
                     setEmployees([
                         {
                             id: '1',
@@ -92,12 +91,20 @@ export default function HrdDashboard() {
                             shift: 'Shift 2 (Malam)',
                             status: 'Aktif',
                         },
+                        {
+                            id: '3',
+                            nrp: 'NRP-2026-089',
+                            name: 'Yohanes Mandagi',
+                            role: 'Mekanik Alat Berat',
+                            shift: 'Off Site',
+                            status: 'Roster Cuti',
+                        },
                     ])
                 }
 
                 setLoading(false)
             } catch (err) {
-                console.error('Error loading HRD data:', err)
+                console.error('Error loading HRD:', err)
                 setLoading(false)
             }
         }
@@ -160,7 +167,7 @@ export default function HrdDashboard() {
 
                 <button
                     onClick={handleLogout}
-                    className="bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/50 text-rose-300 text-xs px-4 py-2 rounded-lg transition"
+                    className="bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/50 text-rose-300 text-xs px-4 py-2 rounded-lg transition cursor-pointer"
                 >
                     Keluar ke Beranda
                 </button>
@@ -177,7 +184,7 @@ export default function HrdDashboard() {
                     <button
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id)}
-                        className={`px-4 py-2.5 rounded-lg text-xs font-bold transition flex items-center gap-2 border ${activeTab === tab.id
+                        className={`px-4 py-2.5 rounded-lg text-xs font-bold transition flex items-center gap-2 border cursor-pointer ${activeTab === tab.id
                                 ? 'bg-[#1b3b5f] border-sky-400 text-white shadow-lg shadow-sky-950/50'
                                 : 'bg-[#0c1a2d] border-[#1b2e46] text-slate-400 hover:text-white hover:bg-[#12243d]'
                             }`}
@@ -222,7 +229,7 @@ export default function HrdDashboard() {
 
                 {/* Kolom Kanan: Panel Statistik & Tabel */}
                 <main className="lg:col-span-9 space-y-6">
-                    {/* Row Atas: Ringkasan Metrik */}
+                    {/* Metrik Cards */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
                             <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">Total Tenaga Kerja</h3>
@@ -258,7 +265,7 @@ export default function HrdDashboard() {
                             </h3>
                             <button
                                 onClick={() => setShowModal(true)}
-                                className="bg-amber-500 hover:bg-amber-600 text-slate-950 text-[11px] font-bold px-3 py-1.5 rounded-lg transition"
+                                className="bg-amber-500 hover:bg-amber-600 text-slate-950 text-[11px] font-bold px-3 py-1.5 rounded-lg transition cursor-pointer"
                             >
                                 + Tambah Personel
                             </button>
@@ -354,14 +361,14 @@ export default function HrdDashboard() {
                                 <button
                                     type="button"
                                     onClick={() => setShowModal(false)}
-                                    className="px-4 py-2 rounded-lg border border-[#1b2e46] text-slate-400 hover:text-white text-xs transition"
+                                    className="px-4 py-2 rounded-lg border border-[#1b2e46] text-slate-400 hover:text-white text-xs transition cursor-pointer"
                                 >
                                     Batal
                                 </button>
                                 <button
                                     type="submit"
                                     disabled={submitting}
-                                    className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs transition"
+                                    className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs transition cursor-pointer"
                                 >
                                     {submitting ? 'Menyimpan...' : 'Simpan Data'}
                                 </button>
