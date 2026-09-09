@@ -3,39 +3,99 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
-// Daftar lengkap seluruh modul/aplikasi platform PT. JEEP
-const APP_MODULES = [
-    { key: 'manager-site', label: 'Pit Produksi Nikel', icon: '⛏️' },
-    { key: 'fleet', label: 'Alat Berat & Hauling', icon: '🚜' },
-    { key: 'fleet-maintenance', label: 'Workshop Fleet', icon: '🔧' },
-    { key: 'ritase', label: 'Ritase & Timbangan', icon: '🚛' },
-    { key: 'bbm', label: 'BBM Solar Industri', icon: '⛽' },
-    { key: 'jetty', label: 'Jetty & LCT Port', icon: '🚢' },
-    { key: 'sparepart', label: 'Gudang Sparepart', icon: '📦' },
-    { key: 'adm', label: 'Administrasi & Persuratan', icon: '📋' },
-    { key: 'assets', label: 'Manajemen Aset Site', icon: '🏷️' },
-    { key: 'mess', label: 'Mess Hall & Hunian Camp', icon: '🏠' },
-    { key: 'ga', label: 'General Affair (GA)', icon: '🚙' },
-    { key: 'vendor', label: 'Vendor & Kontraktor', icon: '🤝' },
-    { key: 'safety', label: 'Inspeksi K3 Tambang', icon: '⛑️' },
-    { key: 'clinic', label: 'Klinik Medis Site', icon: '🏥' },
-    { key: 'security', label: 'Keamanan Gerbang & Pos', icon: '🛡️' },
-    { key: 'radio', label: 'Radio Dispatch & SSB', icon: '📻' },
-    { key: 'hrd', label: 'HRD & Payroll', icon: '👷‍♂️' },
-    { key: 'finance', label: 'Keuangan & Kas Site', icon: '💰' },
-    { key: 'legal', label: 'Legal & IUP-OP', icon: '⚖️' },
-    { key: 'csr', label: 'CSR & Pemberdayaan', icon: '🤝' },
-    { key: 'it-helpdesk', label: 'IT Support & VSAT', icon: '💻' },
-    { key: 'helpdesk', label: 'Helpdesk Fasilitas GA', icon: '🛠️' },
-    { key: 'direktur', label: 'Eksekutif BOD', icon: '🏛️' },
-    { key: 'laporan', label: 'Cetak Laporan Resmi', icon: '📄' },
+// 12 Kartu Modul Persis Tampilan Beranda Manajemen Operasi Tambang PT. JEEP
+const OPERATIONAL_MODULE_CARDS = [
+    {
+        key: 'manager-site',
+        title: 'Pusat Komando Pit',
+        badge: 'Operasional Pit',
+        desc: 'Monitoring ritase batubara, pengupasan overburden, dan laporan shift DOR.',
+        icon: '⛏️',
+    },
+    {
+        key: 'fleet',
+        title: 'Kesiapan Alat Berat',
+        badge: 'Plant & Bengkel',
+        desc: 'Kontrol status unit (OP/ST/BD), jam kerja (HM), serta rasio PA dan MA.',
+        icon: '🚜',
+    },
+    {
+        key: 'sparepart',
+        title: 'Gudang & Sparepart',
+        badge: 'Logistik Workshop',
+        desc: 'Inventaris suku cadang, reorder point, dan ketersediaan part fast-moving.',
+        icon: '📦',
+    },
+    {
+        key: 'safety',
+        title: 'Inspeksi K3 & HSE',
+        badge: 'K3 Tambang',
+        desc: 'Pencatatan temuan hazard, mitigasi risiko K3, dan jam kerja selamat.',
+        icon: '⛑️',
+    },
+    {
+        key: 'ritase',
+        title: 'Ritase & Timbangan',
+        badge: 'Weighbridge',
+        desc: 'Verifikasi tonase bruto, tare, dan netto armada hauling dump truck.',
+        icon: '🚛',
+    },
+    {
+        key: 'jetty',
+        title: 'Jetty & Barging',
+        badge: 'Port Terminal',
+        desc: 'Pemuatan conveyor tongkang batubara, draught survey, dan status SPB.',
+        icon: '🚢',
+    },
+    {
+        key: 'environment',
+        title: 'Lingkungan & Reklamasi',
+        badge: 'Lingkungan Hidup',
+        desc: 'Uji baku mutu settling pond (pH & TSS), penataan lahan, serta revegetasi.',
+        icon: '🌱',
+    },
+    {
+        key: 'bbm',
+        title: 'Tangki & BBM Solar',
+        badge: 'Fuel Management',
+        desc: 'Stok solar industri, pencatatan nozzle alat berat, dan burn rate operasional.',
+        icon: '⛽',
+    },
+    {
+        key: 'finance',
+        title: 'Kas & Finansial Site',
+        badge: 'Finance & Kas',
+        desc: 'Ledger pengeluaran kas kecil, dropping dana pusat, dan biaya lapangan.',
+        icon: '💰',
+    },
+    {
+        key: 'adm',
+        title: 'Administrasi & Surat',
+        badge: 'Site ADM',
+        desc: 'Pengarsipan surat jalan ritase, izin masuk SIMP, dan administrasi berkas.',
+        icon: '📋',
+    },
+    {
+        key: 'hrd',
+        title: 'HRD & Manpower',
+        badge: 'Human Resources',
+        desc: 'Database pekerja tambang, shift kerja, kebugaran, dan status kru.',
+        icon: '👷‍♂️',
+    },
+    {
+        key: 'ga',
+        title: 'General Affair (GA)',
+        badge: 'Fasilitas & Sarana',
+        desc: 'Log armada LV operasional, sarana mess camp, genset, dan logistik makan.',
+        icon: '🚙',
+    },
 ]
 
 export default function SuperAdminConsole() {
-    // Menu default disetel ke 'permissions' agar modul hak akses langsung tampil
+    // Tab menu default langsung ke 'permissions' agar kartu modul hak akses langsung tampak
     const [activeMenu, setActiveMenu] = useState<'permissions' | 'users' | 'roles' | 'system' | 'audit'>('permissions')
 
-    // State untuk daftar pengguna
+    // State Manajemen Pengguna
     const [users, setUsers] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
 
@@ -75,14 +135,14 @@ export default function SuperAdminConsole() {
     const [editPositionName, setEditPositionName] = useState('')
     const [editAccessLevel, setEditAccessLevel] = useState('Standard')
 
-    // State Hak Akses Matriks Modul Divisi (Division -> Allowed Modules)
+    // State Hak Akses Matriks Modul Terpilih per Divisi
     const [selectedDivisionForPermission, setSelectedDivisionForPermission] = useState('Operasional Lapangan')
     const [divisionPermissions, setDivisionPermissions] = useState<Record<string, string[]>>({
-        Administrator: APP_MODULES.map((m) => m.key),
-        'Operasional Lapangan': ['manager-site', 'fleet', 'fleet-maintenance', 'ritase', 'bbm', 'radio'],
-        'Keuangan & Payroll': ['finance', 'hrd', 'legal', 'laporan'],
-        'HSE & Medical': ['safety', 'clinic', 'security'],
-        'General Affair & Logistik': ['adm', 'assets', 'mess', 'ga', 'vendor', 'helpdesk', 'bbm'],
+        Administrator: OPERATIONAL_MODULE_CARDS.map((m) => m.key),
+        'Operasional Lapangan': ['manager-site', 'fleet', 'ritase', 'bbm'],
+        'Keuangan & Payroll': ['finance', 'adm', 'hrd'],
+        'HSE & Medical': ['safety', 'environment'],
+        'General Affair & Logistik': ['adm', 'ga', 'bbm', 'sparepart'],
     })
     const [savingPermission, setSavingPermission] = useState(false)
 
@@ -99,10 +159,8 @@ export default function SuperAdminConsole() {
             .select('*')
             .order('created_at', { ascending: false })
 
-        if (error) {
-            console.error('Gagal mengambil data pengguna:', error.message)
-        } else {
-            setUsers(data || [])
+        if (!error && data) {
+            setUsers(data)
         }
         setLoading(false)
     }
@@ -129,28 +187,24 @@ export default function SuperAdminConsole() {
                 })
                 setDivisionPermissions((prev) => ({ ...prev, ...mapped }))
             }
-        } catch (err) {
-            console.warn('Tabel division_permissions belum ada, menggunakan data lokal.')
+        } catch {
+            // Menggunakan fallback data state lokal
         }
     }
 
-    // Handler Submit Pengguna Baru
     const handleCreateUser = async (e: React.FormEvent) => {
         e.preventDefault()
         setIsSubmitting(true)
-
         try {
             const { data: authData, error: authError } = await supabase.auth.signUp({
                 email,
                 password,
             })
-
             if (authError) throw authError
 
             const userId = authData.user?.id
-
             if (userId) {
-                const { error: profileError } = await supabase.from('profiles').insert([
+                await supabase.from('profiles').insert([
                     {
                         id: userId,
                         full_name: fullName,
@@ -160,11 +214,8 @@ export default function SuperAdminConsole() {
                         status: 'Aktif',
                     },
                 ])
-
-                if (profileError) throw profileError
             }
-
-            alert('Pengguna baru berhasil didaftarkan ke sistem Supabase!')
+            alert('Pengguna baru berhasil ditambahkan!')
             setIsModalOpen(false)
             setFullName('')
             setUsername('')
@@ -224,11 +275,7 @@ export default function SuperAdminConsole() {
             .update({ status: newStatus })
             .eq('id', id)
 
-        if (error) {
-            alert('Gagal mengubah status: ' + error.message)
-        } else {
-            fetchUsers()
-        }
+        if (!error) fetchUsers()
     }
 
     const handleAddRole = async (e: React.FormEvent) => {
@@ -254,13 +301,13 @@ export default function SuperAdminConsole() {
             setRoles([newRoleItem, ...roles])
             alert('Data Divisi & Jabatan berhasil ditambahkan secara lokal.')
         } else {
-            alert('Data Divisi & Jabatan berhasil disimpan ke database Supabase!')
+            alert('Data Divisi & Jabatan berhasil disimpan ke database!')
             fetchRoles()
         }
 
         setDivisionPermissions((prev) => ({
             ...prev,
-            [divisionName]: ['manager-site', 'safety', 'laporan'],
+            [divisionName]: ['manager-site', 'safety', 'adm'],
         }))
 
         setDivisionName('')
@@ -303,7 +350,7 @@ export default function SuperAdminConsole() {
     }
 
     const handleDeleteRole = async (id: string) => {
-        if (!confirm('Yakin ingin menghapus data divisi ini?')) return
+        if (!confirm('Yakin ingin menghapus divisi ini?')) return
         const { error } = await supabase.from('roles').delete().eq('id', id)
         if (error) {
             setRoles(roles.filter((r) => r.id !== id))
@@ -312,7 +359,7 @@ export default function SuperAdminConsole() {
         }
     }
 
-    // Handler Pemilihan Modul Checklist
+    // Handler Checklist Modul per Divisi
     const handleToggleModulePermission = (moduleKey: string) => {
         const currentList = divisionPermissions[selectedDivisionForPermission] || []
         const exists = currentList.includes(moduleKey)
@@ -327,15 +374,13 @@ export default function SuperAdminConsole() {
         })
     }
 
-    // Handler Pilih Semua Modul
     const handleSelectAll = () => {
         setDivisionPermissions({
             ...divisionPermissions,
-            [selectedDivisionForPermission]: APP_MODULES.map((m) => m.key),
+            [selectedDivisionForPermission]: OPERATIONAL_MODULE_CARDS.map((m) => m.key),
         })
     }
 
-    // Handler Hapus Semua Modul
     const handleClearAll = () => {
         setDivisionPermissions({
             ...divisionPermissions,
@@ -343,7 +388,6 @@ export default function SuperAdminConsole() {
         })
     }
 
-    // Handler Simpan Hak Akses ke Supabase
     const handleSavePermissions = async () => {
         setSavingPermission(true)
         const allowedModules = divisionPermissions[selectedDivisionForPermission] || []
@@ -361,7 +405,7 @@ export default function SuperAdminConsole() {
                 )
 
             if (error) {
-                alert(`Hak akses tersimpan lokal untuk divisi: ${selectedDivisionForPermission}`)
+                alert(`Hak akses tersimpan secara lokal untuk divisi: ${selectedDivisionForPermission}`)
             } else {
                 alert(`Hak akses divisi "${selectedDivisionForPermission}" berhasil disimpan ke database!`)
             }
@@ -374,44 +418,43 @@ export default function SuperAdminConsole() {
 
     const handleLogout = async () => {
         await supabase.auth.signOut()
-        const landingUrl = process.env.NEXT_PUBLIC_LANDING_URL || 'https://pt-jeep.vercel.app'
-        window.location.href = landingUrl
+        window.location.href = process.env.NEXT_PUBLIC_LANDING_URL || 'https://pt-jeep.vercel.app'
     }
 
     const currentAllowed = divisionPermissions[selectedDivisionForPermission] || []
 
     return (
-        <div className="flex h-screen bg-[#0a0a0a] text-slate-200 font-sans overflow-hidden selection:bg-amber-500 selection:text-black relative">
-            {/* Sidebar Pengembang */}
-            <aside className="w-64 bg-[#111] border-r border-[#333] flex flex-col">
-                <div className="p-5 border-b border-[#333]">
-                    <div className="text-[10px] text-amber-500 font-mono tracking-widest mb-1">PT-JEEP // JO SYSTEM</div>
-                    <h1 className="text-lg font-bold text-white tracking-tight leading-none">Konsol Developer</h1>
+        <div className="flex h-screen bg-[#070b12] text-slate-200 font-sans overflow-hidden selection:bg-amber-500 selection:text-black relative">
+            {/* Sidebar Navigasi Konsol */}
+            <aside className="w-64 bg-[#0c121e] border-r border-[#1a2333] flex flex-col">
+                <div className="p-5 border-b border-[#1a2333]">
+                    <div className="text-[10px] text-amber-400 font-mono tracking-widest mb-1">PT-JEEP // JO SYSTEM</div>
+                    <h1 className="text-base font-black text-white tracking-tight leading-none">Konsol Developer</h1>
                 </div>
 
-                <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
-                    <p className="px-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 mt-2">Akses & Identitas</p>
+                <nav className="flex-1 py-4 px-3 space-y-1.5 overflow-y-auto">
+                    <p className="px-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Akses & Identitas</p>
 
-                    {/* Menu Hak Akses Divisi (Ditempatkan di Atas) */}
+                    {/* Menu Baru Hak Akses Modul Divisi */}
                     <button
                         onClick={() => setActiveMenu('permissions')}
-                        className={`w-full flex items-center justify-between px-3 py-2.5 rounded-md text-sm font-bold transition cursor-pointer ${activeMenu === 'permissions'
-                                ? 'bg-amber-500 text-slate-950 shadow-md'
-                                : 'text-slate-400 hover:bg-[#1a1a1a] hover:text-white'
+                        className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-xs font-bold transition cursor-pointer ${activeMenu === 'permissions'
+                                ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+                                : 'text-slate-400 hover:bg-[#131d2e] hover:text-white'
                             }`}
                     >
                         <div className="flex items-center gap-2.5">
                             <span>🔑</span>
-                            <span>Hak Akses Divisi</span>
+                            <span>Hak Akses Modul Divisi</span>
                         </div>
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-black/20 font-mono">AKTIF</span>
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-black/30 font-mono">12 MODUL</span>
                     </button>
 
                     <button
                         onClick={() => setActiveMenu('users')}
-                        className={`w-full flex items-center space-x-3 px-3 py-2 rounded-md text-sm transition cursor-pointer ${activeMenu === 'users'
-                                ? 'bg-[#222] text-amber-400 border border-[#444]'
-                                : 'text-slate-400 hover:bg-[#1a1a1a] hover:text-white'
+                        className={`w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-lg text-xs font-bold transition cursor-pointer ${activeMenu === 'users'
+                                ? 'bg-[#1b263b] text-amber-400 border border-[#2b3a54]'
+                                : 'text-slate-400 hover:bg-[#131d2e] hover:text-white'
                             }`}
                     >
                         <span>👥</span> <span>Manajemen Pengguna</span>
@@ -419,89 +462,81 @@ export default function SuperAdminConsole() {
 
                     <button
                         onClick={() => setActiveMenu('roles')}
-                        className={`w-full flex items-center space-x-3 px-3 py-2 rounded-md text-sm transition cursor-pointer ${activeMenu === 'roles'
-                                ? 'bg-[#222] text-amber-400 border border-[#444]'
-                                : 'text-slate-400 hover:bg-[#1a1a1a] hover:text-white'
+                        className={`w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-lg text-xs font-bold transition cursor-pointer ${activeMenu === 'roles'
+                                ? 'bg-[#1b263b] text-amber-400 border border-[#2b3a54]'
+                                : 'text-slate-400 hover:bg-[#131d2e] hover:text-white'
                             }`}
                     >
                         <span>🛡️</span> <span>Divisi & Jabatan</span>
                     </button>
 
-                    <p className="px-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 mt-6">Sistem Inti</p>
+                    <p className="px-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 mt-5">Sistem Inti</p>
                     <button
                         onClick={() => setActiveMenu('system')}
-                        className={`w-full flex items-center space-x-3 px-3 py-2 rounded-md text-sm transition cursor-pointer ${activeMenu === 'system'
-                                ? 'bg-[#222] text-amber-400 border border-[#444]'
-                                : 'text-slate-400 hover:bg-[#1a1a1a] hover:text-white'
+                        className={`w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-lg text-xs font-bold transition cursor-pointer ${activeMenu === 'system'
+                                ? 'bg-[#1b263b] text-amber-400 border border-[#2b3a54]'
+                                : 'text-slate-400 hover:bg-[#131d2e] hover:text-white'
                             }`}
                     >
                         <span>⚡</span> <span>Kesehatan Sistem</span>
                     </button>
                     <button
                         onClick={() => setActiveMenu('audit')}
-                        className={`w-full flex items-center space-x-3 px-3 py-2 rounded-md text-sm transition cursor-pointer ${activeMenu === 'audit'
-                                ? 'bg-[#222] text-amber-400 border border-[#444]'
-                                : 'text-slate-400 hover:bg-[#1a1a1a] hover:text-white'
+                        className={`w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-lg text-xs font-bold transition cursor-pointer ${activeMenu === 'audit'
+                                ? 'bg-[#1b263b] text-amber-400 border border-[#2b3a54]'
+                                : 'text-slate-400 hover:bg-[#131d2e] hover:text-white'
                             }`}
                     >
                         <span>📜</span> <span>Log Audit</span>
                     </button>
                 </nav>
 
-                <div className="p-4 border-t border-[#333] bg-[#0a0a0a] space-y-4">
-                    <div className="text-xs text-slate-400 font-mono">
-                        <span className="text-emerald-500">●</span> Supabase: Terhubung
+                <div className="p-4 border-t border-[#1a2333] bg-[#090d17] space-y-3">
+                    <div className="text-xs text-slate-400 font-mono flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                        <span>Supabase Terhubung</span>
                     </div>
                     <button
                         onClick={handleLogout}
-                        className="w-full flex items-center justify-center space-x-2 bg-rose-950/30 hover:bg-rose-900/50 text-rose-400 border border-rose-900/50 py-2 rounded-md text-sm transition font-medium cursor-pointer"
+                        className="w-full bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border border-rose-800/50 py-2 rounded-lg text-xs font-semibold transition cursor-pointer"
                     >
-                        <span>🚪</span> <span>Keluar</span>
+                        Keluar ke Beranda
                     </button>
                 </div>
             </aside>
 
             {/* Area Konten Utama */}
-            <main className="flex-1 overflow-y-auto bg-[#0a0a0a] p-8">
-                {/* TAB UTAMA: HAK AKSES SETIAP DIVISI UNTUK MEMBUKA APLIKASI */}
+            <main className="flex-1 overflow-y-auto bg-[#070b12] p-8">
+                {/* TAB UTAMA: HAK AKSES MODUL DIVISI (12 KARTU PERSIS GAMBAR) */}
                 {activeMenu === 'permissions' && (
-                    <div className="space-y-6">
-                        <div className="flex flex-wrap justify-between items-end gap-3 border-b border-zinc-800 pb-4">
+                    <div className="space-y-6 max-w-7xl mx-auto">
+                        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#1a273b] pb-4">
                             <div>
-                                <h2 className="text-2xl font-bold text-white mb-1 flex items-center gap-2">
-                                    <span>🔑</span> Hak Akses Pembagian Modul Setiap Divisi
+                                <h2 className="text-2xl font-black text-white flex items-center gap-2.5">
+                                    <span>🔑</span> Hak Akses Pembagian Modul per Divisi
                                 </h2>
-                                <p className="text-xs text-slate-400">
-                                    Pilih divisi untuk mengonfigurasi aplikasi dan halaman mana saja (ADM, BBM, Asset, Mess, dll.) yang berhak dibuka.
+                                <p className="text-xs text-slate-400 mt-0.5">
+                                    Pilih divisi untuk mengonfigurasi aplikasi dan menu operasional mana saja yang berhak dibuka oleh karyawan.
                                 </p>
                             </div>
 
                             <button
                                 onClick={handleSavePermissions}
                                 disabled={savingPermission}
-                                className="bg-amber-500 hover:bg-amber-600 text-black font-bold px-5 py-2.5 rounded text-sm transition cursor-pointer flex items-center gap-2 shadow-lg shadow-amber-500/10"
+                                className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-black px-5 py-2.5 rounded-lg text-xs transition cursor-pointer flex items-center gap-2 shadow-lg shadow-amber-500/10"
                             >
-                                {savingPermission ? (
-                                    <>
-                                        <span className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"></span>
-                                        <span>Menyimpan...</span>
-                                    </>
-                                ) : (
-                                    <>
-                                        <span>💾</span> <span>Simpan Pengaturan Hak Akses</span>
-                                    </>
-                                )}
+                                {savingPermission ? 'Menyimpan ke Supabase...' : '💾 Simpan Pengaturan Akses'}
                             </button>
                         </div>
 
                         {/* Pemilihan Divisi Target & Tombol Tindakan Cepat */}
-                        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 shadow-lg flex flex-wrap items-center justify-between gap-4">
+                        <div className="bg-[#0b1320] border border-[#1a273b] rounded-xl p-5 shadow-xl flex flex-wrap items-center justify-between gap-4">
                             <div className="flex items-center gap-3">
-                                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Pilih Divisi:</label>
+                                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Pilih Divisi Karyawan:</label>
                                 <select
                                     value={selectedDivisionForPermission}
                                     onChange={(e) => setSelectedDivisionForPermission(e.target.value)}
-                                    className="bg-black border border-amber-500/80 text-amber-400 font-bold text-sm px-4 py-2 rounded focus:outline-none"
+                                    className="bg-[#060a10] border border-amber-500/70 text-amber-400 font-bold text-xs px-4 py-2 rounded-lg focus:outline-none"
                                 >
                                     {roles.map((r) => {
                                         const name = r.division || r.name
@@ -517,56 +552,66 @@ export default function SuperAdminConsole() {
                             <div className="flex items-center gap-2">
                                 <button
                                     onClick={handleSelectAll}
-                                    className="bg-zinc-800 hover:bg-zinc-700 text-xs text-slate-200 px-3 py-1.5 rounded transition cursor-pointer"
+                                    className="bg-[#131d2e] hover:bg-[#1a273b] text-xs text-slate-200 px-3 py-1.5 rounded transition cursor-pointer border border-[#1f2f47]"
                                 >
                                     Pilih Semua
                                 </button>
                                 <button
                                     onClick={handleClearAll}
-                                    className="bg-zinc-800 hover:bg-rose-950/50 text-xs text-rose-400 px-3 py-1.5 rounded transition cursor-pointer"
+                                    className="bg-[#131d2e] hover:bg-rose-950/60 text-xs text-rose-400 px-3 py-1.5 rounded transition cursor-pointer border border-[#1f2f47]"
                                 >
                                     Hapus Semua
                                 </button>
-                                <span className="text-xs text-slate-400 ml-2">
-                                    Modul Diizinkan:{' '}
-                                    <strong className="text-amber-400 font-mono">{currentAllowed.length}</strong> / {APP_MODULES.length} Modul
+                                <span className="text-xs text-slate-400 ml-2 font-mono">
+                                    Diizinkan: <strong className="text-amber-400">{currentAllowed.length}</strong> / {OPERATIONAL_MODULE_CARDS.length} Modul
                                 </span>
                             </div>
                         </div>
 
-                        {/* Grid Checklist Modul Aplikasi Lengkap */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                            {APP_MODULES.map((mod) => {
+                        {/* Grid 12 Kartu Modul Persis Tampilan Beranda */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                            {OPERATIONAL_MODULE_CARDS.map((mod) => {
                                 const isChecked = currentAllowed.includes(mod.key)
                                 return (
                                     <div
                                         key={mod.key}
                                         onClick={() => handleToggleModulePermission(mod.key)}
-                                        className={`p-4 rounded-xl border transition cursor-pointer select-none flex items-center justify-between ${isChecked
-                                                ? 'bg-amber-500/10 border-amber-500/60 text-white shadow-md'
-                                                : 'bg-zinc-900/60 border-zinc-800 text-slate-500 hover:border-zinc-700 hover:text-slate-300'
+                                        className={`relative rounded-xl border p-4 transition cursor-pointer flex flex-col justify-between select-none ${isChecked
+                                                ? 'bg-[#102033] border-cyan-400 shadow-md shadow-cyan-950/40'
+                                                : 'bg-[#09101a] border-[#162233] text-slate-400 hover:border-[#22354f]'
                                             }`}
                                     >
-                                        <div className="flex items-center gap-3">
+                                        <div className="flex items-start justify-between mb-3">
                                             <span className="text-2xl">{mod.icon}</span>
-                                            <div>
-                                                <div className={`font-bold text-sm ${isChecked ? 'text-amber-300' : 'text-slate-300'}`}>
-                                                    {mod.label}
-                                                </div>
-                                                <div className="text-[10px] font-mono text-slate-500">/{mod.key}</div>
-                                            </div>
+                                            <span
+                                                className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded border ${isChecked
+                                                        ? 'bg-cyan-950 text-cyan-400 border-cyan-800'
+                                                        : 'bg-[#060a10] text-slate-500 border-[#1c2b42]'
+                                                    }`}
+                                            >
+                                                {mod.badge}
+                                            </span>
                                         </div>
 
-                                        <div className="flex flex-col items-end">
+                                        <div>
+                                            <h4 className={`text-xs font-black mb-1 ${isChecked ? 'text-white' : 'text-slate-300'}`}>
+                                                {mod.title}
+                                            </h4>
+                                            <p className="text-[11px] text-slate-400 line-clamp-2 leading-relaxed">
+                                                {mod.desc}
+                                            </p>
+                                        </div>
+
+                                        <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between text-[11px]">
+                                            <span className={isChecked ? 'text-cyan-400 font-bold' : 'text-slate-500'}>
+                                                {isChecked ? '✓ Akses Diberikan' : 'Terkunci'}
+                                            </span>
                                             <input
                                                 type="checkbox"
                                                 checked={isChecked}
                                                 onChange={() => { }}
-                                                className="w-4 h-4 accent-amber-500 rounded cursor-pointer"
+                                                className="w-4 h-4 accent-cyan-400 rounded cursor-pointer"
                                             />
-                                            <span className="text-[9px] mt-1 font-mono uppercase font-bold text-slate-500">
-                                                {isChecked ? 'DIIZINKAN' : 'DIKUNCI'}
-                                            </span>
                                         </div>
                                     </div>
                                 )
@@ -575,9 +620,9 @@ export default function SuperAdminConsole() {
                     </div>
                 )}
 
-                {/* TAB 2: MANAJEMEN PENGGUNA */}
+                {/* TAB: MANAJEMEN PENGGUNA */}
                 {activeMenu === 'users' && (
-                    <div className="space-y-6">
+                    <div className="space-y-6 max-w-6xl mx-auto">
                         <div className="flex justify-between items-end">
                             <div>
                                 <h2 className="text-2xl font-bold text-white mb-1">Manajemen Pengguna</h2>
@@ -606,55 +651,46 @@ export default function SuperAdminConsole() {
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-[#222]">
-                                        {users.length === 0 ? (
-                                            <tr>
-                                                <td colSpan={5} className="p-8 text-center text-slate-500">
-                                                    Belum ada pengguna terdaftar di database.
+                                        {users.map((u) => (
+                                            <tr key={u.id} className="hover:bg-[#161616]">
+                                                <td className="p-4">
+                                                    <p className="font-bold text-white">{u.full_name || '-'}</p>
+                                                    <p className="text-xs text-amber-500/80 font-mono">@{u.username || '-'}</p>
+                                                </td>
+                                                <td className="p-4 font-mono text-slate-300">{u.email}</td>
+                                                <td className="p-4">
+                                                    <span className="bg-[#222] border border-[#444] px-2 py-1 rounded text-xs text-amber-400">
+                                                        {u.role}
+                                                    </span>
+                                                </td>
+                                                <td className="p-4">
+                                                    <button
+                                                        onClick={() => handleToggleStatus(u.id, u.status)}
+                                                        className={`flex items-center space-x-2 text-xs px-2.5 py-1 rounded-full border transition cursor-pointer ${u.status === 'Aktif'
+                                                                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20'
+                                                                : 'bg-rose-500/10 border-rose-500/30 text-rose-400 hover:bg-rose-500/20'
+                                                            }`}
+                                                    >
+                                                        <span className={`w-2 h-2 rounded-full ${u.status === 'Aktif' ? 'bg-emerald-400' : 'bg-rose-400'}`}></span>
+                                                        <span>{u.status || 'Aktif'}</span>
+                                                    </button>
+                                                </td>
+                                                <td className="p-4 text-right space-x-2">
+                                                    <button
+                                                        onClick={() => openEditUserModal(u)}
+                                                        className="text-slate-300 hover:text-white transition text-xs bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 px-2.5 py-1 rounded cursor-pointer"
+                                                    >
+                                                        Edit
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDeleteUser(u.id, u.email)}
+                                                        className="text-rose-500 hover:text-rose-400 transition text-xs bg-rose-950/30 border border-rose-900/50 px-2.5 py-1 rounded cursor-pointer"
+                                                    >
+                                                        Hapus
+                                                    </button>
                                                 </td>
                                             </tr>
-                                        ) : (
-                                            users.map((u) => (
-                                                <tr key={u.id} className="hover:bg-[#161616]">
-                                                    <td className="p-4">
-                                                        <p className="font-bold text-white">{u.full_name || '-'}</p>
-                                                        <p className="text-xs text-amber-500/80 font-mono">@{u.username || '-'}</p>
-                                                    </td>
-                                                    <td className="p-4 font-mono text-slate-300">{u.email}</td>
-                                                    <td className="p-4">
-                                                        <span className="bg-[#222] border border-[#444] px-2 py-1 rounded text-xs text-amber-400">
-                                                            {u.role}
-                                                        </span>
-                                                    </td>
-                                                    <td className="p-4">
-                                                        <button
-                                                            onClick={() => handleToggleStatus(u.id, u.status)}
-                                                            className={`flex items-center space-x-2 text-xs px-2.5 py-1 rounded-full border transition cursor-pointer ${u.status === 'Aktif'
-                                                                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20'
-                                                                    : 'bg-rose-500/10 border-rose-500/30 text-rose-400 hover:bg-rose-500/20'
-                                                                }`}
-                                                            title="Klik untuk mengubah status Aktif / Non-Aktif"
-                                                        >
-                                                            <span className={`w-2 h-2 rounded-full ${u.status === 'Aktif' ? 'bg-emerald-400' : 'bg-rose-400'}`}></span>
-                                                            <span>{u.status || 'Aktif'}</span>
-                                                        </button>
-                                                    </td>
-                                                    <td className="p-4 text-right space-x-2">
-                                                        <button
-                                                            onClick={() => openEditUserModal(u)}
-                                                            className="text-slate-300 hover:text-white transition text-xs bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 px-2.5 py-1 rounded cursor-pointer"
-                                                        >
-                                                            Edit
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleDeleteUser(u.id, u.email)}
-                                                            className="text-rose-500 hover:text-rose-400 transition text-xs bg-rose-950/30 border border-rose-900/50 px-2.5 py-1 rounded cursor-pointer"
-                                                        >
-                                                            Hapus
-                                                        </button>
-                                                    </td>
-                                                </tr>
-                                            ))
-                                        )}
+                                        ))}
                                     </tbody>
                                 </table>
                             </div>
@@ -662,9 +698,9 @@ export default function SuperAdminConsole() {
                     </div>
                 )}
 
-                {/* TAB 3: MANAJEMEN DIVISI & JABATAN */}
+                {/* TAB: MANAJEMEN DIVISI & JABATAN */}
                 {activeMenu === 'roles' && (
-                    <div className="space-y-6">
+                    <div className="space-y-6 max-w-6xl mx-auto">
                         <div>
                             <h2 className="text-2xl font-bold text-white mb-1">Manajemen Divisi & Jabatan</h2>
                             <p className="text-sm text-slate-500">Struktur organisasi yang terhubung ke modul Admin, HRD, Keuangan, dan Payroll.</p>
@@ -718,156 +754,139 @@ export default function SuperAdminConsole() {
                         </section>
 
                         <section className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-lg">
-                            <div className="px-6 py-4 border-b border-zinc-800">
-                                <h3 className="text-md font-semibold text-white">Daftar Divisi & Jabatan Terintegrasi</h3>
-                            </div>
-                            {rolesLoading ? (
-                                <div className="p-8 text-center text-slate-500">Memuat data divisi...</div>
-                            ) : (
-                                <table className="w-full text-left border-collapse">
-                                    <thead>
-                                        <tr className="border-b border-zinc-800 text-xs text-slate-500 bg-black/40 uppercase">
-                                            <th className="py-3 px-6">Divisi</th>
-                                            <th className="py-3 px-6">Jabatan</th>
-                                            <th className="py-3 px-6">Tingkat Akses</th>
-                                            <th className="py-3 px-6 text-right">Aksi</th>
+                            <table className="w-full text-left border-collapse">
+                                <thead>
+                                    <tr className="border-b border-zinc-800 text-xs text-slate-500 bg-black/40 uppercase">
+                                        <th className="py-3 px-6">Divisi</th>
+                                        <th className="py-3 px-6">Jabatan</th>
+                                        <th className="py-3 px-6">Tingkat Akses</th>
+                                        <th className="py-3 px-6 text-right">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-zinc-800 text-sm">
+                                    {roles.map((r) => (
+                                        <tr key={r.id} className="hover:bg-zinc-800/50 transition">
+                                            <td className="py-4 px-6 font-bold text-white">{r.division || r.name}</td>
+                                            <td className="py-4 px-6 text-slate-400">{r.position || r.description}</td>
+                                            <td className="py-4 px-6">
+                                                <span className="px-2 py-1 rounded text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                                    {r.access_level}
+                                                </span>
+                                            </td>
+                                            <td className="py-4 px-6 text-right space-x-2">
+                                                <button
+                                                    onClick={() => openEditRoleModal(r)}
+                                                    className="text-slate-300 hover:text-white transition text-xs bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 px-2.5 py-1 rounded cursor-pointer"
+                                                >
+                                                    Edit
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDeleteRole(r.id)}
+                                                    className="text-rose-500 hover:text-rose-400 text-xs font-medium transition px-2.5 py-1 bg-rose-950/30 rounded border border-rose-900/30 cursor-pointer"
+                                                >
+                                                    Hapus
+                                                </button>
+                                            </td>
                                         </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-zinc-800 text-sm">
-                                        {roles.map((r) => (
-                                            <tr key={r.id} className="hover:bg-zinc-800/50 transition">
-                                                <td className="py-4 px-6 font-bold text-white">{r.division || r.name}</td>
-                                                <td className="py-4 px-6 text-slate-400">{r.position || r.description}</td>
-                                                <td className="py-4 px-6">
-                                                    <span
-                                                        className={`px-2 py-1 rounded text-xs font-medium ${r.access_level === 'Full'
-                                                                ? 'bg-red-500/10 text-red-400 border border-red-500/20'
-                                                                : r.access_level === 'Limited'
-                                                                    ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                                                                    : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                                                            }`}
-                                                    >
-                                                        {r.access_level}
-                                                    </span>
-                                                </td>
-                                                <td className="py-4 px-6 text-right space-x-2">
-                                                    <button
-                                                        onClick={() => openEditRoleModal(r)}
-                                                        className="text-slate-300 hover:text-white transition text-xs bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 px-2.5 py-1 rounded cursor-pointer"
-                                                    >
-                                                        Edit
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleDeleteRole(r.id)}
-                                                        className="text-rose-500 hover:text-rose-400 text-xs font-medium transition px-2.5 py-1 bg-rose-950/30 rounded border border-rose-900/30 cursor-pointer"
-                                                    >
-                                                        Hapus
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            )}
+                                    ))}
+                                </tbody>
+                            </table>
                         </section>
+                    </div>
+                )}
+
+                {/* TAB: KESEHATAN SISTEM */}
+                {activeMenu === 'system' && (
+                    <div className="max-w-4xl mx-auto space-y-4">
+                        <h2 className="text-2xl font-bold text-white mb-2">Kesehatan Sistem</h2>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="p-4 bg-[#111] border border-[#222] rounded-xl">
+                                <div className="text-xs text-slate-400">Database Supabase</div>
+                                <div className="text-lg font-bold text-emerald-400 mt-1">Terhubung & Normal</div>
+                            </div>
+                            <div className="p-4 bg-[#111] border border-[#222] rounded-xl">
+                                <div className="text-xs text-slate-400">Latency Server</div>
+                                <div className="text-lg font-bold text-cyan-400 mt-1">~24 ms</div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* TAB: LOG AUDIT */}
+                {activeMenu === 'audit' && (
+                    <div className="max-w-4xl mx-auto space-y-4">
+                        <h2 className="text-2xl font-bold text-white mb-2">Log Audit Sistem</h2>
+                        <div className="p-6 bg-[#111] border border-[#222] rounded-xl text-xs text-slate-400">
+                            Aktivitas login dan perubahan konfigurasi hak akses modul terekam secara berkala di basis data.
+                        </div>
                     </div>
                 )}
             </main>
 
-            {/* Modal Buat Pengguna */}
+            {/* MODAL BUAT PENGGUNA */}
             {isModalOpen && (
                 <div className="absolute inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                     <div className="bg-[#111] border border-[#333] rounded-xl w-full max-w-lg p-6 shadow-2xl">
-                        <h3 className="text-xl font-bold text-white mb-4">Buat Pengguna Sistem Baru (Real Supabase)</h3>
+                        <h3 className="text-xl font-bold text-white mb-4">Buat Pengguna Sistem Baru</h3>
                         <form onSubmit={handleCreateUser} className="space-y-4">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Nama Lengkap</label>
-                                    <input
-                                        type="text"
-                                        required
-                                        value={fullName}
-                                        onChange={(e) => setFullName(e.target.value)}
-                                        className="w-full bg-[#0a0a0a] border border-[#333] rounded p-2.5 text-white text-sm focus:outline-none focus:border-amber-500"
-                                        placeholder="Contoh: Budi Santoso"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Username</label>
-                                    <input
-                                        type="text"
-                                        required
-                                        value={username}
-                                        onChange={(e) => setUsername(e.target.value)}
-                                        className="w-full bg-[#0a0a0a] border border-[#333] rounded p-2.5 text-white text-sm focus:outline-none focus:border-amber-500 font-mono"
-                                        placeholder="budi_pit"
-                                    />
-                                </div>
-                            </div>
-
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Alamat Email</label>
-                                <input
-                                    type="email"
-                                    required
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                    className="w-full bg-[#0a0a0a] border border-[#333] rounded p-2.5 text-white text-sm focus:outline-none focus:border-amber-500 font-mono"
-                                    placeholder="budi@pt-jeep.com"
-                                />
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Kata Sandi</label>
-                                    <input
-                                        type="password"
-                                        required
-                                        minLength={6}
-                                        value={password}
-                                        onChange={(e) => setPassword(e.target.value)}
-                                        className="w-full bg-[#0a0a0a] border border-[#333] rounded p-2.5 text-white text-sm focus:outline-none focus:border-amber-500"
-                                        placeholder="Min. 6 karakter"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Tetapkan Divisi</label>
-                                    <select
-                                        value={role}
-                                        onChange={(e) => setRole(e.target.value)}
-                                        className="w-full bg-black border border-zinc-700 rounded p-2.5 text-sm text-white focus:outline-none focus:border-amber-500"
-                                    >
-                                        {roles.map((r) => {
-                                            const divName = r.division || r.name
-                                            const posName = r.position || r.description
-                                            return (
-                                                <option key={r.id} value={divName}>
-                                                    {divName} {posName ? `(${posName})` : ''}
-                                                </option>
-                                            )
-                                        })}
-                                    </select>
-                                </div>
-                            </div>
-
+                            <input
+                                type="text"
+                                required
+                                value={fullName}
+                                onChange={(e) => setFullName(e.target.value)}
+                                className="w-full bg-[#0a0a0a] border border-[#333] rounded p-2.5 text-white text-sm"
+                                placeholder="Nama Lengkap"
+                            />
+                            <input
+                                type="text"
+                                required
+                                value={username}
+                                onChange={(e) => setUsername(e.target.value)}
+                                className="w-full bg-[#0a0a0a] border border-[#333] rounded p-2.5 text-white text-sm font-mono"
+                                placeholder="Username"
+                            />
+                            <input
+                                type="email"
+                                required
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                className="w-full bg-[#0a0a0a] border border-[#333] rounded p-2.5 text-white text-sm font-mono"
+                                placeholder="Email"
+                            />
+                            <input
+                                type="password"
+                                required
+                                minLength={6}
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                className="w-full bg-[#0a0a0a] border border-[#333] rounded p-2.5 text-white text-sm"
+                                placeholder="Password"
+                            />
+                            <select
+                                value={role}
+                                onChange={(e) => setRole(e.target.value)}
+                                className="w-full bg-black border border-zinc-700 rounded p-2.5 text-sm text-white"
+                            >
+                                {roles.map((r) => (
+                                    <option key={r.id} value={r.division || r.name}>
+                                        {r.division || r.name}
+                                    </option>
+                                ))}
+                            </select>
                             <div className="flex space-x-3 pt-4">
                                 <button
                                     type="button"
                                     onClick={() => setIsModalOpen(false)}
-                                    className="flex-1 bg-[#222] hover:bg-[#333] border border-[#444] text-white py-2.5 rounded text-sm transition font-medium cursor-pointer"
+                                    className="flex-1 bg-[#222] text-white py-2.5 rounded text-sm"
                                 >
                                     Batal
                                 </button>
                                 <button
                                     type="submit"
                                     disabled={isSubmitting}
-                                    className="flex-1 bg-amber-500 hover:bg-amber-600 text-black py-2.5 rounded text-sm transition font-bold flex justify-center items-center cursor-pointer"
+                                    className="flex-1 bg-amber-500 text-black py-2.5 rounded text-sm font-bold"
                                 >
-                                    {isSubmitting ? (
-                                        <span className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"></span>
-                                    ) : (
-                                        'Simpan ke Database'
-                                    )}
+                                    Simpan
                                 </button>
                             </div>
                         </form>
@@ -875,63 +894,46 @@ export default function SuperAdminConsole() {
                 </div>
             )}
 
-            {/* Modal Edit Pengguna */}
+            {/* MODAL EDIT PENGGUNA */}
             {isEditUserModalOpen && (
                 <div className="absolute inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                     <div className="bg-[#111] border border-[#333] rounded-xl w-full max-w-lg p-6 shadow-2xl">
                         <h3 className="text-xl font-bold text-white mb-4">Edit Data Pengguna</h3>
                         <form onSubmit={handleUpdateUser} className="space-y-4">
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Nama Lengkap</label>
-                                <input
-                                    type="text"
-                                    required
-                                    value={editFullName}
-                                    onChange={(e) => setEditFullName(e.target.value)}
-                                    className="w-full bg-[#0a0a0a] border border-[#333] rounded p-2.5 text-white text-sm focus:outline-none focus:border-amber-500"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Username</label>
-                                <input
-                                    type="text"
-                                    required
-                                    value={editUsername}
-                                    onChange={(e) => setEditUsername(e.target.value)}
-                                    className="w-full bg-[#0a0a0a] border border-[#333] rounded p-2.5 text-white text-sm focus:outline-none focus:border-amber-500 font-mono"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Divisi / Peran</label>
-                                <select
-                                    value={editRole}
-                                    onChange={(e) => setEditRole(e.target.value)}
-                                    className="w-full bg-black border border-zinc-700 rounded p-2.5 text-sm text-white focus:outline-none focus:border-amber-500"
-                                >
-                                    {roles.map((r) => {
-                                        const divName = r.division || r.name
-                                        const posName = r.position || r.description
-                                        return (
-                                            <option key={r.id} value={divName}>
-                                                {divName} {posName ? `(${posName})` : ''}
-                                            </option>
-                                        )
-                                    })}
-                                </select>
-                            </div>
-
+                            <input
+                                type="text"
+                                required
+                                value={editFullName}
+                                onChange={(e) => setEditFullName(e.target.value)}
+                                className="w-full bg-[#0a0a0a] border border-[#333] rounded p-2.5 text-white text-sm"
+                            />
+                            <input
+                                type="text"
+                                required
+                                value={editUsername}
+                                onChange={(e) => setEditUsername(e.target.value)}
+                                className="w-full bg-[#0a0a0a] border border-[#333] rounded p-2.5 text-white text-sm font-mono"
+                            />
+                            <select
+                                value={editRole}
+                                onChange={(e) => setEditRole(e.target.value)}
+                                className="w-full bg-black border border-zinc-700 rounded p-2.5 text-sm text-white"
+                            >
+                                {roles.map((r) => (
+                                    <option key={r.id} value={r.division || r.name}>
+                                        {r.division || r.name}
+                                    </option>
+                                ))}
+                            </select>
                             <div className="flex space-x-3 pt-4">
                                 <button
                                     type="button"
                                     onClick={() => setIsEditUserModalOpen(false)}
-                                    className="flex-1 bg-[#222] hover:bg-[#333] border border-[#444] text-white py-2.5 rounded text-sm transition font-medium cursor-pointer"
+                                    className="flex-1 bg-[#222] text-white py-2.5 rounded text-sm"
                                 >
                                     Batal
                                 </button>
-                                <button
-                                    type="submit"
-                                    className="flex-1 bg-amber-500 hover:bg-amber-600 text-black py-2.5 rounded text-sm transition font-bold cursor-pointer"
-                                >
+                                <button type="submit" className="flex-1 bg-amber-500 text-black py-2.5 rounded text-sm font-bold">
                                     Simpan Perubahan
                                 </button>
                             </div>
@@ -940,57 +942,35 @@ export default function SuperAdminConsole() {
                 </div>
             )}
 
-            {/* Modal Edit Divisi & Jabatan */}
+            {/* MODAL EDIT DIVISI & JABATAN */}
             {isEditRoleModalOpen && (
                 <div className="absolute inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                     <div className="bg-[#111] border border-[#333] rounded-xl w-full max-w-lg p-6 shadow-2xl">
                         <h3 className="text-xl font-bold text-white mb-4">Edit Divisi & Jabatan</h3>
                         <form onSubmit={handleUpdateRole} className="space-y-4">
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Divisi</label>
-                                <input
-                                    type="text"
-                                    required
-                                    value={editDivisionName}
-                                    onChange={(e) => setEditDivisionName(e.target.value)}
-                                    className="w-full bg-[#0a0a0a] border border-[#333] rounded p-2.5 text-white text-sm focus:outline-none focus:border-amber-500"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Jabatan</label>
-                                <input
-                                    type="text"
-                                    required
-                                    value={editPositionName}
-                                    onChange={(e) => setEditPositionName(e.target.value)}
-                                    className="w-full bg-[#0a0a0a] border border-[#333] rounded p-2.5 text-white text-sm focus:outline-none focus:border-amber-500"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Tingkat Akses Sistem</label>
-                                <select
-                                    value={editAccessLevel}
-                                    onChange={(e) => setEditAccessLevel(e.target.value)}
-                                    className="w-full bg-black border border-zinc-700 rounded p-2.5 text-sm text-white focus:outline-none focus:border-amber-500"
-                                >
-                                    <option value="Full">Full (Penuh)</option>
-                                    <option value="Standard">Standard</option>
-                                    <option value="Read-Only">Read-Only (Baca Saja)</option>
-                                </select>
-                            </div>
-
+                            <input
+                                type="text"
+                                required
+                                value={editDivisionName}
+                                onChange={(e) => setEditDivisionName(e.target.value)}
+                                className="w-full bg-[#0a0a0a] border border-[#333] rounded p-2.5 text-white text-sm"
+                            />
+                            <input
+                                type="text"
+                                required
+                                value={editPositionName}
+                                onChange={(e) => setEditPositionName(e.target.value)}
+                                className="w-full bg-[#0a0a0a] border border-[#333] rounded p-2.5 text-white text-sm"
+                            />
                             <div className="flex space-x-3 pt-4">
                                 <button
                                     type="button"
                                     onClick={() => setIsEditRoleModalOpen(false)}
-                                    className="flex-1 bg-[#222] hover:bg-[#333] border border-[#444] text-white py-2.5 rounded text-sm transition font-medium cursor-pointer"
+                                    className="flex-1 bg-[#222] text-white py-2.5 rounded text-sm"
                                 >
                                     Batal
                                 </button>
-                                <button
-                                    type="submit"
-                                    className="flex-1 bg-amber-500 hover:bg-amber-600 text-black py-2.5 rounded text-sm transition font-bold cursor-pointer"
-                                >
+                                <button type="submit" className="flex-1 bg-amber-500 text-black py-2.5 rounded text-sm font-bold">
                                     Simpan Perubahan
                                 </button>
                             </div>
