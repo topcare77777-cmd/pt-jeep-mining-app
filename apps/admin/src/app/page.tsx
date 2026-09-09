@@ -333,7 +333,7 @@ export default function SuperAdminConsole() {
                     },
                 ])
             }
-            alert('Pengguna baru berhasil ditambahkan!')
+            alert('Pengguna baru berhasil didaftarkan!')
             setIsModalOpen(false)
             setFullName('')
             setUsername('')
@@ -496,7 +496,7 @@ export default function SuperAdminConsole() {
         const allowedModules = divisionPermissions[selectedDivisionForPermission] || []
 
         try {
-            const { error } = await supabase
+            const { data, error } = await supabase
                 .from('division_permissions')
                 .upsert(
                     {
@@ -506,14 +506,15 @@ export default function SuperAdminConsole() {
                     },
                     { onConflict: 'division_name' }
                 )
+                .select()
 
             if (error) {
-                alert(`Hak akses tersimpan secara lokal untuk: ${selectedDivisionForPermission}`)
+                alert('Gagal simpan ke Supabase: ' + error.message)
             } else {
-                alert(`Hak akses divisi "${selectedDivisionForPermission}" berhasil disimpan ke database!`)
+                alert(`Hak akses divisi "${selectedDivisionForPermission}" BERHASIL disimpan ke database Supabase!`)
             }
-        } catch {
-            alert(`Hak akses tersimpan lokal untuk: ${selectedDivisionForPermission}`)
+        } catch (err: any) {
+            alert('Kendala koneksi database: ' + (err?.message || err))
         } finally {
             setSavingPermission(false)
         }
