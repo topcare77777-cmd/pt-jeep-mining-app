@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react'
 import { createClient } from '@supabase/supabase-js'
+import NavigationHeader from '@/components/NavigationHeader'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
@@ -20,7 +21,9 @@ interface FuelLog {
 
 export default function FuelManagementPage() {
     const [loading, setLoading] = useState(true)
+    const [userName, setUserName] = useState('Fuelman Site')
     const [logs, setLogs] = useState<FuelLog[]>([])
+    const [searchQuery, setSearchQuery] = useState('')
 
     // Modal State
     const [showModal, setShowModal] = useState(false)
@@ -35,33 +38,74 @@ export default function FuelManagementPage() {
     const landingUrl = process.env.NEXT_PUBLIC_LANDING_URL || 'https://pt-jeep.vercel.app'
 
     useEffect(() => {
+        let isMounted = true
+
         async function initFuel() {
             try {
+                if (typeof window !== 'undefined' && window.location.hash.includes('access_token')) {
+                    const hashClean = window.location.hash.startsWith('#')
+                        ? window.location.hash.substring(1)
+                        : window.location.hash
+                    const hashParams = new URLSearchParams(hashClean)
+                    const accessToken = hashParams.get('access_token')
+                    const refreshToken = hashParams.get('refresh_token')
+
+                    if (accessToken) {
+                        await supabase.auth.setSession({
+                            access_token: accessToken,
+                            refresh_token: refreshToken || '',
+                        })
+                        window.history.replaceState(null, '', window.location.pathname)
+                    }
+                }
+
                 const { data: { session } } = await supabase.auth.getSession()
                 if (!session) {
                     window.location.href = landingUrl
                     return
                 }
 
-                const { data, error } = await supabase
-                    .from('fuel_logs')
-                    .select('*')
-                    .order('created_at', { ascending: false })
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('full_name, status')
+                    .eq('id', session.user.id)
+                    .maybeSingle()
 
-                if (!error && data) {
-                    setLogs(data)
+                const statusClean = (profile?.status || '').toLowerCase().trim()
+                if (statusClean === 'nonaktif' || statusClean === 'banned') {
+                    alert('Akun Anda dinonaktifkan.')
+                    await supabase.auth.signOut()
+                    window.location.href = landingUrl
+                    return
                 }
-                setLoading(false)
+
+                if (isMounted) {
+                    setUserName(profile?.full_name || 'Fuel & Tank Supervisor')
+
+                    const { data, error } = await supabase
+                        .from('fuel_logs')
+                        .select('*')
+                        .order('created_at', { ascending: false })
+
+                    if (!error && data) {
+                        setLogs(data)
+                    }
+                    setLoading(false)
+                }
             } catch (err) {
                 console.error(err)
-                setLoading(false)
+                if (isMounted) setLoading(false)
             }
         }
 
         initFuel()
+
+        return () => {
+            isMounted = false
+        }
     }, [landingUrl])
 
-    // Hitung Estimasi Stok Real-Time (Dasar kapasitas awal misal 40.000 L)
+    // Perhitungan Stok
     const initialStock = 40000
     const totalIn = logs
         .filter((item) => item.transaction_type === 'Penerimaan')
@@ -79,7 +123,7 @@ export default function FuelManagementPage() {
 
         const payload = {
             transaction_type: txType,
-            unit_no: txType === 'Pengisian' ? unitNo || 'Genset / Fasilitas' : 'Vendor Supplier BBM',
+            unit_no: txType === 'Pengisian' ? unitNo.toUpperCase() || 'GENSET / FASILITAS' : unitNo,
             liters: parseFloat(liters),
             operator_driver: pic,
             storage_tank: storageTank,
@@ -105,6 +149,12 @@ export default function FuelManagementPage() {
         setSubmitting(false)
     }
 
+    // Filter pencarian live
+    const filteredLogs = logs.filter((item) =>
+        item.unit_no.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.operator_driver.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+
     if (loading) {
         return (
             <div className="min-h-screen bg-[#060c14] flex flex-col items-center justify-center text-white font-sans">
@@ -116,28 +166,14 @@ export default function FuelManagementPage() {
 
     return (
         <div className="min-h-screen bg-[#060c14] text-slate-100 font-sans p-4 md:p-6 select-none">
-            {/* Header */}
-            <header className="flex flex-wrap items-center justify-between bg-[#0a1625] border border-[#1b2e46] rounded-xl px-6 py-4 mb-6 shadow-xl">
-                <div className="flex items-center space-x-3">
-                    <span className="text-2xl">⛽</span>
-                    <div>
-                        <h1 className="text-xl md:text-2xl font-black tracking-wide text-white">
-                            Pusat Manajemen BBM Solar & Tangki Site PT. JEEP
-                        </h1>
-                        <p className="text-xs text-amber-400 flex items-center gap-1.5 mt-0.5">
-                            <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
-                            Kontrol Burn Rate, Pengisian Alat Berat, & Penerimaan Tangki
-                        </p>
-                    </div>
-                </div>
-
-                <button
-                    onClick={() => window.history.back()}
-                    className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs px-4 py-2 rounded-lg transition cursor-pointer"
-                >
-                    ← Kembali ke Dasbor
-                </button>
-            </header>
+            {/* Global Header */}
+            <NavigationHeader
+                title="Pusat Manajemen BBM Solar & Tangki Site"
+                subtitle="Kontrol Burn Rate, Pengisian Alat Berat, & Penerimaan Tangki"
+                userName={userName}
+                roleBadge="Fuel & Logistics"
+                accentColor="amber"
+            />
 
             {/* Metrik Stok Tangki */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
@@ -146,23 +182,23 @@ export default function FuelManagementPage() {
                     <div className="text-2xl font-black text-emerald-400">
                         {currentStock.toLocaleString('id-ID')} Liter
                     </div>
-                    <p className="mt-2 text-[11px] text-slate-400">Level Aman Cadangan 4–5 Hari</p>
+                    <p className="mt-2 text-[11px] text-slate-400">Level Aman Cadangan Site</p>
                 </div>
 
                 <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
-                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Total Terpakai (Disalurkan)</h3>
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Total Pengisian Unit (Keluar)</h3>
                     <div className="text-2xl font-black text-amber-400">
                         {totalOut.toLocaleString('id-ID')} Liter
                     </div>
-                    <p className="mt-2 text-[11px] text-slate-400">Unit Alat Berat & Genset Site</p>
+                    <p className="mt-2 text-[11px] text-slate-400">Excavator, DT, & Fasilitas</p>
                 </div>
 
                 <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
-                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Total Pengiriman Masuk</h3>
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Total Penerimaan (Masuk)</h3>
                     <div className="text-2xl font-black text-sky-400">
                         {totalIn.toLocaleString('id-ID')} Liter
                     </div>
-                    <p className="mt-2 text-[11px] text-slate-400">Dari Truk Tangki Vendor</p>
+                    <p className="mt-2 text-[11px] text-slate-400">Dari Vendor Supplier</p>
                 </div>
 
                 <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
@@ -173,17 +209,20 @@ export default function FuelManagementPage() {
             </div>
 
             {/* Tabel Log Transaksi BBM */}
-            <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
-                <div className="flex justify-between items-center mb-4">
-                    <div>
-                        <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider">
-                            Log Penyaluran & Pengisian Solar (Live Supabase)
-                        </h3>
-                        <p className="text-[11px] text-slate-500">Tercatat {logs.length} transaksi distribusi</p>
+            <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg space-y-4">
+                <div className="flex flex-wrap justify-between items-center gap-3">
+                    <div className="w-full md:w-72">
+                        <input
+                            type="text"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder="Cari unit atau nama operator..."
+                            className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400"
+                        />
                     </div>
                     <button
                         onClick={() => setShowModal(true)}
-                        className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs px-3.5 py-2 rounded-lg transition cursor-pointer"
+                        className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs px-4 py-2 rounded-lg transition cursor-pointer"
                     >
                         + Catat Pengisian / Penerimaan
                     </button>
@@ -196,17 +235,17 @@ export default function FuelManagementPage() {
                                 <th className="pb-2">Waktu Catat</th>
                                 <th className="pb-2">Jenis Transaksi</th>
                                 <th className="pb-2">Nomor Unit / Vendor</th>
-                                <th className="pb-2">Volume (Liter)</th>
+                                <th className="pb-2 text-right">Volume (Liter)</th>
                                 <th className="pb-2">Operator / Driver</th>
                                 <th className="pb-2">Tangki Asal</th>
                                 <th className="pb-2">Catatan</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-[#16273c] text-slate-300">
-                            {logs.length > 0 ? (
-                                logs.map((item) => (
+                            {filteredLogs.length > 0 ? (
+                                filteredLogs.map((item) => (
                                     <tr key={item.id}>
-                                        <td className="py-2.5 text-slate-400">
+                                        <td className="py-2.5 text-slate-400 font-mono text-[11px]">
                                             {item.created_at ? new Date(item.created_at).toLocaleString('id-ID') : 'Hari ini'}
                                         </td>
                                         <td>
@@ -220,7 +259,7 @@ export default function FuelManagementPage() {
                                             </span>
                                         </td>
                                         <td className="font-bold text-white font-mono">{item.unit_no}</td>
-                                        <td className="font-mono font-bold text-emerald-400">
+                                        <td className="font-mono font-bold text-emerald-400 text-right">
                                             {Number(item.liters || 0).toLocaleString('id-ID')} L
                                         </td>
                                         <td>{item.operator_driver}</td>
@@ -231,7 +270,7 @@ export default function FuelManagementPage() {
                             ) : (
                                 <tr>
                                     <td colSpan={7} className="py-8 text-center text-slate-500 italic">
-                                        Belum ada log pengisian BBM. Klik "+ Catat Pengisian / Penerimaan" untuk input.
+                                        Tidak ada log transaksi BBM yang cocok.
                                     </td>
                                 </tr>
                             )}
@@ -293,7 +332,7 @@ export default function FuelManagementPage() {
                                     value={liters}
                                     onChange={(e) => setLiters(e.target.value)}
                                     placeholder="Contoh: 350"
-                                    className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400"
+                                    className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400 font-mono"
                                 />
                             </div>
 
