@@ -9,33 +9,34 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
-interface Employee {
+interface EmployeeItem {
     id: string
     created_at?: string
     nik: string
     full_name: string
-    position: string
     department: string
-    status: string
-    phone?: string
+    position_title: string
+    roster_schedule: string
+    base_salary_idr: number
+    employment_status: string
 }
 
-export default function HrdDashboard() {
+export default function HRDManagementPage() {
     const pathname = usePathname()
     const [loading, setLoading] = useState(true)
-    const [userName, setUserName] = useState('Petugas HRD')
-    const [activeTab, setActiveTab] = useState('karyawan')
-    const [employees, setEmployees] = useState<Employee[]>([])
+    const [userName, setUserName] = useState('HRD Superintendent')
+    const [employees, setEmployees] = useState<EmployeeItem[]>([])
     const [searchQuery, setSearchQuery] = useState('')
 
-    // Modal Input Personil Baru
+    // State Modal Input Pegawai Baru
     const [showModal, setShowModal] = useState(false)
     const [nik, setNik] = useState('')
     const [fullName, setFullName] = useState('')
-    const [position, setPosition] = useState('')
-    const [department, setDepartment] = useState('Operasional Pit')
-    const [status, setStatus] = useState('Aktif (Site)')
-    const [phone, setPhone] = useState('')
+    const [department, setDepartment] = useState('Produksi Pit')
+    const [positionTitle, setPositionTitle] = useState('Operator Excavator PC200')
+    const [rosterSchedule, setRosterSchedule] = useState('8:2 (8 Minggu Kerja, 2 Minggu Off)')
+    const [baseSalaryIdr, setBaseSalaryIdr] = useState('8500000')
+    const [employmentStatus, setEmploymentStatus] = useState('Aktif')
     const [submitting, setSubmitting] = useState(false)
 
     const landingUrl = process.env.NEXT_PUBLIC_LANDING_URL || 'https://pt-jeep.vercel.app'
@@ -43,7 +44,7 @@ export default function HrdDashboard() {
     useEffect(() => {
         let isMounted = true
 
-        async function initHrd() {
+        async function initHRD() {
             try {
                 if (typeof window !== 'undefined' && window.location.hash.includes('access_token')) {
                     const hashClean = window.location.hash.startsWith('#')
@@ -70,7 +71,7 @@ export default function HrdDashboard() {
 
                 const { data: profile } = await supabase
                     .from('profiles')
-                    .select('full_name, role, status')
+                    .select('full_name, status')
                     .eq('id', session.user.id)
                     .maybeSingle()
 
@@ -83,47 +84,58 @@ export default function HrdDashboard() {
                 }
 
                 if (isMounted) {
-                    setUserName(profile?.full_name || 'HRD & K3 Coordinator')
+                    setUserName(profile?.full_name || 'HRD & Manpower Manager')
 
-                    const { data: empData, error } = await supabase
-                        .from('hrd_employees')
+                    const { data, error } = await supabase
+                        .from('hr_employee_records')
                         .select('*')
-                        .order('created_at', { ascending: false })
+                        .order('nik', { ascending: true })
 
-                    if (!error && empData && empData.length > 0) {
-                        setEmployees(empData)
+                    if (!error && data && data.length > 0) {
+                        setEmployees(data)
                     } else {
                         setEmployees([
                             {
                                 id: '1',
-                                nik: 'JP-2026-088',
-                                full_name: 'Bambang Supriyanto',
-                                position: 'Operator Excavator PC-400',
-                                department: 'Operasional Pit',
-                                status: 'Aktif (Site)',
-                                phone: '081234567890',
+                                nik: 'JEEP-2026-001',
+                                full_name: 'Slamet Riyadi',
+                                department: 'Produksi Pit',
+                                position_title: 'Supervisor Pit Penambangan',
+                                roster_schedule: '8:2 (8 Minggu Kerja, 2 Minggu Off)',
+                                base_salary_idr: 12500000,
+                                employment_status: 'Aktif',
                             },
                             {
                                 id: '2',
-                                nik: 'JP-2026-042',
-                                full_name: 'Rian Hidayat',
-                                position: 'Safety Officer / HSE',
-                                department: 'K3 & Lingkungan',
-                                status: 'Aktif (Site)',
-                                phone: '082198765432',
+                                nik: 'JEEP-2026-002',
+                                full_name: 'Budi Santoso',
+                                department: 'Plant & Workshop',
+                                position_title: 'Mekanik Kepala Alat Berat',
+                                roster_schedule: '8:2 (8 Minggu Kerja, 2 Minggu Off)',
+                                base_salary_idr: 10500000,
+                                employment_status: 'Aktif',
+                            },
+                            {
+                                id: '3',
+                                nik: 'JEEP-2026-003',
+                                full_name: 'Joko Widodo',
+                                department: 'HSE & K3',
+                                position_title: 'Safety Officer Lapangan',
+                                roster_schedule: '8:2 (8 Minggu Kerja, 2 Minggu Off)',
+                                base_salary_idr: 9500000,
+                                employment_status: 'Aktif',
                             },
                         ])
                     }
-
                     setLoading(false)
                 }
             } catch (err) {
-                console.error('Error HRD init:', err)
+                console.error(err)
                 if (isMounted) setLoading(false)
             }
         }
 
-        initHrd()
+        initHRD()
 
         return () => {
             isMounted = false
@@ -132,35 +144,32 @@ export default function HrdDashboard() {
 
     const handleAddEmployee = async (e: React.FormEvent) => {
         e.preventDefault()
-        if (!fullName || !position) return
+        if (!nik || !fullName) return
 
         setSubmitting(true)
 
-        const generatedNik = nik || `JP-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`
-
         const payload = {
-            nik: generatedNik,
+            nik: nik.toUpperCase(),
             full_name: fullName,
-            position,
             department,
-            status,
-            phone,
+            position_title: positionTitle,
+            roster_schedule: rosterSchedule,
+            base_salary_idr: parseFloat(baseSalaryIdr) || 0,
+            employment_status: employmentStatus,
         }
 
         const { data, error } = await supabase
-            .from('hrd_employees')
+            .from('hr_employee_records')
             .insert([payload])
             .select()
 
         if (!error && data) {
-            setEmployees([data[0], ...employees])
+            setEmployees([...employees, data[0]])
             setShowModal(false)
             setNik('')
             setFullName('')
-            setPosition('')
-            setPhone('')
         } else {
-            alert('Gagal mendaftarkan personil: ' + (error?.message || 'Terjadi kesalahan sistem.'))
+            alert('Gagal mendaftarkan karyawan: ' + (error?.message || 'NIK sudah terdaftar.'))
         }
 
         setSubmitting(false)
@@ -171,29 +180,37 @@ export default function HrdDashboard() {
         window.location.href = landingUrl
     }
 
-    const filteredEmployees = employees.filter((emp) =>
-        emp.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        emp.nik.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        emp.position.toLowerCase().includes(searchQuery.toLowerCase())
+    const totalEmployees = employees.length
+    const activeEmployees = employees.filter((e) => e.employment_status === 'Aktif').length
+    const totalPayrollMonthly = employees.reduce((acc, curr) => acc + Number(curr.base_salary_idr || 0), 0)
+
+    const filteredEmployees = employees.filter((item) =>
+        item.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.nik.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.department.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.position_title.toLowerCase().includes(searchQuery.toLowerCase())
     )
 
     const navLinks = [
-        { href: '/manager-site', label: 'Pit Produksi', icon: '⛏️' },
-        { href: '/ritase', label: 'Ritase & Timbangan', icon: '🚛' },
-        { href: '/bbm', label: 'Tangki BBM', icon: '⛽' },
+        { href: '/hrd', label: 'HRD & Payroll', icon: '👷‍♂️' },
+        { href: '/fleet-maintenance', label: 'Maintenance', icon: '🔧' },
+        { href: '/fleet', label: 'Alat Berat', icon: '🚜' },
+        { href: '/sparepart', label: 'Sparepart', icon: '📦' },
+        { href: '/manager-site', label: 'Pit Penambangan', icon: '⛏️' },
+        { href: '/safety', label: 'Inspeksi K3', icon: '⛑️' },
+        { href: '/jetty', label: 'Jetty & LCT', icon: '🚢' },
+        { href: '/bbm', label: 'BBM Solar', icon: '⛽' },
         { href: '/finance', label: 'Keuangan', icon: '💰' },
-        { href: '/adm', label: 'ADM & Surat', icon: '📋' },
-        { href: '/hrd', label: 'HRD & K3', icon: '👷‍♂️' },
-        { href: '/ga', label: 'GA & Fasilitas', icon: '🚙' },
-        { href: '/direktur', label: 'Eksekutif', icon: '🏛️' },
+        { href: '/legal', label: 'Legal & IUP', icon: '⚖️' },
+        { href: '/investor', label: 'Investor', icon: '📈' },
         { href: '/laporan', label: 'Cetak Laporan', icon: '📄' },
     ]
 
     if (loading) {
         return (
             <div className="min-h-screen bg-[#060c14] flex flex-col items-center justify-center text-white font-sans">
-                <div className="w-10 h-10 border-4 border-sky-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-                <p className="text-xs text-slate-400">Sinkronisasi Personil & HSE Site...</p>
+                <div className="w-10 h-10 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+                <p className="text-xs text-slate-400">Sinkronisasi Data Kepegawaian & HRD Site...</p>
             </div>
         )
     }
@@ -203,19 +220,22 @@ export default function HrdDashboard() {
             {/* Header Mandiri */}
             <header className="mb-6 space-y-3">
                 <div className="flex flex-wrap items-center justify-between bg-[#0a1625] border border-[#1b2e46] rounded-xl px-6 py-4 shadow-xl">
-                    <div>
-                        <h1 className="text-xl md:text-2xl font-black tracking-wide text-white flex items-center gap-2">
-                            Dashboard Human Resources & HSE (K3) PT. JEEP
-                        </h1>
-                        <p className="text-xs text-slate-400 flex items-center gap-2 mt-1">
-                            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                            <span>Manpower Management & Jam Kerja Selamat (Zero Accident)</span>
-                            <span className="text-slate-600">•</span>
-                            <span className="text-slate-300 font-semibold">{userName}</span>
-                            <span className="bg-[#112233] border border-[#1e3a5f] text-slate-300 text-[10px] px-2 py-0.5 rounded font-mono">
-                                HRD & HSE
-                            </span>
-                        </p>
+                    <div className="flex items-center space-x-3">
+                        <span className="text-2xl">👷‍♂️</span>
+                        <div>
+                            <h1 className="text-xl md:text-2xl font-black tracking-wide text-white">
+                                Manajemen HRD & Penggajian Karyawan PT. JEEP
+                            </h1>
+                            <p className="text-xs text-amber-400 flex items-center gap-1.5 mt-0.5">
+                                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                                <span>Kontrol Database Karyawan, Roster Kerja, & Rekapitulasi Payroll Site</span>
+                                <span className="text-slate-600">•</span>
+                                <span className="text-slate-300 font-semibold">{userName}</span>
+                                <span className="bg-[#112233] border border-[#1e3a5f] text-slate-300 text-[10px] px-2 py-0.5 rounded font-mono">
+                                    HRD Dept
+                                </span>
+                            </p>
+                        </div>
                     </div>
 
                     <button
@@ -247,219 +267,198 @@ export default function HrdDashboard() {
                 </div>
             </header>
 
-            {/* Nav Tabs */}
-            <nav className="flex flex-wrap gap-2 mb-6">
-                {[
-                    { id: 'karyawan', label: 'DATA PERSONIL & CREW', badge: `${employees.length} ORANG` },
-                    { id: 'k3', label: 'STATISTIK K3 & SAFETY INDUCTION', badge: 'ZERO ACCIDENT' },
-                    { id: 'absensi', label: 'ROSTER & ABSENSI SHIFT', badge: '' },
-                    { id: 'mcu', label: 'MEDICAL CHECK-UP (MCU)', badge: '100% FIT' },
-                ].map((tab) => (
-                    <button
-                        key={tab.id}
-                        onClick={() => setActiveTab(tab.id)}
-                        className={`px-4 py-2.5 rounded-lg text-xs font-bold transition flex items-center gap-2 border cursor-pointer ${activeTab === tab.id
-                                ? 'bg-[#1b3b5f] border-sky-400 text-white shadow-lg shadow-sky-950/40'
-                                : 'bg-[#0c1a2d] border-[#1b2e46] text-slate-400 hover:text-white hover:bg-[#12243d]'
-                            }`}
-                    >
-                        <span>{tab.label}</span>
-                        {tab.badge && (
-                            <span className="bg-sky-400 text-slate-950 text-[10px] px-1.5 py-0.5 rounded font-black">
-                                {tab.badge}
-                            </span>
-                        )}
-                    </button>
-                ))}
-            </nav>
+            {/* KPI HRD */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+                <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Total Tenaga Kerja Site</h3>
+                    <div className="text-2xl font-black text-white font-mono">{totalEmployees} Orang</div>
+                    <p className="mt-2 text-[11px] text-slate-400">Terdaftar di Sistem HRD</p>
+                </div>
 
-            {/* Konten Utama */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                {/* Kolom Kiri: Action Bar */}
-                <aside className="lg:col-span-3 space-y-3">
-                    <div
-                        onClick={() => setShowModal(true)}
-                        className="p-4 rounded-xl border border-dashed border-sky-500/50 bg-sky-950/20 hover:bg-sky-900/30 text-sky-400 cursor-pointer transition flex items-center gap-3"
-                    >
-                        <span className="text-xl">➕</span>
-                        <div>
-                            <div className="text-xs font-bold">Daftarkan Personil Baru</div>
-                            <div className="text-[10px] text-slate-400">Operator, Driver, Mekanik, HSE</div>
-                        </div>
+                <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Karyawan Aktif Shift On</h3>
+                    <div className="text-2xl font-black text-emerald-400 font-mono">{activeEmployees} Orang</div>
+                    <p className="mt-2 text-[11px] text-emerald-400 font-semibold">Bertugas di Area Penambangan</p>
+                </div>
+
+                <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Akumulasi Payroll Bulanan</h3>
+                    <div className="text-2xl font-black text-amber-400 font-mono">
+                        Rp {(totalPayrollMonthly / 1000000).toFixed(1)} Juta
                     </div>
+                    <p className="mt-2 text-[11px] text-slate-400">Estimasi Penggajian Rutin</p>
+                </div>
 
-                    <div className="p-4 rounded-xl border border-[#16273c] bg-[#0a1625] text-slate-400 space-y-2">
-                        <span className="text-xs font-bold text-white uppercase tracking-wider block">Database Personil</span>
-                        <div className="text-[11px] flex justify-between">
-                            <span>Tabel Supabase</span>
-                            <span className="text-sky-400 font-semibold">hrd_employees</span>
-                        </div>
-                        <div className="text-[11px] flex justify-between">
-                            <span>Total Terdaftar</span>
-                            <span className="text-slate-200 font-bold">{employees.length} personil</span>
-                        </div>
-                    </div>
-                </aside>
-
-                {/* Kolom Kanan: Panel Tabel */}
-                <main className="lg:col-span-9 space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
-                            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Jam Kerja Selamat (LTI-Free)</h3>
-                            <div className="text-2xl font-black text-emerald-400">142.850 Jam</div>
-                            <p className="mt-2 text-[11px] text-emerald-400 font-semibold">✓ Zero Fatal Accident Tercapai</p>
-                        </div>
-
-                        <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
-                            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Total Manpower Site</h3>
-                            <div className="text-2xl font-black text-white">{employees.length} Orang</div>
-                            <p className="mt-2 text-[11px] text-slate-400">Termasuk Kontraktor & Kru Pit</p>
-                        </div>
-
-                        <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
-                            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Kebugaran Kerja (Fit To Work)</h3>
-                            <div className="text-2xl font-black text-sky-400">100% Fit</div>
-                            <p className="mt-2 text-[11px] text-sky-400 font-medium">Daily Fatigue Check Selesai</p>
-                        </div>
-                    </div>
-
-                    <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg space-y-4">
-                        <div className="flex flex-wrap justify-between items-center gap-3">
-                            <div className="w-full md:w-72">
-                                <input
-                                    type="text"
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    placeholder="Cari nama, NIK, jabatan..."
-                                    className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-sky-400"
-                                />
-                            </div>
-                            <button
-                                onClick={() => setShowModal(true)}
-                                className="bg-sky-500 hover:bg-sky-600 text-slate-950 text-[11px] font-bold px-3.5 py-2 rounded-lg transition cursor-pointer"
-                            >
-                                + Registrasi Personil
-                            </button>
-                        </div>
-
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left text-xs">
-                                <thead>
-                                    <tr className="border-b border-[#1b2e46] text-slate-400">
-                                        <th className="pb-2">NIK</th>
-                                        <th className="pb-2">Nama Lengkap</th>
-                                        <th className="pb-2">Jabatan / Posisi</th>
-                                        <th className="pb-2">Departemen</th>
-                                        <th className="pb-2">Kontak</th>
-                                        <th className="pb-2">Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-[#16273c] text-slate-300">
-                                    {filteredEmployees.length > 0 ? (
-                                        filteredEmployees.map((emp) => (
-                                            <tr key={emp.id}>
-                                                <td className="py-2.5 font-mono text-sky-400 font-bold">{emp.nik}</td>
-                                                <td className="font-semibold text-white">{emp.full_name}</td>
-                                                <td>{emp.position}</td>
-                                                <td className="text-slate-400">{emp.department}</td>
-                                                <td className="text-slate-400 font-mono">{emp.phone || '-'}</td>
-                                                <td>
-                                                    <span className="bg-emerald-950/80 border border-emerald-800/40 text-emerald-400 text-[10px] px-2 py-0.5 rounded font-medium">
-                                                        {emp.status}
-                                                    </span>
-                                                </td>
-                                            </tr>
-                                        ))
-                                    ) : (
-                                        <tr>
-                                            <td colSpan={6} className="py-8 text-center text-slate-500 italic">
-                                                Tidak ada personil yang cocok dengan pencarian.
-                                            </td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </main>
+                <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Kepatuhan Ketenagakerjaan</h3>
+                    <div className="text-2xl font-black text-cyan-400 font-mono">100% Sesuai</div>
+                    <p className="mt-2 text-[11px] text-cyan-400 font-medium">✓ Standar UU Ketenagakerjaan</p>
+                </div>
             </div>
 
-            {/* Modal Pendaftaran Personil */}
+            {/* Grid Tabel HRD */}
+            <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg space-y-4">
+                <div className="flex flex-wrap justify-between items-center gap-3">
+                    <div className="w-full md:w-72">
+                        <input
+                            type="text"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder="Cari NIK, nama, jabatan, departemen..."
+                            className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400"
+                        />
+                    </div>
+                    <button
+                        onClick={() => setShowModal(true)}
+                        className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs px-4 py-2 rounded-lg transition cursor-pointer"
+                    >
+                        + Daftarkan Karyawan Baru
+                    </button>
+                </div>
+
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                        <thead>
+                            <tr className="border-b border-[#1b2e46] text-slate-400">
+                                <th className="pb-2">Nomor Induk (NIK)</th>
+                                <th className="pb-2">Nama Lengkap Karyawan</th>
+                                <th className="pb-2">Departemen</th>
+                                <th className="pb-2">Jabatan / Posisi</th>
+                                <th className="pb-2">Roster Kerja</th>
+                                <th className="pb-2 text-right">Gaji & Tunjangan (IDR)</th>
+                                <th className="pb-2 text-center">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[#16273c] text-slate-300">
+                            {filteredEmployees.length > 0 ? (
+                                filteredEmployees.map((emp) => (
+                                    <tr key={emp.id}>
+                                        <td className="py-2.5 font-bold font-mono text-amber-400">{emp.nik}</td>
+                                        <td className="font-semibold text-white">{emp.full_name}</td>
+                                        <td>
+                                            <span className="bg-[#112233] border border-[#1e3a5f] text-slate-300 text-[10px] px-2 py-0.5 rounded">
+                                                {emp.department}
+                                            </span>
+                                        </td>
+                                        <td className="text-slate-300">{emp.position_title}</td>
+                                        <td className="text-slate-400 font-mono text-[11px]">{emp.roster_schedule}</td>
+                                        <td className="text-right font-mono font-bold text-emerald-400">
+                                            Rp {Number(emp.base_salary_idr).toLocaleString('id-ID')}
+                                        </td>
+                                        <td className="text-center">
+                                            <span className="bg-emerald-950/80 border border-emerald-800/40 text-emerald-400 text-[10px] px-2.5 py-0.5 rounded font-bold">
+                                                {emp.employment_status.toUpperCase()}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                ))
+                            ) : (
+                                <tr>
+                                    <td colSpan={7} className="py-8 text-center text-slate-500 italic">
+                                        Tidak ada data karyawan yang cocok dengan pencarian.
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            {/* Modal Input Karyawan */}
             {showModal && (
                 <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
                     <div className="bg-[#0a1625] border border-[#1b2e46] rounded-xl p-6 w-full max-w-md shadow-2xl space-y-4">
-                        <h2 className="text-sm font-bold text-white uppercase tracking-wider">Registrasi Tenaga Kerja Tambang</h2>
+                        <h2 className="text-sm font-bold text-white uppercase tracking-wider">Registrasi Karyawan & Payroll Baru</h2>
                         <form onSubmit={handleAddEmployee} className="space-y-3">
-                            <div>
-                                <label className="text-[11px] text-slate-400 block mb-1">NIK Perusahaan (Opsional)</label>
-                                <input
-                                    type="text"
-                                    value={nik}
-                                    onChange={(e) => setNik(e.target.value)}
-                                    placeholder="Otomatis diisi jika kosong"
-                                    className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-sky-400 font-mono"
-                                />
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-[11px] text-slate-400 block mb-1">Nomor Induk (NIK)</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        value={nik}
+                                        onChange={(e) => setNik(e.target.value)}
+                                        placeholder="JEEP-2026-050"
+                                        className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400 font-mono"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[11px] text-slate-400 block mb-1">Nama Lengkap</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        value={fullName}
+                                        onChange={(e) => setFullName(e.target.value)}
+                                        placeholder="Nama Karyawan"
+                                        className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400"
+                                    />
+                                </div>
                             </div>
-                            <div>
-                                <label className="text-[11px] text-slate-400 block mb-1">Nama Lengkap</label>
-                                <input
-                                    type="text"
-                                    required
-                                    value={fullName}
-                                    onChange={(e) => setFullName(e.target.value)}
-                                    placeholder="Contoh: Joko Widodo"
-                                    className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-sky-400"
-                                />
-                            </div>
-                            <div>
-                                <label className="text-[11px] text-slate-400 block mb-1">Jabatan / Posisi Kerja</label>
-                                <input
-                                    type="text"
-                                    required
-                                    value={position}
-                                    onChange={(e) => setPosition(e.target.value)}
-                                    placeholder="Contoh: Operator Dozer D85 / Pengawas Pit"
-                                    className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-sky-400"
-                                />
-                            </div>
+
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
                                     <label className="text-[11px] text-slate-400 block mb-1">Departemen</label>
                                     <select
                                         value={department}
                                         onChange={(e) => setDepartment(e.target.value)}
-                                        className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-sky-400"
+                                        className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400"
                                     >
-                                        <option value="Operasional Pit">Operasional Pit</option>
-                                        <option value="Hauling & Port">Hauling & Port</option>
-                                        <option value="K3 & Lingkungan">K3 & Lingkungan (HSE)</option>
-                                        <option value="Plant & Maintenance">Plant & Maintenance</option>
-                                        <option value="Finance & ADM">Finance & ADM</option>
-                                        <option value="General Affair">General Affair (GA)</option>
+                                        <option value="Produksi Pit">Produksi Pit</option>
+                                        <option value="Plant & Workshop">Plant & Workshop</option>
+                                        <option value="HSE & K3">HSE & K3</option>
+                                        <option value="Jetty Port">Jetty Port</option>
+                                        <option value="General Affair">General Affair</option>
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="text-[11px] text-slate-400 block mb-1">Status Karyawan</label>
-                                    <select
-                                        value={status}
-                                        onChange={(e) => setStatus(e.target.value)}
-                                        className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-sky-400"
-                                    >
-                                        <option value="Aktif (Site)">Aktif (Site)</option>
-                                        <option value="Roster Off / Cuti">Roster Off / Cuti</option>
-                                        <option value="Training">Training / Induksi</option>
-                                    </select>
+                                    <label className="text-[11px] text-slate-400 block mb-1">Jabatan / Posisi</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        value={positionTitle}
+                                        onChange={(e) => setPositionTitle(e.target.value)}
+                                        placeholder="Operator / Mekanik"
+                                        className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400"
+                                    />
                                 </div>
                             </div>
+
                             <div>
-                                <label className="text-[11px] text-slate-400 block mb-1">Nomor HP / WhatsApp</label>
+                                <label className="text-[11px] text-slate-400 block mb-1">Roster Kerja Site</label>
                                 <input
-                                    type="tel"
-                                    value={phone}
-                                    onChange={(e) => setPhone(e.target.value)}
-                                    placeholder="0812xxxxxxxx"
-                                    className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-sky-400 font-mono"
+                                    type="text"
+                                    required
+                                    value={rosterSchedule}
+                                    onChange={(e) => setRosterSchedule(e.target.value)}
+                                    placeholder="8:2 (8 Minggu Kerja, 2 Minggu Off)"
+                                    className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400"
                                 />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-[11px] text-slate-400 block mb-1">Gaji & Tunjangan (IDR)</label>
+                                    <input
+                                        type="number"
+                                        required
+                                        value={baseSalaryIdr}
+                                        onChange={(e) => setBaseSalaryIdr(e.target.value)}
+                                        placeholder="8500000"
+                                        className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400 font-mono"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[11px] text-slate-400 block mb-1">Status Kepegawaian</label>
+                                    <select
+                                        value={employmentStatus}
+                                        onChange={(e) => setEmploymentStatus(e.target.value)}
+                                        className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400 font-bold"
+                                    >
+                                        <option value="Aktif">Aktif Bekerja</option>
+                                        <option value="Cuti Roster">Cuti Roster (Off)</option>
+                                        <option value="Nonaktif">Nonaktif</option>
+                                    </select>
+                                </div>
                             </div>
 
                             <div className="flex justify-end gap-2 pt-2">
@@ -473,9 +472,9 @@ export default function HrdDashboard() {
                                 <button
                                     type="submit"
                                     disabled={submitting}
-                                    className="px-4 py-2 rounded-lg bg-sky-500 hover:bg-sky-600 text-slate-950 font-bold text-xs transition cursor-pointer"
+                                    className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs transition cursor-pointer"
                                 >
-                                    {submitting ? 'Menyimpan...' : 'Simpan Personil'}
+                                    {submitting ? 'Menyimpan...' : 'Simpan Karyawan'}
                                 </button>
                             </div>
                         </form>
