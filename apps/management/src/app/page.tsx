@@ -45,7 +45,7 @@ const ALL_OPERATIONAL_MODULES = [
     {
         key: 'safety',
         title: 'Inspeksi K3 & HSE',
-        badge: 'K3 Tambang',
+        badge: 'K3 Tambang Nikel',
         desc: 'Pencatatan temuan hazard, mitigasi risiko K3, dan jam kerja selamat.',
         icon: '⛑️',
         href: '/safety',
@@ -263,7 +263,6 @@ export default function ManagementPortalPage() {
 
         async function checkAuthAndPermissions() {
             try {
-                // Tangkap token dari hash jika login via redirect URL landing page
                 if (typeof window !== 'undefined' && window.location.hash.includes('access_token')) {
                     const hashClean = window.location.hash.startsWith('#')
                         ? window.location.hash.substring(1)
@@ -304,23 +303,41 @@ export default function ManagementPortalPage() {
 
                 if (isMounted) {
                     setUserProfile(profile)
-                    const userDivision = profile?.role || ''
+                    const userDivision = (profile?.role || '').trim()
 
-                    // 2. Jika Superadmin, berikan semua modul
-                    if (userDivision.toLowerCase().includes('admin')) {
+                    // 2. Jika Superadmin murni (bukan ADM), berikan semua modul
+                    const isSuperAdmin = userDivision.toLowerCase() === 'admin' ||
+                        userDivision.toLowerCase() === 'administrator' ||
+                        userDivision.toLowerCase() === 'superadmin'
+
+                    if (isSuperAdmin) {
                         setAllowedModules(ALL_OPERATIONAL_MODULES.map((m) => m.key))
                     } else {
-                        // 3. Ambil hak akses divisi dari database Supabase
-                        const { data: permData } = await supabase
+                        // 3. Ambil data izin divisi dari Supabase dengan penanganan fuzzy matching
+                        const { data: allPerms } = await supabase
                             .from('division_permissions')
-                            .select('allowed_modules')
-                            .eq('division_name', userDivision)
-                            .maybeSingle()
+                            .select('division_name, allowed_modules')
 
-                        if (permData && Array.isArray(permData.allowed_modules)) {
-                            setAllowedModules(permData.allowed_modules)
+                        if (allPerms && allPerms.length > 0) {
+                            const cleanDiv = userDivision.toLowerCase()
+
+                            const matched = allPerms.find((p) => {
+                                const target = (p.division_name || '').toLowerCase().trim()
+                                return (
+                                    target === cleanDiv ||
+                                    target.includes(cleanDiv) ||
+                                    cleanDiv.includes(target) ||
+                                    (cleanDiv === 'adm' && (target.includes('administrasi') || target.includes('adm')))
+                                )
+                            })
+
+                            if (matched && Array.isArray(matched.allowed_modules)) {
+                                setAllowedModules(matched.allowed_modules)
+                            } else {
+                                setAllowedModules(['adm']) // fallback khusus role ADM
+                            }
                         } else {
-                            setAllowedModules([])
+                            setAllowedModules(['adm'])
                         }
                     }
                     setLoading(false)
