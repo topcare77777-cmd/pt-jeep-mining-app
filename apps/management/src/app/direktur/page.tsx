@@ -12,30 +12,79 @@ export default function DirekturDashboard() {
     const [directorName, setDirectorName] = useState('Direktur Utama')
     const [activeTab, setActiveTab] = useState('executive')
 
+    // State Agregasi Data Live Eksekutif
+    const [totalExpense, setTotalExpense] = useState<number>(0)
+    const [totalObBcm, setTotalObBcm] = useState<number>(0)
+    const [totalCoalTon, setTotalCoalTon] = useState<number>(0)
+    const [productionCount, setProductionCount] = useState<number>(0)
+
     const landingUrl = process.env.NEXT_PUBLIC_LANDING_URL || 'https://pt-jeep.vercel.app'
 
     useEffect(() => {
         async function initDirector() {
             try {
+                // 1. Ambil token dari URL hash jika dialihkan lintas-domain
+                if (typeof window !== 'undefined' && window.location.hash.includes('access_token')) {
+                    const hashParams = new URLSearchParams(window.location.hash.replace('#', '?'))
+                    const accessToken = hashParams.get('access_token')
+                    const refreshToken = hashParams.get('refresh_token')
+
+                    if (accessToken && refreshToken) {
+                        await supabase.auth.setSession({
+                            access_token: accessToken,
+                            refresh_token: refreshToken,
+                        })
+                        window.history.replaceState(null, '', window.location.pathname)
+                    }
+                }
+
+                // 2. Proteksi Sesi Supabase
                 const { data: { session } } = await supabase.auth.getSession()
                 if (!session) {
                     window.location.href = landingUrl
                     return
                 }
 
+                // 3. Verifikasi Profil
                 const { data: profile } = await supabase
                     .from('profiles')
                     .select('full_name, role, status')
                     .eq('id', session.user.id)
                     .single()
 
-                if (!profile || profile.status !== 'Aktif') {
+                const userStatus = (profile?.status || '').toLowerCase()
+                if (profile && userStatus && userStatus !== 'aktif') {
+                    alert('Akun Anda dinonaktifkan.')
                     await supabase.auth.signOut()
                     window.location.href = landingUrl
                     return
                 }
 
-                setDirectorName(profile.full_name || 'Direktur Utama')
+                setDirectorName(profile?.full_name || 'Direktur Utama')
+
+                // 4. Tarik dan Agregasi Pengeluaran Keuangan (Finance)
+                const { data: financeData } = await supabase
+                    .from('finance_transactions')
+                    .select('amount')
+
+                if (financeData && financeData.length > 0) {
+                    const sumExp = financeData.reduce((acc, curr) => acc + Number(curr.amount || 0), 0)
+                    setTotalExpense(sumExp)
+                }
+
+                // 5. Tarik dan Agregasi Produksi Site (Overburden & Coal)
+                const { data: prodData } = await supabase
+                    .from('site_production_logs')
+                    .select('overburden_bcm, coal_getting_ton')
+
+                if (prodData && prodData.length > 0) {
+                    setProductionCount(prodData.length)
+                    const sumOb = prodData.reduce((acc, curr) => acc + Number(curr.overburden_bcm || 0), 0)
+                    const sumCoal = prodData.reduce((acc, curr) => acc + Number(curr.coal_getting_ton || 0), 0)
+                    setTotalObBcm(sumOb)
+                    setTotalCoalTon(sumCoal)
+                }
+
                 setLoading(false)
             } catch (err) {
                 console.error('Error init director:', err)
@@ -55,7 +104,7 @@ export default function DirekturDashboard() {
         return (
             <div className="min-h-screen bg-[#060c14] flex flex-col items-center justify-center text-white font-sans">
                 <div className="w-10 h-10 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-                <p className="text-xs text-slate-400">Menyiapkan Ringkasan Eksekutif...</p>
+                <p className="text-xs text-slate-400">Menyiapkan Ringkasan Eksekutif Terpadu...</p>
             </div>
         )
     }
@@ -88,10 +137,10 @@ export default function DirekturDashboard() {
             {/* Nav Tabs */}
             <nav className="flex flex-wrap gap-2 mb-6">
                 {[
-                    { id: 'executive', label: 'RINGKASAN EKSEKUTIF', badge: 'Q3 2026' },
-                    { id: 'financial', label: 'NET PROFIT & CASH FLOW', badge: '' },
-                    { id: 'production', label: 'TARGET VS REALISASI PRODUKSI', badge: '' },
-                    { id: 'esg', label: 'COMPLIANCE & ESG AUDIT', badge: 'AMAN' },
+                    { id: 'executive', label: 'RINGKASAN EKSEKUTIF', badge: 'LIVE SYNC' },
+                    { id: 'financial', label: 'PENGELUARAN & BIAYA SITE', badge: '' },
+                    { id: 'production', label: 'TARGET VS REALISASI PIT', badge: '' },
+                    { id: 'esg', label: 'COMPLIANCE & LEGALITAS', badge: '100% VALID' },
                 ].map((tab) => (
                     <button
                         key={tab.id}
@@ -114,27 +163,33 @@ export default function DirekturDashboard() {
             {/* Kartu Metrik Level Dewan Direksi */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
                 <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
-                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Total Pendapatan (YTD)</h3>
-                    <div className="text-2xl font-black text-white">Rp 48,2 Miliar</div>
-                    <p className="mt-2 text-[11px] text-emerald-400 font-semibold">+14,5% terhadap target RKAB</p>
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Total Pengeluaran Site (Live)</h3>
+                    <div className="text-2xl font-black text-amber-400">
+                        Rp {totalExpense.toLocaleString('id-ID')}
+                    </div>
+                    <p className="mt-2 text-[11px] text-emerald-400 font-semibold">Tercatat di Divisi Finance</p>
                 </div>
 
                 <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
-                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Estimasi Laba Bersih</h3>
-                    <div className="text-2xl font-black text-emerald-400">Rp 12,8 Miliar</div>
-                    <p className="mt-2 text-[11px] text-slate-400">Net Profit Margin: 26,5%</p>
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Total Overburden Pit</h3>
+                    <div className="text-2xl font-black text-white">
+                        {totalObBcm.toLocaleString('id-ID')} BCM
+                    </div>
+                    <p className="mt-2 text-[11px] text-emerald-400 font-semibold">Dari {productionCount} shift pelaporan</p>
                 </div>
 
                 <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
-                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Realisasi Pengiriman (Barge)</h3>
-                    <div className="text-2xl font-black text-amber-400">185.000 MT</div>
-                    <p className="mt-2 text-[11px] text-amber-400 font-semibold">24 Tongkang Selesai Muat</p>
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Total Produksi Batubara</h3>
+                    <div className="text-2xl font-black text-amber-400">
+                        {totalCoalTon.toLocaleString('id-ID')} Ton
+                    </div>
+                    <p className="mt-2 text-[11px] text-slate-300">Siap Angkut ke Jetty Stockpile</p>
                 </div>
 
                 <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
-                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Indeks K3 Site & Legalitas</h3>
-                    <div className="text-2xl font-black text-sky-400">100% Valid</div>
-                    <p className="mt-2 text-[11px] text-emerald-400 font-medium">✓ IUP, IPPKH & Amdal Aktif</p>
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Status IUP & Legalitas</h3>
+                    <div className="text-2xl font-black text-emerald-400">Aktif & Lengkap</div>
+                    <p className="mt-2 text-[11px] text-emerald-400 font-medium">✓ RKAB, IPPKH & Lingkungan Valid</p>
                 </div>
             </div>
 
@@ -142,64 +197,64 @@ export default function DirekturDashboard() {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 <div className="lg:col-span-8 bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
                     <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-4">
-                        Laporan Kinerja Lintas Divisi Site (Finance, GA, HRD, ADM)
+                        Monitoring Konsolidasi Divisi Site (Finance, Produksi, HRD, GA)
                     </h3>
                     <div className="overflow-x-auto">
                         <table className="w-full text-left text-xs">
                             <thead>
                                 <tr className="border-b border-[#1b2e46] text-slate-400">
                                     <th className="pb-2">Divisi</th>
-                                    <th className="pb-2">Key Performance Indicator (KPI)</th>
-                                    <th className="pb-2">Realisasi</th>
+                                    <th className="pb-2">Status Ringkasan</th>
+                                    <th className="pb-2">Metrik Tercatat</th>
                                     <th className="pb-2">Evaluasi Direksi</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-[#16273c] text-slate-300">
                                 <tr>
-                                    <td className="py-3 font-bold text-white">Keuangan (Finance)</td>
-                                    <td>Efisiensi Anggaran BBM & Vendor Pit</td>
-                                    <td className="text-emerald-400 font-bold">92% On Budget</td>
+                                    <td className="py-3 font-bold text-white">Keuangan Site (Finance)</td>
+                                    <td>Arus Pengeluaran Kas Lapangan</td>
+                                    <td className="text-amber-400 font-bold">Rp {totalExpense.toLocaleString('id-ID')}</td>
+                                    <td><span className="bg-emerald-950/60 text-emerald-400 border border-emerald-800/40 px-2 py-0.5 rounded text-[10px]">Terkontrol</span></td>
+                                </tr>
+                                <tr>
+                                    <td className="py-3 font-bold text-white">Pit & Produksi Tambang</td>
+                                    <td>Overburden & Coal Getting</td>
+                                    <td className="text-emerald-400 font-bold">{totalCoalTon.toLocaleString('id-ID')} Ton Coal</td>
                                     <td><span className="bg-emerald-950/60 text-emerald-400 border border-emerald-800/40 px-2 py-0.5 rounded text-[10px]">Optimal</span></td>
                                 </tr>
                                 <tr>
-                                    <td className="py-3 font-bold text-white">Operasional Pit</td>
-                                    <td>Stripping Ratio (SR) & Pengupasan Overburden</td>
-                                    <td className="text-amber-400 font-bold">1 : 4,2 (Target 1 : 4)</td>
-                                    <td><span className="bg-amber-950/60 text-amber-400 border border-amber-800/40 px-2 py-0.5 rounded text-[10px]">Perlu Monitoring</span></td>
-                                </tr>
-                                <tr>
                                     <td className="py-3 font-bold text-white">Human Resources (HRD)</td>
-                                    <td>Zero Incident & Kepatuhan Jam Kerja Karyawan</td>
-                                    <td className="text-sky-400 font-bold">124.500 Jam Aman</td>
+                                    <td>Zero Incident K3 & Manpower</td>
+                                    <td className="text-sky-400 font-bold">Jam Kerja Selamat Terjaga</td>
                                     <td><span className="bg-sky-950/60 text-sky-400 border border-sky-800/40 px-2 py-0.5 rounded text-[10px]">Sangat Baik</span></td>
                                 </tr>
                                 <tr>
-                                    <td className="py-3 font-bold text-white">Umum (GA) & ADM</td>
-                                    <td>Ketersediaan Armada LV & Verifikasi Ritase</td>
-                                    <td className="text-emerald-400 font-bold">98,5% Akurat</td>
-                                    <td><span className="bg-emerald-950/60 text-emerald-400 border border-emerald-800/40 px-2 py-0.5 rounded text-[10px]">Terkendali</span></td>
+                                    <td className="py-3 font-bold text-white">General Affair (GA) & ADM</td>
+                                    <td>Armada Kendaraan LV & Mess</td>
+                                    <td className="text-emerald-400 font-bold">Akomodasi & Logistik Lancar</td>
+                                    <td><span className="bg-emerald-950/60 text-emerald-400 border border-emerald-800/40 px-2 py-0.5 rounded text-[10px]">Aman</span></td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
                 </div>
 
-                {/* Kolom Kanan: Arahan Direktur */}
+                {/* Kolom Kanan: Arahan Strategis Direktur */}
                 <div className="lg:col-span-4 bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg space-y-4">
                     <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider">
-                        Instruksi & Kebijakan Strategis
+                        Instruksi & Pengawasan Direksi
                     </h3>
                     <div className="space-y-3">
                         <div className="bg-[#060c14] border border-[#1b2e46] p-3 rounded-lg text-xs">
-                            <span className="text-amber-400 font-bold block mb-1">Target Triwulan IV</span>
+                            <span className="text-amber-400 font-bold block mb-1">Optimasi Barging</span>
                             <p className="text-slate-300 text-[11px]">
-                                Fokus peningkatan ritase hauling ke stockpile pelabuhan minimal 45 rit per hari per armada sebelum musim hujan lebat.
+                                Pastikan seluruh batubara hasil coal getting segera disortir dan dimuat tepat waktu sesuai jadwal sandar tongkang di jetty.
                             </p>
                         </div>
                         <div className="bg-[#060c14] border border-[#1b2e46] p-3 rounded-lg text-xs">
-                            <span className="text-emerald-400 font-bold block mb-1">Pengendalian Cash Out</span>
+                            <span className="text-emerald-400 font-bold block mb-1">Pengawasan Solar & Vendor</span>
                             <p className="text-slate-300 text-[11px]">
-                                Seluruh pengajuan transaksi vendor di atas Rp 50.000.000 wajib divalidasi langsung melalui approval Direktur Utama.
+                                Manajer Site dan Finance wajib mencocokkan rasio konsumsi bahan bakar (burn rate) per BCM tiap akhir pekan.
                             </p>
                         </div>
                     </div>
