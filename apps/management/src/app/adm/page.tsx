@@ -2,229 +2,183 @@
 
 import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
 import { createClient } from '@supabase/supabase-js'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
-interface DocumentLog {
-    id: string
-    created_at: string
-    agenda_no: string
-    title: string
-    sender: string
-    category: string
-    status: string
-}
+// 30 Modul Tambang Nikel PT. JEEP
+const ALL_MODULES = [
+    { key: 'manager-site', label: 'Pit Produksi', icon: '⛏️', href: '/manager-site' },
+    { key: 'fleet', label: 'Alat Berat', icon: '🚜', href: '/fleet' },
+    { key: 'fleet-maintenance', label: 'Workshop Fleet', icon: '🔧', href: '/fleet-maintenance' },
+    { key: 'sparepart', label: 'Sparepart', icon: '📦', href: '/sparepart' },
+    { key: 'safety', label: 'Inspeksi K3', icon: '⛑️', href: '/safety' },
+    { key: 'ritase', label: 'Ritase', icon: '🚛', href: '/ritase' },
+    { key: 'jetty', label: 'Jetty Port', icon: '🚢', href: '/jetty' },
+    { key: 'environment', label: 'Lingkungan', icon: '🌱', href: '/environment' },
+    { key: 'lingkungan', label: 'Kanal Sedimen', icon: '🏞️', href: '/lingkungan' },
+    { key: 'bbm', label: 'BBM Solar', icon: '⛽', href: '/bbm' },
+    { key: 'finance', label: 'Keuangan', icon: '💰', href: '/finance' },
+    { key: 'adm', label: 'ADM & Surat', icon: '📋', href: '/adm' },
+    { key: 'hrd', label: 'HRD & K3', icon: '👷‍♂️', href: '/hrd' },
+    { key: 'ga', label: 'GA & Fasilitas', icon: '🚙', href: '/ga' },
+    { key: 'mess', label: 'Mess Camp', icon: '🏠', href: '/mess' },
+    { key: 'catering', label: 'Katering', icon: '🍱', href: '/catering' },
+    { key: 'clinic', label: 'Klinik Site', icon: '🏥', href: '/clinic' },
+    { key: 'security', label: 'Security', icon: '🛡️', href: '/security' },
+    { key: 'radio', label: 'Radio Dispatch', icon: '📻', href: '/radio' },
+    { key: 'legal', label: 'Legalitas IUP', icon: '⚖️', href: '/legal' },
+    { key: 'csr', label: 'CSR Masyarakat', icon: '🤝', href: '/csr' },
+    { key: 'vendor', label: 'Vendor', icon: '🏬', href: '/vendor' },
+    { key: 'transport', label: 'Transport Kru', icon: '🚌', href: '/transport' },
+    { key: 'training', label: 'Training K3', icon: '🎓', href: '/training' },
+    { key: 'performance', label: 'Kinerja KPI', icon: '📈', href: '/performance' },
+    { key: 'it-helpdesk', label: 'IT Helpdesk', icon: '💻', href: '/it-helpdesk' },
+    { key: 'helpdesk', label: 'Helpdesk GA', icon: '🛠️', href: '/helpdesk' },
+    { key: 'investor', label: 'Investor', icon: '📊', href: '/investor' },
+    { key: 'direktur', label: 'Eksekutif BOD', icon: '🏛️', href: '/direktur' },
+    { key: 'laporan', label: 'Cetak Laporan', icon: '📄', href: '/laporan' },
+]
 
-export default function AdmDashboard() {
-    const pathname = usePathname()
+export default function AdmDashboardPage() {
     const [loading, setLoading] = useState(true)
-    const [userName, setUserName] = useState('Petugas ADM')
-    const [userId, setUserId] = useState<string | null>(null)
-    const [activeTab, setActiveTab] = useState('surat')
-    const [documents, setDocuments] = useState<DocumentLog[]>([])
-    const [searchQuery, setSearchQuery] = useState('')
-
-    // Modal Input Dokumen Baru
-    const [showModal, setShowModal] = useState(false)
-    const [agendaNo, setAgendaNo] = useState('')
-    const [title, setTitle] = useState('')
-    const [sender, setSender] = useState('')
-    const [category, setCategory] = useState('Surat Jalan')
-    const [submitting, setSubmitting] = useState(false)
+    const [userProfile, setUserProfile] = useState<any>(null)
+    const [allowedModules, setAllowedModules] = useState<string[]>([])
+    const [activeTab, setActiveTab] = useState<'surat' | 'jalan' | 'po' | 'simp'>('surat')
+    const [searchTerm, setSearchTerm] = useState('')
 
     const landingUrl = process.env.NEXT_PUBLIC_LANDING_URL || 'https://pt-jeep.vercel.app'
 
     useEffect(() => {
         let isMounted = true
 
-        async function initAdm() {
+        async function loadAuthAndPermissions() {
             try {
-                if (typeof window !== 'undefined' && window.location.hash.includes('access_token')) {
-                    const hashClean = window.location.hash.startsWith('#')
-                        ? window.location.hash.substring(1)
-                        : window.location.hash
-                    const hashParams = new URLSearchParams(hashClean)
-                    const accessToken = hashParams.get('access_token')
-                    const refreshToken = hashParams.get('refresh_token')
-
-                    if (accessToken) {
-                        await supabase.auth.setSession({
-                            access_token: accessToken,
-                            refresh_token: refreshToken || '',
-                        })
-                        window.history.replaceState(null, '', window.location.pathname)
-                    }
-                }
-
                 const { data: { session } } = await supabase.auth.getSession()
                 if (!session) {
                     window.location.href = landingUrl
                     return
                 }
 
-                setUserId(session.user.id)
-
+                // Ambil profil
                 const { data: profile } = await supabase
                     .from('profiles')
                     .select('full_name, role, status')
                     .eq('id', session.user.id)
                     .maybeSingle()
 
-                const statusClean = (profile?.status || '').toLowerCase().trim()
-                if (statusClean === 'nonaktif' || statusClean === 'banned') {
-                    alert('Akun Anda dinonaktifkan.')
-                    await supabase.auth.signOut()
-                    window.location.href = landingUrl
-                    return
-                }
-
                 if (isMounted) {
-                    setUserName(profile?.full_name || 'Petugas ADM & Legal Site')
+                    setUserProfile(profile)
+                    const userDivision = (profile?.role || '').trim()
 
-                    const { data: docData } = await supabase
-                        .from('adm_documents')
-                        .select('*')
-                        .order('created_at', { ascending: false })
+                    // Jika Superadmin, berikan semua modul
+                    const isSuperAdmin = ['admin', 'administrator', 'superadmin'].includes(userDivision.toLowerCase())
 
-                    if (docData && docData.length > 0) {
-                        setDocuments(docData)
+                    if (isSuperAdmin) {
+                        setAllowedModules(ALL_MODULES.map((m) => m.key))
+                    } else {
+                        // Ambil izin dari database
+                        const { data: allPerms } = await supabase
+                            .from('division_permissions')
+                            .select('division_name, allowed_modules')
+
+                        if (allPerms && allPerms.length > 0) {
+                            const cleanDiv = userDivision.toLowerCase()
+
+                            const matched = allPerms.find((p) => {
+                                const target = (p.division_name || '').toLowerCase().trim()
+                                return (
+                                    target === cleanDiv ||
+                                    target.includes(cleanDiv) ||
+                                    cleanDiv.includes(target) ||
+                                    (cleanDiv === 'adm' && target.includes('adm'))
+                                )
+                            })
+
+                            if (matched && Array.isArray(matched.allowed_modules)) {
+                                setAllowedModules(matched.allowed_modules)
+                            } else {
+                                setAllowedModules(['adm'])
+                            }
+                        } else {
+                            setAllowedModules(['adm'])
+                        }
                     }
-
                     setLoading(false)
                 }
             } catch (err) {
-                console.error('Error in ADM init:', err)
+                console.error('Gagal memuat izin:', err)
                 if (isMounted) setLoading(false)
             }
         }
 
-        initAdm()
-
-        return () => {
-            isMounted = false
-        }
+        loadAuthAndPermissions()
+        return () => { isMounted = false }
     }, [landingUrl])
-
-    const handleAddDocument = async (e: React.FormEvent) => {
-        e.preventDefault()
-        if (!title || !sender) return
-
-        setSubmitting(true)
-        const generatedNo = agendaNo || `ADM/${new Date().getFullYear()}/${Date.now().toString().slice(-4)}`
-
-        const payload: Record<string, any> = {
-            agenda_no: generatedNo,
-            title,
-            sender,
-            category,
-            status: 'Tervalidasi',
-        }
-
-        if (userId) {
-            payload.created_by = userId
-        }
-
-        const { data, error } = await supabase
-            .from('adm_documents')
-            .insert([payload])
-            .select()
-
-        if (!error && data) {
-            setDocuments([data[0], ...documents])
-            setShowModal(false)
-            setTitle('')
-            setSender('')
-            setAgendaNo('')
-        } else {
-            alert('Gagal menyimpan dokumen: ' + (error?.message || 'Terjadi kesalahan sistem.'))
-        }
-
-        setSubmitting(false)
-    }
 
     const handleLogout = async () => {
         await supabase.auth.signOut()
         window.location.href = landingUrl
     }
 
-    const filteredDocs = documents.filter((doc) =>
-        (doc.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (doc.agenda_no || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (doc.sender || '').toLowerCase().includes(searchQuery.toLowerCase())
+    // Filter tombol navigasi: hanya modul yang diizinkan oleh Superadmin
+    const authorizedNavItems = ALL_MODULES.filter((item) =>
+        allowedModules.includes(item.key)
     )
-
-    const navLinks = [
-        { href: '/manager-site', label: 'Pit Produksi', icon: '⛏️' },
-        { href: '/fleet', label: 'Alat Berat', icon: '🚜' },
-        { href: '/safety', label: 'Inspeksi K3', icon: '⛑️' },
-        { href: '/sparepart', label: 'Sparepart', icon: '📦' },
-        { href: '/ritase', label: 'Ritase', icon: '🚛' },
-        { href: '/jetty', label: 'Jetty Port', icon: '🚢' },
-        { href: '/lingkungan', label: 'Lingkungan', icon: '🌱' },
-        { href: '/bbm', label: 'BBM Solar', icon: '⛽' },
-        { href: '/finance', label: 'Keuangan', icon: '💰' },
-        { href: '/adm', label: 'ADM & Surat', icon: '📋' },
-        { href: '/hrd', label: 'HRD & K3', icon: '👷‍♂️' },
-        { href: '/ga', label: 'GA & Fasilitas', icon: '🚙' },
-        { href: '/direktur', label: 'Eksekutif', icon: '🏛️' },
-        { href: '/laporan', label: 'Cetak Laporan', icon: '📄' },
-    ]
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-[#060c14] flex flex-col items-center justify-center text-white font-sans">
-                <div className="w-10 h-10 border-4 border-sky-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-                <p className="text-xs text-slate-400">Sinkronisasi Dokumen ADM...</p>
+            <div className="min-h-screen bg-[#070b12] flex flex-col items-center justify-center text-slate-300 font-sans">
+                <div className="w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mb-3"></div>
+                <p className="text-xs font-mono">Memuat Modul Administrasi Nikel...</p>
             </div>
         )
     }
 
     return (
-        <div className="min-h-screen bg-[#060c14] text-slate-100 font-sans p-4 md:p-6 select-none">
-            {/* Header Mandiri */}
-            <header className="mb-6 space-y-3">
-                <div className="flex flex-wrap items-center justify-between bg-[#0a1625] border border-[#1b2e46] rounded-xl px-6 py-4 shadow-xl">
-                    <div className="flex items-center space-x-3">
-                        <span className="text-2xl">📋</span>
-                        <div>
-                            <h1 className="text-xl md:text-2xl font-black tracking-wide text-white">
-                                Dashboard Administrasi (ADM) PT. JEEP
-                            </h1>
-                            <p className="text-xs text-sky-400 flex items-center gap-1.5 mt-0.5">
-                                <span className="w-2 h-2 rounded-full bg-sky-500 animate-pulse"></span>
-                                <span>Live Sync Dokumen & Surat Jalan</span>
-                                <span className="text-slate-600">•</span>
-                                <span className="text-slate-300 font-semibold">{userName}</span>
-                                <span className="bg-[#112233] border border-[#1e3a5f] text-slate-300 text-[10px] px-2 py-0.5 rounded font-mono">
-                                    Site Administration
-                                </span>
-                            </p>
-                        </div>
+        <div className="min-h-screen bg-[#070b12] text-slate-100 font-sans p-6 select-none">
+            {/* Header Utama Modul */}
+            <div className="bg-[#0b1320] border border-[#1b2a40] rounded-xl p-5 mb-5 flex flex-wrap items-center justify-between gap-4">
+                <div className="flex items-center gap-3.5">
+                    <span className="text-3xl p-2.5 bg-[#070e18] border border-[#16253a] rounded-lg">📋</span>
+                    <div>
+                        <h1 className="text-xl font-bold text-white tracking-tight">
+                            Dashboard Administrasi (ADM) PT. JEEP
+                        </h1>
+                        <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-2">
+                            <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                            <span>Live Sync Dokumen Tambang Nikel</span>
+                            <span>•</span>
+                            <strong className="text-slate-200">{userProfile?.full_name || 'Staff ADM'}</strong>
+                            <span className="bg-[#122236] border border-[#1b3659] text-cyan-300 text-[10px] px-2 py-0.5 rounded font-mono font-bold">
+                                {userProfile?.role || 'ADM'}
+                            </span>
+                        </p>
                     </div>
-
-                    <button
-                        onClick={handleLogout}
-                        className="bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/50 text-rose-300 text-xs px-4 py-2 rounded-lg transition cursor-pointer"
-                    >
-                        Keluar ke Beranda
-                    </button>
                 </div>
 
-                {/* Global Module Switcher */}
-                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
-                    {navLinks.map((item) => {
-                        const isActive = pathname === item.href
+                <button
+                    onClick={handleLogout}
+                    className="bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/50 text-rose-300 text-xs font-semibold px-4 py-2 rounded-lg transition cursor-pointer"
+                >
+                    Keluar ke Beranda
+                </button>
+            </div>
+
+            {/* Bilah Navigasi: Hanya Merender Modul yang Diizinkan */}
+            <div className="overflow-x-auto pb-2 mb-6">
+                <div className="flex items-center gap-2 min-w-max">
+                    {authorizedNavItems.map((item) => {
+                        const isCurrent = item.key === 'adm'
                         return (
                             <Link
-                                key={item.href}
+                                key={item.key}
                                 href={item.href}
-                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border whitespace-nowrap font-medium transition cursor-pointer ${isActive
-                                        ? 'bg-[#162d47] text-white border-sky-400/80 shadow-sm'
-                                        : 'bg-[#0a1625] text-slate-400 border-[#1b2e46] hover:text-slate-200 hover:bg-[#0f2137]'
+                                className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition ${isCurrent
+                                        ? 'bg-[#10253d] border border-cyan-400 text-white shadow-md shadow-cyan-950/50'
+                                        : 'bg-[#0b1320] border border-[#162336] text-slate-400 hover:text-slate-200 hover:border-[#243754]'
                                     }`}
                             >
                                 <span>{item.icon}</span>
@@ -233,210 +187,131 @@ export default function AdmDashboard() {
                         )
                     })}
                 </div>
-            </header>
+            </div>
 
-            {/* Nav Tabs */}
-            <nav className="flex flex-wrap gap-2 mb-6">
-                {[
-                    { id: 'surat', label: 'SURAT MASUK & KELUAR', badge: `${documents.length} BERKAS` },
-                    { id: 'suratjalan', label: 'SURAT JALAN & RITASE' },
-                    { id: 'po', label: 'PURCHASE ORDER (PO)' },
-                    { id: 'simp', label: 'BUKU TAMU & SIMP' },
-                ].map((tab) => (
-                    <button
-                        key={tab.id}
-                        onClick={() => setActiveTab(tab.id)}
-                        className={`px-4 py-2.5 rounded-lg text-xs font-bold transition flex items-center gap-2 border cursor-pointer ${activeTab === tab.id
-                                ? 'bg-[#1b3b5f] border-sky-400 text-white shadow-lg shadow-sky-950/50'
-                                : 'bg-[#0c1a2d] border-[#1b2e46] text-slate-400 hover:text-white hover:bg-[#12243d]'
-                            }`}
-                    >
-                        <span>{tab.label}</span>
-                        {tab.badge && (
-                            <span className="bg-amber-500 text-slate-950 text-[10px] px-1.5 py-0.5 rounded font-black">
-                                {tab.badge}
-                            </span>
-                        )}
-                    </button>
-                ))}
-            </nav>
+            {/* Tab Filter Sub-Kategori ADM */}
+            <div className="flex flex-wrap items-center gap-2.5 mb-6">
+                <button
+                    onClick={() => setActiveTab('surat')}
+                    className={`px-4 py-2 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-2 ${activeTab === 'surat'
+                            ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+                            : 'bg-[#0b1320] border border-[#162336] text-slate-400 hover:text-white'
+                        }`}
+                >
+                    <span>SURAT MASUK & KELUAR</span>
+                    <span className="text-[10px] px-1.5 py-0.2 rounded bg-black/20 font-mono">0 BERKAS</span>
+                </button>
 
-            {/* Konten Utama */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                {/* Kolom Kiri: Action Bar */}
-                <aside className="lg:col-span-3 space-y-3">
-                    <div
-                        onClick={() => setShowModal(true)}
-                        className="p-4 rounded-xl border border-dashed border-sky-500/50 bg-sky-950/20 hover:bg-sky-900/30 text-sky-400 cursor-pointer transition flex items-center gap-3"
-                    >
-                        <span className="text-xl">➕</span>
-                        <div>
-                            <div className="text-xs font-bold">Catat Dokumen Baru</div>
-                            <div className="text-[10px] text-slate-400">Surat Jalan, Memo, atau SIMP</div>
+                <button
+                    onClick={() => setActiveTab('jalan')}
+                    className={`px-4 py-2 rounded-lg text-xs font-bold transition cursor-pointer ${activeTab === 'jalan'
+                            ? 'bg-amber-500 text-slate-950'
+                            : 'bg-[#0b1320] border border-[#162336] text-slate-400 hover:text-white'
+                        }`}
+                >
+                    SURAT JALAN & RITASE NIKEL
+                </button>
+
+                <button
+                    onClick={() => setActiveTab('po')}
+                    className={`px-4 py-2 rounded-lg text-xs font-bold transition cursor-pointer ${activeTab === 'po'
+                            ? 'bg-amber-500 text-slate-950'
+                            : 'bg-[#0b1320] border border-[#162336] text-slate-400 hover:text-white'
+                        }`}
+                >
+                    PURCHASE ORDER (PO)
+                </button>
+
+                <button
+                    onClick={() => setActiveTab('simp')}
+                    className={`px-4 py-2 rounded-lg text-xs font-bold transition cursor-pointer ${activeTab === 'simp'
+                            ? 'bg-amber-500 text-slate-950'
+                            : 'bg-[#0b1320] border border-[#162336] text-slate-400 hover:text-white'
+                        }`}
+                >
+                    BUKU TAMU & SIMP SITE
+                </button>
+            </div>
+
+            {/* Konten Area Kerja Administrasi */}
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                {/* Kolom Kiri: Tombol Aksi Cepat & Info DB */}
+                <div className="space-y-4">
+                    <div className="bg-[#0b1320] border border-cyan-500/30 rounded-xl p-4 cursor-pointer hover:border-cyan-400 transition">
+                        <div className="flex items-center gap-3">
+                            <span className="text-xl text-cyan-400 font-bold">+</span>
+                            <div>
+                                <h3 className="text-xs font-bold text-white">Catat Dokumen Baru</h3>
+                                <p className="text-[11px] text-slate-400">Surat Jalan, Memo, atau SIMP Nikel</p>
+                            </div>
                         </div>
                     </div>
 
-                    <Link
-                        href="/ritase"
-                        className="p-4 rounded-xl border border-[#1b2e46] bg-[#0c1a2d] hover:bg-[#12243d] hover:border-sky-500/50 text-slate-200 transition flex items-center gap-3 block"
-                    >
-                        <span className="text-xl">⚖️</span>
-                        <div>
-                            <div className="text-xs font-bold text-sky-400">Rekap Timbangan & Ritase</div>
-                            <div className="text-[10px] text-slate-400">Verifikasi Muatan Surat Jalan</div>
-                        </div>
-                    </Link>
-
-                    <div className="p-4 rounded-xl border border-[#16273c] bg-[#0a1625] text-slate-400 space-y-2">
-                        <span className="text-xs font-bold text-white uppercase tracking-wider block">Database ADM</span>
-                        <div className="text-[11px] flex justify-between">
-                            <span>Tabel Terhubung</span>
-                            <span className="text-emerald-400 font-semibold">adm_documents</span>
-                        </div>
-                        <div className="text-[11px] flex justify-between">
-                            <span>Total Berkas</span>
-                            <span className="text-slate-200 font-bold">{documents.length} baris</span>
+                    <div className="bg-[#0b1320] border border-[#162336] rounded-xl p-4 cursor-pointer hover:border-[#243754] transition">
+                        <div className="flex items-center gap-3">
+                            <span className="text-xl text-amber-400">⚖️</span>
+                            <div>
+                                <h3 className="text-xs font-bold text-white">Rekap Timbangan & Ritase</h3>
+                                <p className="text-[11px] text-slate-400">Verifikasi Muatan Surat Jalan</p>
+                            </div>
                         </div>
                     </div>
-                </aside>
+
+                    <div className="bg-[#0b1320] border border-[#162336] rounded-xl p-4 text-xs space-y-2">
+                        <h4 className="font-bold text-slate-300 uppercase text-[10px] tracking-wider">DATABASE ADM</h4>
+                        <div className="flex justify-between text-slate-400">
+                            <span>Tabel Terhubung:</span>
+                            <span className="font-mono text-cyan-400">adm_documents</span>
+                        </div>
+                        <div className="flex justify-between text-slate-400">
+                            <span>Total Berkas:</span>
+                            <span className="font-mono text-slate-200 font-bold">0 baris</span>
+                        </div>
+                    </div>
+                </div>
 
                 {/* Kolom Kanan: Tabel Dokumen */}
-                <main className="lg:col-span-9 space-y-6">
-                    <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg space-y-4">
-                        <div className="flex flex-wrap justify-between items-center gap-3">
-                            <div className="w-full md:w-72">
+                <div className="lg:col-span-3 bg-[#0b1320] border border-[#162336] rounded-xl p-5 flex flex-col justify-between">
+                    <div>
+                        <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
+                            <div className="relative flex-1 max-w-md">
                                 <input
                                     type="text"
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
                                     placeholder="Cari no. agenda, perihal, pengirim..."
-                                    className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-sky-400"
+                                    className="w-full bg-[#070e18] border border-[#1b2b42] rounded-lg px-3.5 py-2 text-xs text-white focus:outline-none focus:border-cyan-400"
                                 />
                             </div>
-                            <button
-                                onClick={() => setShowModal(true)}
-                                className="bg-sky-500 hover:bg-sky-600 text-slate-950 font-bold text-xs px-3.5 py-2 rounded-lg transition cursor-pointer"
-                            >
+
+                            <button className="bg-cyan-500 hover:bg-cyan-600 text-slate-950 font-bold px-4 py-2 rounded-lg text-xs transition cursor-pointer">
                                 + Dokumen Baru
                             </button>
                         </div>
 
-                        <div className="overflow-x-auto">
+                        <div className="border border-[#162336] rounded-lg overflow-hidden">
                             <table className="w-full text-left text-xs">
-                                <thead>
-                                    <tr className="border-b border-[#1b2e46] text-slate-400">
-                                        <th className="pb-2">No. Agenda</th>
-                                        <th className="pb-2">Perihal / Berkas</th>
-                                        <th className="pb-2">Pengirim</th>
-                                        <th className="pb-2">Kategori</th>
-                                        <th className="pb-2">Status</th>
+                                <thead className="bg-[#070e18] text-slate-400 border-b border-[#162336]">
+                                    <tr>
+                                        <th className="p-3">No. Agenda</th>
+                                        <th className="p-3">Perihal / Berkas</th>
+                                        <th className="p-3">Pengirim</th>
+                                        <th className="p-3">Kategori</th>
+                                        <th className="p-3 text-right">Status</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-[#16273c] text-slate-300">
-                                    {filteredDocs.length > 0 ? (
-                                        filteredDocs.map((doc) => (
-                                            <tr key={doc.id}>
-                                                <td className="py-2.5 font-mono text-[11px] text-sky-400 font-bold">{doc.agenda_no}</td>
-                                                <td className="font-semibold text-white">{doc.title}</td>
-                                                <td className="text-slate-400">{doc.sender}</td>
-                                                <td>
-                                                    <span className="bg-[#112233] border border-[#1e3a5f] text-slate-300 text-[10px] px-2 py-0.5 rounded">
-                                                        {doc.category}
-                                                    </span>
-                                                </td>
-                                                <td>
-                                                    <span className="text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800/40 text-[10px]">
-                                                        {doc.status}
-                                                    </span>
-                                                </td>
-                                            </tr>
-                                        ))
-                                    ) : (
-                                        <tr>
-                                            <td colSpan={5} className="py-8 text-center text-slate-500 italic">
-                                                Belum ada dokumen yang cocok dengan pencarian.
-                                            </td>
-                                        </tr>
-                                    )}
+                                <tbody>
+                                    <tr>
+                                        <td colSpan={5} className="p-12 text-center text-slate-500 italic">
+                                            Belum ada dokumen yang cocok dengan pencarian.
+                                        </td>
+                                    </tr>
                                 </tbody>
                             </table>
                         </div>
                     </div>
-                </main>
-            </div>
-
-            {/* Modal Form Tambah Dokumen */}
-            {showModal && (
-                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-                    <div className="bg-[#0a1625] border border-[#1b2e46] rounded-xl p-6 w-full max-w-md shadow-2xl space-y-4">
-                        <h2 className="text-sm font-bold text-white uppercase tracking-wider">Catat Dokumen / Surat Masuk</h2>
-                        <form onSubmit={handleAddDocument} className="space-y-3">
-                            <div>
-                                <label className="text-[11px] text-slate-400 block mb-1">Nomor Agenda (Opsional)</label>
-                                <input
-                                    type="text"
-                                    value={agendaNo}
-                                    onChange={(e) => setAgendaNo(e.target.value)}
-                                    placeholder="Otomatis jika dikosongkan"
-                                    className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-sky-400 font-mono"
-                                />
-                            </div>
-                            <div>
-                                <label className="text-[11px] text-slate-400 block mb-1">Perihal Dokumen / Surat</label>
-                                <input
-                                    type="text"
-                                    required
-                                    value={title}
-                                    onChange={(e) => setTitle(e.target.value)}
-                                    placeholder="Contoh: Surat Jalan Solar 16.000L"
-                                    className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-sky-400"
-                                />
-                            </div>
-                            <div>
-                                <label className="text-[11px] text-slate-400 block mb-1">Pengirim / Vendor / Divisi</label>
-                                <input
-                                    type="text"
-                                    required
-                                    value={sender}
-                                    onChange={(e) => setSender(e.target.value)}
-                                    placeholder="Contoh: PT Surya Jaya Transport"
-                                    className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-sky-400"
-                                />
-                            </div>
-                            <div>
-                                <label className="text-[11px] text-slate-400 block mb-1">Kategori Dokumen</label>
-                                <select
-                                    value={category}
-                                    onChange={(e) => setCategory(e.target.value)}
-                                    className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-sky-400"
-                                >
-                                    <option value="Surat Jalan">Surat Jalan (Delivery Order)</option>
-                                    <option value="SIMP">Izin Masuk Site (SIMP)</option>
-                                    <option value="Surat Dinas">Surat Masuk / Memo Internal</option>
-                                    <option value="PO & Invoice">PO & Administrasi Vendor</option>
-                                </select>
-                            </div>
-
-                            <div className="flex justify-end gap-2 pt-2">
-                                <button
-                                    type="button"
-                                    onClick={() => setShowModal(false)}
-                                    className="px-4 py-2 rounded-lg border border-[#1b2e46] text-slate-400 hover:text-white text-xs transition cursor-pointer"
-                                >
-                                    Batal
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={submitting}
-                                    className="px-4 py-2 rounded-lg bg-sky-500 hover:bg-sky-600 text-slate-950 font-bold text-xs transition cursor-pointer"
-                                >
-                                    {submitting ? 'Menyimpan...' : 'Simpan Berkas'}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
                 </div>
-            )}
+            </div>
         </div>
     )
 }
