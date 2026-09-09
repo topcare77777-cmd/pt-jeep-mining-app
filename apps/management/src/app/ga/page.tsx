@@ -9,6 +9,7 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 interface VehicleLog {
     id: string
+    created_at?: string
     hull_no: string
     model: string
     driver: string
@@ -19,7 +20,7 @@ interface VehicleLog {
 export default function GaDashboard() {
     const [loading, setLoading] = useState(true)
     const [userName, setUserName] = useState('Petugas GA')
-    const [activeTab, setActiveTab] = useState('mess')
+    const [activeTab, setActiveTab] = useState('kendaraan')
     const [vehicles, setVehicles] = useState<VehicleLog[]>([])
 
     // Modal Peminjaman / Log Armada LV
@@ -57,33 +58,43 @@ export default function GaDashboard() {
 
                 setUserName(profile.full_name || 'Petugas GA')
 
-                // 3. Muat Data Armada Kendaraan
-                setVehicles([
-                    {
-                        id: '1',
-                        hull_no: 'LV-01',
-                        model: 'Toyota Hilux 4x4 Double Cabin',
-                        driver: 'Hendra (Engineering Pit)',
-                        destination: 'Front Penambangan Blok C',
-                        status: 'Dipakai',
-                    },
-                    {
-                        id: '2',
-                        hull_no: 'LV-05',
-                        model: 'Mitsubishi Triton 4x4',
-                        driver: 'Tim K3 & Safety Patrol',
-                        destination: 'Inspeksi Hauling Road',
-                        status: 'Dipakai',
-                    },
-                    {
-                        id: '3',
-                        hull_no: 'LV-AMB',
-                        model: 'Toyota Hilux Ambulance Rescue',
-                        driver: 'Tim Medis Site',
-                        destination: 'Klinik Utama Pit Tambang',
-                        status: 'Standby Siaga',
-                    },
-                ])
+                // 3. Tarik data dari tabel ga_vehicle_logs di Supabase
+                const { data: logsData, error } = await supabase
+                    .from('ga_vehicle_logs')
+                    .select('*')
+                    .order('created_at', { ascending: false })
+
+                if (!error && logsData && logsData.length > 0) {
+                    setVehicles(logsData)
+                } else {
+                    // Data awal jika tabel belum terisi
+                    setVehicles([
+                        {
+                            id: '1',
+                            hull_no: 'LV-01',
+                            model: 'Toyota Hilux 4x4 Double Cabin',
+                            driver: 'Hendra (Engineering Pit)',
+                            destination: 'Front Penambangan Blok C',
+                            status: 'Dipakai',
+                        },
+                        {
+                            id: '2',
+                            hull_no: 'LV-05',
+                            model: 'Mitsubishi Triton 4x4',
+                            driver: 'Tim K3 & Safety Patrol',
+                            destination: 'Inspeksi Hauling Road',
+                            status: 'Dipakai',
+                        },
+                        {
+                            id: '3',
+                            hull_no: 'LV-AMB',
+                            model: 'Toyota Hilux Ambulance Rescue',
+                            driver: 'Tim Medis Site',
+                            destination: 'Klinik Utama Pit Tambang',
+                            status: 'Standby Siaga',
+                        },
+                    ])
+                }
 
                 setLoading(false)
             } catch (err) {
@@ -95,26 +106,37 @@ export default function GaDashboard() {
         initGa()
     }, [landingUrl])
 
+    // Simpan Log Peminjaman Kendaraan ke Supabase
     const handleAddVehicleLog = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!hullNo || !driver || !destination) return
 
         setSubmitting(true)
-        const newLog: VehicleLog = {
-            id: Date.now().toString(),
+
+        const payload = {
             hull_no: hullNo,
-            model: model || 'Kendaraan Operasional Lapangan',
+            model: model || 'Kendaraan Operasional Site',
             driver,
             destination,
             status: 'Dipakai',
         }
 
-        setVehicles([newLog, ...vehicles])
-        setShowModal(false)
-        setHullNo('')
-        setModel('')
-        setDriver('')
-        setDestination('')
+        const { data, error } = await supabase
+            .from('ga_vehicle_logs')
+            .insert([payload])
+            .select()
+
+        if (!error && data) {
+            setVehicles([data[0], ...vehicles])
+            setShowModal(false)
+            setHullNo('')
+            setModel('')
+            setDriver('')
+            setDestination('')
+        } else {
+            alert('Gagal mencatat peminjaman kendaraan: ' + (error?.message || ''))
+        }
+
         setSubmitting(false)
     }
 
@@ -160,8 +182,8 @@ export default function GaDashboard() {
             {/* Nav Tabs Atas */}
             <nav className="flex flex-wrap gap-2 mb-6">
                 {[
-                    { id: 'mess', label: 'MESS & AKOMODASI', badge: '92% TERISI' },
                     { id: 'kendaraan', label: 'KENDARAAN OPERASIONAL (LV)', badge: `${vehicles.length} UNIT` },
+                    { id: 'mess', label: 'MESS & AKOMODASI', badge: '92% TERISI' },
                     { id: 'catering', label: 'CATERING & KONSUMSI', badge: '3X MAKAN' },
                     { id: 'izin', label: 'PERIZINAN & LINGKUNGAN', badge: 'LENGKAP' },
                 ].map((tab) => (
@@ -185,7 +207,7 @@ export default function GaDashboard() {
 
             {/* Grid Konten Utama */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                {/* Kolom Kiri: Menu Aksi Cepat */}
+                {/* Kolom Kiri: Tombol Aksi Cepat */}
                 <aside className="lg:col-span-3 space-y-3">
                     <div
                         onClick={() => setShowModal(true)}
@@ -199,62 +221,28 @@ export default function GaDashboard() {
                     </div>
 
                     <div className="p-4 rounded-xl border border-[#16273c] bg-[#0a1625] text-slate-400 space-y-2">
-                        <span className="text-xs font-bold text-white uppercase tracking-wider block">Status Aset GA</span>
+                        <span className="text-xs font-bold text-white uppercase tracking-wider block">Status Database GA</span>
                         <div className="text-[11px] flex justify-between">
-                            <span>Armada Terdaftar</span>
-                            <span className="text-slate-200">{vehicles.length} unit</span>
+                            <span>Tabel Supabase</span>
+                            <span className="text-emerald-400 font-semibold">ga_vehicle_logs</span>
                         </div>
                         <div className="text-[11px] flex justify-between">
-                            <span>Kamar Mess Terpakai</span>
-                            <span className="text-emerald-400 font-semibold">128 / 140</span>
+                            <span>Total Armada Tercatat</span>
+                            <span className="text-slate-200 font-bold">{vehicles.length} log</span>
                         </div>
                         <div className="text-[11px] flex justify-between">
-                            <span>Pasokan Air & Genset</span>
-                            <span className="text-emerald-400 font-semibold">Normal</span>
+                            <span>Kapasitas Mess Pit</span>
+                            <span className="text-amber-400 font-semibold">128 / 140 Bed</span>
                         </div>
                     </div>
                 </aside>
 
-                {/* Kolom Kanan: Panel Statistik & Tabel */}
+                {/* Kolom Kanan: Panel Tabel */}
                 <main className="lg:col-span-9 space-y-6">
-                    {/* Row Atas: Kartu Metrik GA */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
-                            <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">Kapasitas Mess Pit</h3>
-                            <div className="flex items-baseline gap-2">
-                                <span className="text-3xl font-black text-amber-400">128/140</span>
-                                <span className="text-xs text-slate-400">Bed Terisi</span>
-                            </div>
-                            <p className="mt-3 text-[11px] text-slate-400">Blok A (Staf), Blok B & C (Kru Pit)</p>
-                        </div>
-
-                        <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
-                            <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">Kesiapan Armada LV</h3>
-                            <div className="flex items-baseline gap-2">
-                                <span className="text-3xl font-black text-emerald-400">{vehicles.length} Unit</span>
-                                <span className="text-xs text-slate-400">Aktif Site</span>
-                            </div>
-                            <div className="mt-3 text-[11px] text-slate-400 flex justify-between">
-                                <span>Triton/Hilux: {vehicles.length - 1}</span>
-                                <span>Ambulans: 1</span>
-                            </div>
-                        </div>
-
-                        <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
-                            <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">Distribusi Catering Hari Ini</h3>
-                            <div className="flex items-baseline gap-2">
-                                <span className="text-3xl font-black text-white">426</span>
-                                <span className="text-xs text-slate-400">Porsi Terkirim</span>
-                            </div>
-                            <p className="mt-3 text-[11px] text-emerald-400 font-medium">✓ Standar Higienis Terpenuhi</p>
-                        </div>
-                    </div>
-
-                    {/* Tabel Status Armada LV */}
                     <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
                         <div className="flex justify-between items-center mb-3">
                             <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider">
-                                Status Pemakaian Kendaraan Operasional Lapangan (LV)
+                                Status Pemakaian Kendaraan Operasional Lapangan (Live Supabase)
                             </h3>
                             <button
                                 onClick={() => setShowModal(true)}
@@ -269,7 +257,7 @@ export default function GaDashboard() {
                                     <tr className="border-b border-[#1b2e46] text-slate-400">
                                         <th className="pb-2">No. Lambung</th>
                                         <th className="pb-2">Tipe Kendaraan</th>
-                                        <th className="pb-2">Peminjam / Penanggung Jawab</th>
+                                        <th className="pb-2">Peminjam / Driver</th>
                                         <th className="pb-2">Tujuan Lokasi</th>
                                         <th className="pb-2">Status</th>
                                     </tr>
@@ -282,10 +270,12 @@ export default function GaDashboard() {
                                             <td className="text-slate-300">{v.driver}</td>
                                             <td className="text-slate-400">{v.destination}</td>
                                             <td>
-                                                <span className={`px-2 py-0.5 rounded border text-[10px] ${v.status === 'Dipakai'
-                                                        ? 'text-amber-400 bg-amber-950/60 border-amber-800/40'
-                                                        : 'text-emerald-400 bg-emerald-950/60 border-emerald-800/40'
-                                                    }`}>
+                                                <span
+                                                    className={`px-2 py-0.5 rounded border text-[10px] ${v.status === 'Dipakai'
+                                                            ? 'text-amber-400 bg-amber-950/60 border-amber-800/40'
+                                                            : 'text-emerald-400 bg-emerald-950/60 border-emerald-800/40'
+                                                        }`}
+                                                >
                                                     {v.status}
                                                 </span>
                                             </td>
@@ -311,7 +301,7 @@ export default function GaDashboard() {
                                     required
                                     value={hullNo}
                                     onChange={(e) => setHullNo(e.target.value)}
-                                    placeholder="Contoh: LV-08"
+                                    placeholder="Contoh: LV-09"
                                     className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400 font-mono"
                                 />
                             </div>
@@ -326,7 +316,7 @@ export default function GaDashboard() {
                                 />
                             </div>
                             <div>
-                                <label className="text-[11px] text-slate-400 block mb-1">Nama Peminjam / Divisi</label>
+                                <label className="text-[11px] text-slate-400 block mb-1">Nama Peminjam / Driver</label>
                                 <input
                                     type="text"
                                     required
@@ -343,7 +333,7 @@ export default function GaDashboard() {
                                     required
                                     value={destination}
                                     onChange={(e) => setDestination(e.target.value)}
-                                    placeholder="Contoh: Stockpile Pelabuhan / Workshop"
+                                    placeholder="Contoh: Stockpile Pelabuhan / Hauling Road"
                                     className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400"
                                 />
                             </div>
