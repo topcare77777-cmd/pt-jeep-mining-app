@@ -1,6 +1,8 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { createClient } from '@supabase/supabase-js'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
@@ -19,10 +21,12 @@ interface Employee {
 }
 
 export default function HrdDashboard() {
+    const pathname = usePathname()
     const [loading, setLoading] = useState(true)
     const [userName, setUserName] = useState('Petugas HRD')
     const [activeTab, setActiveTab] = useState('karyawan')
     const [employees, setEmployees] = useState<Employee[]>([])
+    const [searchQuery, setSearchQuery] = useState('')
 
     // Modal Input Personil Baru
     const [showModal, setShowModal] = useState(false)
@@ -52,7 +56,7 @@ export default function HrdDashboard() {
                     if (accessToken) {
                         await supabase.auth.setSession({
                             access_token: accessToken,
-                            refreshToken: refreshToken || '',
+                            refresh_token: refreshToken || '',
                         })
                         window.history.replaceState(null, '', window.location.pathname)
                     }
@@ -167,6 +171,24 @@ export default function HrdDashboard() {
         window.location.href = landingUrl
     }
 
+    const filteredEmployees = employees.filter((emp) =>
+        emp.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        emp.nik.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        emp.position.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+
+    const navLinks = [
+        { href: '/manager-site', label: 'Pit Produksi', icon: '⛏️' },
+        { href: '/ritase', label: 'Ritase & Timbangan', icon: '🚛' },
+        { href: '/bbm', label: 'Tangki BBM', icon: '⛽' },
+        { href: '/finance', label: 'Keuangan', icon: '💰' },
+        { href: '/adm', label: 'ADM & Surat', icon: '📋' },
+        { href: '/hrd', label: 'HRD & K3', icon: '👷‍♂️' },
+        { href: '/ga', label: 'GA & Fasilitas', icon: '🚙' },
+        { href: '/direktur', label: 'Eksekutif', icon: '🏛️' },
+        { href: '/laporan', label: 'Cetak Laporan', icon: '📄' },
+    ]
+
     if (loading) {
         return (
             <div className="min-h-screen bg-[#060c14] flex flex-col items-center justify-center text-white font-sans">
@@ -178,27 +200,51 @@ export default function HrdDashboard() {
 
     return (
         <div className="min-h-screen bg-[#060c14] text-slate-100 font-sans p-4 md:p-6 select-none">
-            {/* Header Bar */}
-            <header className="flex flex-wrap items-center justify-between bg-[#0a1625] border border-[#1b2e46] rounded-xl px-6 py-4 mb-6 shadow-xl">
-                <div className="flex items-center space-x-3">
-                    <span className="text-2xl">👷‍♂️</span>
+            {/* Header Mandiri */}
+            <header className="mb-6 space-y-3">
+                <div className="flex flex-wrap items-center justify-between bg-[#0a1625] border border-[#1b2e46] rounded-xl px-6 py-4 shadow-xl">
                     <div>
-                        <h1 className="text-xl md:text-2xl font-black tracking-wide text-white">
+                        <h1 className="text-xl md:text-2xl font-black tracking-wide text-white flex items-center gap-2">
                             Dashboard Human Resources & HSE (K3) PT. JEEP
                         </h1>
-                        <p className="text-xs text-sky-400 flex items-center gap-1.5 mt-0.5">
+                        <p className="text-xs text-slate-400 flex items-center gap-2 mt-1">
                             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                            Manpower Management & Jam Kerja Selamat (Zero Accident) • {userName}
+                            <span>Manpower Management & Jam Kerja Selamat (Zero Accident)</span>
+                            <span className="text-slate-600">•</span>
+                            <span className="text-slate-300 font-semibold">{userName}</span>
+                            <span className="bg-[#112233] border border-[#1e3a5f] text-slate-300 text-[10px] px-2 py-0.5 rounded font-mono">
+                                HRD & HSE
+                            </span>
                         </p>
                     </div>
+
+                    <button
+                        onClick={handleLogout}
+                        className="bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/50 text-rose-300 text-xs px-4 py-2 rounded-lg transition cursor-pointer"
+                    >
+                        Keluar ke Beranda
+                    </button>
                 </div>
 
-                <button
-                    onClick={handleLogout}
-                    className="bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/50 text-rose-300 text-xs px-4 py-2 rounded-lg transition cursor-pointer"
-                >
-                    Keluar ke Beranda
-                </button>
+                {/* Global Module Switcher */}
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+                    {navLinks.map((item) => {
+                        const isActive = pathname === item.href
+                        return (
+                            <Link
+                                key={item.href}
+                                href={item.href}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border whitespace-nowrap font-medium transition cursor-pointer ${isActive
+                                        ? 'bg-[#162d47] text-white border-amber-400/80 shadow-sm'
+                                        : 'bg-[#0a1625] text-slate-400 border-[#1b2e46] hover:text-slate-200 hover:bg-[#0f2137]'
+                                    }`}
+                            >
+                                <span>{item.icon}</span>
+                                <span>{item.label}</span>
+                            </Link>
+                        )
+                    })}
+                </div>
             </header>
 
             {/* Nav Tabs */}
@@ -277,18 +323,25 @@ export default function HrdDashboard() {
                         </div>
                     </div>
 
-                    <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
-                        <div className="flex justify-between items-center mb-3">
-                            <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider">
-                                Daftar Personil & Tenaga Kerja Site (Live Supabase)
-                            </h3>
+                    <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg space-y-4">
+                        <div className="flex flex-wrap justify-between items-center gap-3">
+                            <div className="w-full md:w-72">
+                                <input
+                                    type="text"
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    placeholder="Cari nama, NIK, jabatan..."
+                                    className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-sky-400"
+                                />
+                            </div>
                             <button
                                 onClick={() => setShowModal(true)}
-                                className="bg-sky-500 hover:bg-sky-600 text-slate-950 text-[11px] font-bold px-3 py-1.5 rounded-lg transition cursor-pointer"
+                                className="bg-sky-500 hover:bg-sky-600 text-slate-950 text-[11px] font-bold px-3.5 py-2 rounded-lg transition cursor-pointer"
                             >
                                 + Registrasi Personil
                             </button>
                         </div>
+
                         <div className="overflow-x-auto">
                             <table className="w-full text-left text-xs">
                                 <thead>
@@ -302,20 +355,28 @@ export default function HrdDashboard() {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-[#16273c] text-slate-300">
-                                    {employees.map((emp) => (
-                                        <tr key={emp.id}>
-                                            <td className="py-2.5 font-mono text-sky-400 font-bold">{emp.nik}</td>
-                                            <td className="font-semibold text-white">{emp.full_name}</td>
-                                            <td>{emp.position}</td>
-                                            <td className="text-slate-400">{emp.department}</td>
-                                            <td className="text-slate-400 font-mono">{emp.phone || '-'}</td>
-                                            <td>
-                                                <span className="bg-emerald-950/80 border border-emerald-800/40 text-emerald-400 text-[10px] px-2 py-0.5 rounded font-medium">
-                                                    {emp.status}
-                                                </span>
+                                    {filteredEmployees.length > 0 ? (
+                                        filteredEmployees.map((emp) => (
+                                            <tr key={emp.id}>
+                                                <td className="py-2.5 font-mono text-sky-400 font-bold">{emp.nik}</td>
+                                                <td className="font-semibold text-white">{emp.full_name}</td>
+                                                <td>{emp.position}</td>
+                                                <td className="text-slate-400">{emp.department}</td>
+                                                <td className="text-slate-400 font-mono">{emp.phone || '-'}</td>
+                                                <td>
+                                                    <span className="bg-emerald-950/80 border border-emerald-800/40 text-emerald-400 text-[10px] px-2 py-0.5 rounded font-medium">
+                                                        {emp.status}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    ) : (
+                                        <tr>
+                                            <td colSpan={6} className="py-8 text-center text-slate-500 italic">
+                                                Tidak ada personil yang cocok dengan pencarian.
                                             </td>
                                         </tr>
-                                    ))}
+                                    )}
                                 </tbody>
                             </table>
                         </div>
