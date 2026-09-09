@@ -9,7 +9,7 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 interface DocumentLog {
     id: string
-    created_at: string
+    created_at?: string
     agenda_no: string
     title: string
     sender: string
@@ -20,6 +20,7 @@ interface DocumentLog {
 export default function AdmDashboard() {
     const [loading, setLoading] = useState(true)
     const [userName, setUserName] = useState('Petugas ADM')
+    const [userId, setUserId] = useState<string | null>(null)
     const [activeTab, setActiveTab] = useState('surat')
     const [documents, setDocuments] = useState<DocumentLog[]>([])
 
@@ -36,12 +37,29 @@ export default function AdmDashboard() {
     useEffect(() => {
         async function initAdm() {
             try {
+                // Ambil token dari URL hash jika dialihkan lintas-domain
+                if (typeof window !== 'undefined' && window.location.hash.includes('access_token')) {
+                    const hashParams = new URLSearchParams(window.location.hash.replace('#', '?'))
+                    const accessToken = hashParams.get('access_token')
+                    const refreshToken = hashParams.get('refresh_token')
+
+                    if (accessToken && refreshToken) {
+                        await supabase.auth.setSession({
+                            access_token: accessToken,
+                            refresh_token: refreshToken,
+                        })
+                        window.history.replaceState(null, '', window.location.pathname)
+                    }
+                }
+
                 // 1. Proteksi Sesi Supabase
                 const { data: { session } } = await supabase.auth.getSession()
                 if (!session) {
                     window.location.href = landingUrl
                     return
                 }
+
+                setUserId(session.user.id)
 
                 // 2. Verifikasi Profil
                 const { data: profile } = await supabase
@@ -50,25 +68,26 @@ export default function AdmDashboard() {
                     .eq('id', session.user.id)
                     .single()
 
-                if (!profile || profile.status !== 'Aktif') {
+                const userStatus = (profile?.status || '').toLowerCase()
+                if (profile && userStatus && userStatus !== 'aktif') {
+                    alert('Akun Anda dinonaktifkan.')
                     await supabase.auth.signOut()
                     window.location.href = landingUrl
                     return
                 }
 
-                setUserName(profile.full_name || 'Petugas ADM')
+                setUserName(profile?.full_name || 'Petugas ADM')
 
-                // 3. Ambil data dokumen dari tabel adm_documents jika ada
+                // 3. Ambil data dokumen dari tabel adm_documents
                 const { data: docData } = await supabase
                     .from('adm_documents')
                     .select('*')
                     .order('created_at', { ascending: false })
-                    .limit(10)
+                    .limit(20)
 
                 if (docData && docData.length > 0) {
                     setDocuments(docData)
                 } else {
-                    // Data cadangan lokal jika tabel belum di-migrate
                     setDocuments([
                         {
                             id: '1',
@@ -101,7 +120,7 @@ export default function AdmDashboard() {
         initAdm()
     }, [landingUrl])
 
-    // Submit Dokumen Baru
+    // Submit Dokumen Baru ke Supabase
     const handleAddDocument = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!title || !sender) return
@@ -109,33 +128,33 @@ export default function AdmDashboard() {
         setSubmitting(true)
         const generatedNo = agendaNo || `ADM/${new Date().getFullYear()}/${Date.now().toString().slice(-4)}`
 
-        const newDoc: DocumentLog = {
-            id: Date.now().toString(),
-            created_at: new Date().toISOString(),
+        const payload: Record<string, any> = {
             agenda_no: generatedNo,
             title,
             sender,
             category,
-            status: 'Tercatat',
+            status: 'Tervalidasi',
         }
 
-        // Coba simpan ke Supabase jika tabel sudah ada
+        if (userId) {
+            payload.created_by = userId
+        }
+
         const { data, error } = await supabase
             .from('adm_documents')
-            .insert([newDoc])
+            .insert([payload])
             .select()
 
         if (!error && data) {
             setDocuments([data[0], ...documents])
+            setShowModal(false)
+            setTitle('')
+            setSender('')
+            setAgendaNo('')
         } else {
-            // Fallback state lokal
-            setDocuments([newDoc, ...documents])
+            alert('Gagal menyimpan berkas: ' + (error?.message || 'Terjadi kesalahan sistem.'))
         }
 
-        setShowModal(false)
-        setTitle('')
-        setSender('')
-        setAgendaNo('')
         setSubmitting(false)
     }
 
@@ -172,7 +191,7 @@ export default function AdmDashboard() {
 
                 <button
                     onClick={handleLogout}
-                    className="bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/50 text-rose-300 text-xs px-4 py-2 rounded-lg transition"
+                    className="bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/50 text-rose-300 text-xs px-4 py-2 rounded-lg transition cursor-pointer"
                 >
                     Keluar ke Beranda
                 </button>
@@ -189,7 +208,7 @@ export default function AdmDashboard() {
                     <button
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id)}
-                        className={`px-4 py-2.5 rounded-lg text-xs font-bold transition flex items-center gap-2 border ${activeTab === tab.id
+                        className={`px-4 py-2.5 rounded-lg text-xs font-bold transition flex items-center gap-2 border cursor-pointer ${activeTab === tab.id
                                 ? 'bg-[#1b3b5f] border-sky-400 text-white shadow-lg shadow-sky-950/50'
                                 : 'bg-[#0c1a2d] border-[#1b2e46] text-slate-400 hover:text-white hover:bg-[#12243d]'
                             }`}
@@ -206,7 +225,7 @@ export default function AdmDashboard() {
 
             {/* Konten Utama */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                {/* Kolom Kiri: Tombol Aksi Cepat */}
+                {/* Kolom Kiri: Tombol Aksi Cepat & Navigasi */}
                 <aside className="lg:col-span-3 space-y-3">
                     <div
                         onClick={() => setShowModal(true)}
@@ -219,15 +238,27 @@ export default function AdmDashboard() {
                         </div>
                     </div>
 
+                    {/* Tombol Pintas ke Modul Ritase untuk Verifikasi Muatan */}
+                    <a
+                        href="/ritase"
+                        className="p-4 rounded-xl border border-[#1b2e46] bg-[#0c1a2d] hover:bg-[#12243d] hover:border-sky-500/50 text-slate-200 transition flex items-center gap-3 block"
+                    >
+                        <span className="text-xl">⚖️</span>
+                        <div>
+                            <div className="text-xs font-bold text-sky-400">Rekap Timbangan & Ritase</div>
+                            <div className="text-[10px] text-slate-400">Verifikasi Muatan Surat Jalan</div>
+                        </div>
+                    </a>
+
                     <div className="p-4 rounded-xl border border-[#16273c] bg-[#0a1625] text-slate-400 space-y-2">
                         <span className="text-xs font-bold text-white uppercase tracking-wider block">Status Berkas</span>
                         <div className="text-[11px] flex justify-between">
                             <span>Total Terarsip</span>
-                            <span className="text-slate-200">{documents.length} berkas</span>
+                            <span className="text-slate-200 font-bold">{documents.length} berkas</span>
                         </div>
                         <div className="text-[11px] flex justify-between">
-                            <span>Portal Terhubung</span>
-                            <span className="text-emerald-400 font-semibold">Aktif</span>
+                            <span>Tabel Supabase</span>
+                            <span className="text-emerald-400 font-semibold">adm_documents</span>
                         </div>
                     </div>
                 </aside>
@@ -237,11 +268,11 @@ export default function AdmDashboard() {
                     <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
                         <div className="flex justify-between items-center mb-4">
                             <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider">
-                                Log Surat & Berkas Masuk Lapangan
+                                Log Surat & Berkas Masuk Lapangan (Live Supabase)
                             </h3>
                             <button
                                 onClick={() => setShowModal(true)}
-                                className="bg-sky-500 hover:bg-sky-600 text-slate-950 font-bold text-xs px-3 py-1.5 rounded-lg transition"
+                                className="bg-sky-500 hover:bg-sky-600 text-slate-950 font-bold text-xs px-3 py-1.5 rounded-lg transition cursor-pointer"
                             >
                                 + Dokumen Baru
                             </button>
@@ -339,14 +370,14 @@ export default function AdmDashboard() {
                                 <button
                                     type="button"
                                     onClick={() => setShowModal(false)}
-                                    className="px-4 py-2 rounded-lg border border-[#1b2e46] text-slate-400 hover:text-white text-xs transition"
+                                    className="px-4 py-2 rounded-lg border border-[#1b2e46] text-slate-400 hover:text-white text-xs transition cursor-pointer"
                                 >
                                     Batal
                                 </button>
                                 <button
                                     type="submit"
                                     disabled={submitting}
-                                    className="px-4 py-2 rounded-lg bg-sky-500 hover:bg-sky-600 text-slate-950 font-bold text-xs transition"
+                                    className="px-4 py-2 rounded-lg bg-sky-500 hover:bg-sky-600 text-slate-950 font-bold text-xs transition cursor-pointer"
                                 >
                                     {submitting ? 'Menyimpan...' : 'Simpan Berkas'}
                                 </button>
