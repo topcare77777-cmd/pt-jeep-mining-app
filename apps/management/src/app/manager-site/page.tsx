@@ -40,29 +40,47 @@ export default function ManagerSiteDashboard() {
     useEffect(() => {
         async function initManager() {
             try {
-                // 1. Proteksi Sesi Supabase
+                // 1. Ambil token dari URL hash jika dialihkan lintas-domain
+                if (typeof window !== 'undefined' && window.location.hash.includes('access_token')) {
+                    const hashParams = new URLSearchParams(window.location.hash.replace('#', '?'))
+                    const accessToken = hashParams.get('access_token')
+                    const refreshToken = hashParams.get('refresh_token')
+
+                    if (accessToken && refreshToken) {
+                        await supabase.auth.setSession({
+                            access_token: accessToken,
+                            refresh_token: refreshToken,
+                        })
+                        window.history.replaceState(null, '', window.location.pathname)
+                    }
+                }
+
+                // 2. Proteksi Sesi Supabase
                 const { data: { session } } = await supabase.auth.getSession()
                 if (!session) {
                     window.location.href = landingUrl
                     return
                 }
 
-                // 2. Verifikasi Profil
+                // 3. Verifikasi Profil Pengguna
                 const { data: profile } = await supabase
                     .from('profiles')
                     .select('full_name, role, status')
                     .eq('id', session.user.id)
                     .single()
 
-                if (!profile || profile.status !== 'Aktif') {
+                // Periksa status aktif secara fleksibel (case-insensitive)
+                const userStatus = (profile?.status || '').toLowerCase()
+                if (profile && userStatus && userStatus !== 'aktif') {
+                    alert('Akun Anda dinonaktifkan.')
                     await supabase.auth.signOut()
                     window.location.href = landingUrl
                     return
                 }
 
-                setManagerName(profile.full_name || 'Kepala Teknik Tambang / Site Manager')
+                setManagerName(profile?.full_name || 'Kepala Teknik Tambang / Site Manager')
 
-                // 3. Ambil data dari tabel site_production_logs
+                // 4. Ambil data dari tabel site_production_logs
                 const { data: logsData, error } = await supabase
                     .from('site_production_logs')
                     .select('*')
@@ -71,7 +89,6 @@ export default function ManagerSiteDashboard() {
                 if (!error && logsData && logsData.length > 0) {
                     setProductionLogs(logsData)
                 } else {
-                    // Data cadangan jika tabel masih kosong
                     setProductionLogs([
                         {
                             id: '1',
@@ -240,7 +257,7 @@ export default function ManagerSiteDashboard() {
                         <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
                             <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Overburden (OB) Terakhir</h3>
                             <div className="text-2xl font-black text-white">
-                                {productionLogs[0]?.overburden_bcm.toLocaleString('id-ID') || 0} BCM
+                                {productionLogs[0]?.overburden_bcm ? Number(productionLogs[0].overburden_bcm).toLocaleString('id-ID') : 0} BCM
                             </div>
                             <p className="mt-2 text-[11px] text-emerald-400 font-semibold">Target Shift Tercapai</p>
                         </div>
@@ -248,7 +265,7 @@ export default function ManagerSiteDashboard() {
                         <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
                             <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Coal Getting Terakhir</h3>
                             <div className="text-2xl font-black text-amber-400">
-                                {productionLogs[0]?.coal_getting_ton.toLocaleString('id-ID') || 0} Ton
+                                {productionLogs[0]?.coal_getting_ton ? Number(productionLogs[0].coal_getting_ton).toLocaleString('id-ID') : 0} Ton
                             </div>
                             <p className="mt-2 text-[11px] text-slate-400">Stockpile Pit Siap Hauling</p>
                         </div>
