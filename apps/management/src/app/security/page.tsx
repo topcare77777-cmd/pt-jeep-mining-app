@@ -9,34 +9,34 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
-interface GateLog {
+interface SecurityItem {
     id: string
     created_at?: string
     visitor_name: string
-    company_origin: string
-    vehicle_no: string
-    purpose: string
-    access_card_no?: string
-    guard_name: string
-    status: string
+    institution: string
+    vehicle_plate: string
+    purpose_visit: string
+    access_card_no: string
+    entry_status: string
+    security_officer: string
 }
 
 export default function SecurityManagementPage() {
     const pathname = usePathname()
     const [loading, setLoading] = useState(true)
-    const [userName, setUserName] = useState('Komandan Regu Security')
-    const [logs, setLogs] = useState<GateLog[]>([])
+    const [userName, setUserName] = useState('Komandan Security Site')
+    const [logs, setLogs] = useState<SecurityItem[]>([])
     const [searchQuery, setSearchQuery] = useState('')
 
-    // State Modal Input Log Gerbang Baru
+    // State Modal Input Tamu Baru
     const [showModal, setShowModal] = useState(false)
     const [visitorName, setVisitorName] = useState('')
-    const [companyOrigin, setCompanyOrigin] = useState('')
-    const [vehicleNo, setVehicleNo] = useState('')
-    const [purpose, setPurpose] = useState('Pengiriman Logistik Sparepart')
-    const [accessCardNo, setAccessCardNo] = useState('')
-    const [guardName, setGuardName] = useState('')
-    const [status, setStatus] = useState('Masuk')
+    const [institution, setInstitution] = useState('PT Supplier Mandiri')
+    const [vehiclePlate, setVehiclePlate] = useState('')
+    const [purposeVisit, setPurposeVisit] = useState('Pengiriman Suku Cadang Workshop')
+    const [accessCardNo, setAccessCardNo] = useState('CARD-012')
+    const [entryStatus, setEntryStatus] = useState('Di Dalam Site')
+    const [securityOfficer, setSecurityOfficer] = useState('')
     const [submitting, setSubmitting] = useState(false)
 
     const landingUrl = process.env.NEXT_PUBLIC_LANDING_URL || 'https://pt-jeep.vercel.app'
@@ -84,7 +84,7 @@ export default function SecurityManagementPage() {
                 }
 
                 if (isMounted) {
-                    setUserName(profile?.full_name || 'Chief Security Officer')
+                    setUserName(profile?.full_name || 'Chief Security Officer Suroso')
 
                     const { data, error } = await supabase
                         .from('security_gate_logs')
@@ -98,24 +98,24 @@ export default function SecurityManagementPage() {
                             {
                                 id: '1',
                                 created_at: new Date().toISOString(),
-                                visitor_name: 'Agus Pratama',
-                                company_origin: 'PT Surya Ekspedisi',
-                                vehicle_no: 'KT-8821-AJ',
-                                purpose: 'Pengiriman Filter & Oli Workshop',
-                                access_card_no: 'V-001',
-                                guard_name: 'Komandan Pos Suroso',
-                                status: 'Masuk',
+                                visitor_name: 'Ir. H. Rahmat',
+                                institution: 'Inspektorat Tambang ESDM',
+                                vehicle_plate: 'B 1234 TMB',
+                                purpose_visit: 'Inspeksi K3 & Lingkungan Lapangan',
+                                access_card_no: 'VIP-001',
+                                entry_status: 'Di Dalam Site',
+                                security_officer: 'Danru Suroso',
                             },
                             {
                                 id: '2',
                                 created_at: new Date().toISOString(),
-                                visitor_name: 'Ir. Bambang S.',
-                                company_origin: 'Konsultan Lingkungan',
-                                vehicle_no: 'B-1242-UIF',
-                                purpose: 'Inspeksi Settling Pond Tambang',
-                                access_card_no: 'V-002',
-                                guard_name: 'Komandan Pos Suroso',
-                                status: 'Keluar',
+                                visitor_name: 'Yusuf Bahtiar',
+                                institution: 'PT Surya Diesel Perkasa',
+                                vehicle_plate: 'DD 9921 KA',
+                                purpose_visit: 'Pengiriman Filter & Oli Workshop',
+                                access_card_no: 'CARD-010',
+                                entry_status: 'Sudah Keluar',
+                                security_officer: 'Anggota Budi',
                             },
                         ])
                     }
@@ -134,20 +134,20 @@ export default function SecurityManagementPage() {
         }
     }, [landingUrl])
 
-    const handleAddLog = async (e: React.FormEvent) => {
+    const handleAddSecurityLog = async (e: React.FormEvent) => {
         e.preventDefault()
-        if (!visitorName || !vehicleNo) return
+        if (!visitorName || !vehiclePlate) return
 
         setSubmitting(true)
 
         const payload = {
             visitor_name: visitorName,
-            company_origin: companyOrigin,
-            vehicle_no: vehicleNo.toUpperCase(),
-            purpose,
-            access_card_no: accessCardNo || '-',
-            guard_name: guardName || userName,
-            status,
+            institution,
+            vehicle_plate: vehiclePlate.toUpperCase(),
+            purpose_visit: purposeVisit,
+            access_card_no: accessCardNo.toUpperCase(),
+            entry_status: entryStatus,
+            security_officer: securityOfficer || userName,
         }
 
         const { data, error } = await supabase
@@ -159,11 +159,9 @@ export default function SecurityManagementPage() {
             setLogs([data[0], ...logs])
             setShowModal(false)
             setVisitorName('')
-            setCompanyOrigin('')
-            setVehicleNo('')
-            setAccessCardNo('')
+            setVehiclePlate('')
         } else {
-            alert('Gagal mencatat log gerbang: ' + (error?.message || 'Terjadi kesalahan sistem.'))
+            alert('Gagal mencatat buku tamu security: ' + (error?.message || 'Terjadi kesalahan sistem.'))
         }
 
         setSubmitting(false)
@@ -175,34 +173,30 @@ export default function SecurityManagementPage() {
     }
 
     const totalLogs = logs.length
-    const insideCount = logs.filter((l) => l.status === 'Masuk').length
+    const insideCount = logs.filter((l) => l.entry_status === 'Di Dalam Site').length
 
     const filteredLogs = logs.filter((item) =>
         item.visitor_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.company_origin.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.vehicle_no.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.purpose.toLowerCase().includes(searchQuery.toLowerCase())
+        item.institution.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.vehicle_plate.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.purpose_visit.toLowerCase().includes(searchQuery.toLowerCase())
     )
 
     const navLinks = [
-        { href: '/manager-site', label: 'Pit Produksi', icon: '⛏️' },
-        { href: '/fleet', label: 'Alat Berat', icon: '🚜' },
-        { href: '/safety', label: 'Inspeksi K3', icon: '⛑️' },
-        { href: '/sparepart', label: 'Sparepart', icon: '📦' },
-        { href: '/mess', label: 'Mess & Camp', icon: '🏠' },
-        { href: '/vendor', label: 'Vendor', icon: '🤝' },
-        { href: '/radio', label: 'Radio', icon: '📻' },
-        { href: '/clinic', label: 'Klinik', icon: '🏥' },
         { href: '/security', label: 'Security Gate', icon: '🛡️' },
-        { href: '/ritase', label: 'Ritase', icon: '🚛' },
-        { href: '/jetty', label: 'Jetty Port', icon: '🚢' },
-        { href: '/lingkungan', label: 'Lingkungan', icon: '🌱' },
+        { href: '/clinic', label: 'Klinik Medis', icon: '🏥' },
+        { href: '/radio', label: 'Radio Dispatch', icon: '📻' },
+        { href: '/sparepart', label: 'Sparepart', icon: '📦' },
+        { href: '/fleet-maintenance', label: 'Maintenance', icon: '🔧' },
+        { href: '/fleet', label: 'Alat Berat', icon: '🚜' },
+        { href: '/manager-site', label: 'Pit Penambangan', icon: '⛏️' },
+        { href: '/safety', label: 'Inspeksi K3', icon: '⛑️' },
+        { href: '/jetty', label: 'Jetty & LCT', icon: '🚢' },
         { href: '/bbm', label: 'BBM Solar', icon: '⛽' },
+        { href: '/hrd', label: 'HRD & Payroll', icon: '👷‍♂️' },
         { href: '/finance', label: 'Keuangan', icon: '💰' },
-        { href: '/adm', label: 'ADM & Surat', icon: '📋' },
-        { href: '/hrd', label: 'HRD & K3', icon: '👷‍♂️' },
-        { href: '/ga', label: 'GA & Fasilitas', icon: '🚙' },
-        { href: '/direktur', label: 'Eksekutif', icon: '🏛️' },
+        { href: '/legal', label: 'Legal & IUP', icon: '⚖️' },
+        { href: '/investor', label: 'Investor', icon: '📈' },
         { href: '/laporan', label: 'Cetak Laporan', icon: '📄' },
     ]
 
@@ -210,7 +204,7 @@ export default function SecurityManagementPage() {
         return (
             <div className="min-h-screen bg-[#060c14] flex flex-col items-center justify-center text-white font-sans">
                 <div className="w-10 h-10 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-                <p className="text-xs text-slate-400">Sinkronisasi Pos Keamanan & Kontrol Gerbang...</p>
+                <p className="text-xs text-slate-400">Sinkronisasi Keamanan Gerbang & Pos Security...</p>
             </div>
         )
     }
@@ -224,11 +218,11 @@ export default function SecurityManagementPage() {
                         <span className="text-2xl">🛡️</span>
                         <div>
                             <h1 className="text-xl md:text-2xl font-black tracking-wide text-white">
-                                Keamanan & Pos Pengamanan (Security Gate) PT. JEEP
+                                Keamanan Gerbang & Security PT. JEEP
                             </h1>
                             <p className="text-xs text-amber-400 flex items-center gap-1.5 mt-0.5">
                                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                                <span>Kontrol Akses Gerbang Utama, Buku Tamu, & Patroli Keamanan Site</span>
+                                <span>Kontrol Akses Main Gate, Buku Tamu Vendor, & Pengamanan Aset Site</span>
                                 <span className="text-slate-600">•</span>
                                 <span className="text-slate-300 font-semibold">{userName}</span>
                                 <span className="bg-[#112233] border border-[#1e3a5f] text-slate-300 text-[10px] px-2 py-0.5 rounded font-mono">
@@ -251,7 +245,7 @@ export default function SecurityManagementPage() {
                     {navLinks.map((item) => {
                         const isActive = pathname === item.href
                         return (
-                            <a
+                            <Link
                                 key={item.href}
                                 href={item.href}
                                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border whitespace-nowrap font-medium transition cursor-pointer ${isActive
@@ -261,7 +255,7 @@ export default function SecurityManagementPage() {
                             >
                                 <span>{item.icon}</span>
                                 <span>{item.label}</span>
-                            </a>
+                            </Link>
                         )
                     })}
                 </div>
@@ -270,27 +264,27 @@ export default function SecurityManagementPage() {
             {/* KPI Security */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
                 <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
-                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Total Kunjungan / Tamu</h3>
-                    <div className="text-2xl font-black text-white font-mono">{totalLogs} Kendaraan</div>
-                    <p className="mt-2 text-[11px] text-slate-400">Tercatat di Pos Utama Security</p>
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Total Kunjungan Tercatat</h3>
+                    <div className="text-2xl font-black text-white font-mono">{totalLogs} Tamu</div>
+                    <p className="mt-2 text-[11px] text-slate-400">Buku Tamu Main Gate</p>
                 </div>
 
                 <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
-                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Tamu / Kendaraan di Dalam</h3>
-                    <div className="text-2xl font-black text-amber-400 font-mono">{insideCount} Unit</div>
-                    <p className="mt-2 text-[11px] text-amber-400 font-semibold">Masih Berada di Area Site</p>
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Tamu Masih di Dalam Site</h3>
+                    <div className="text-2xl font-black text-amber-400 font-mono">{insideCount} Orang</div>
+                    <p className="mt-2 text-[11px] text-amber-400 font-semibold">Memakai Kartu Akses Visitor</p>
                 </div>
 
                 <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
-                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Status Perimeter Site</h3>
-                    <div className="text-2xl font-black text-emerald-400 font-mono">Aman Terkendali</div>
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Perimeter Security</h3>
+                    <div className="text-2xl font-black text-emerald-400 font-mono">Aman & Kondusif</div>
                     <p className="mt-2 text-[11px] text-emerald-400 font-medium">✓ Patroli Regu 24 Jam Aktif</p>
                 </div>
 
                 <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
                     <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Insiden Keamanan</h3>
-                    <div className="text-2xl font-black text-cyan-400 font-mono">0 Insiden</div>
-                    <p className="mt-2 text-[11px] text-cyan-400 font-medium">✓ Zero Security Breach</p>
+                    <div className="text-2xl font-black text-emerald-400 font-mono">0 Pelanggaran</div>
+                    <p className="mt-2 text-[11px] text-emerald-400 font-medium">✓ Zero Security Breach</p>
                 </div>
             </div>
 
@@ -302,7 +296,7 @@ export default function SecurityManagementPage() {
                             type="text"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            placeholder="Cari nama, plat, perusahaan, keperluan..."
+                            placeholder="Cari nama tamu, instansi, plat nomor..."
                             className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400"
                         />
                     </div>
@@ -310,7 +304,7 @@ export default function SecurityManagementPage() {
                         onClick={() => setShowModal(true)}
                         className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs px-4 py-2 rounded-lg transition cursor-pointer"
                     >
-                        + Catat Kendaraan / Tamu Masuk
+                        + Catat Buku Tamu / Kendaraan Baru
                     </button>
                 </div>
 
@@ -318,45 +312,48 @@ export default function SecurityManagementPage() {
                     <table className="w-full text-left text-xs">
                         <thead>
                             <tr className="border-b border-[#1b2e46] text-slate-400">
-                                <th className="pb-2">Waktu Catat</th>
-                                <th className="pb-2">Nama Pengemudi / Tamu</th>
-                                <th className="pb-2">Asal Perusahaan</th>
-                                <th className="pb-2">Nomor Plat</th>
-                                <th className="pb-2">Keperluan / Keterangan</th>
-                                <th className="pb-2 text-center">No. Kartu Tamu</th>
-                                <th className="pb-2 text-center">Status Gerbang</th>
-                                <th className="pb-2">Petugas Jaga</th>
+                                <th className="pb-2">Waktu Masuk</th>
+                                <th className="pb-2">Nama Tamu / Driver</th>
+                                <th className="pb-2">Asal Instansi / Vendor</th>
+                                <th className="pb-2">Nomor Polisi Kendaraan</th>
+                                <th className="pb-2">Keperluan Kunjungan</th>
+                                <th className="pb-2 text-center">No. Kartu Akses</th>
+                                <th className="pb-2 text-center">Status Posisi</th>
+                                <th className="pb-2">Security Jaga</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-[#16273c] text-slate-300">
                             {filteredLogs.length > 0 ? (
-                                filteredLogs.map((l) => (
-                                    <tr key={l.id}>
-                                        <td className="py-2.5 font-mono text-slate-400 text-[11px]">
-                                            {l.created_at ? new Date(l.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : 'Baru saja'}
-                                        </td>
-                                        <td className="font-bold text-white">{l.visitor_name}</td>
-                                        <td className="text-slate-300">{l.company_origin}</td>
-                                        <td className="font-mono text-amber-400 font-bold">{l.vehicle_no}</td>
-                                        <td className="text-slate-300">{l.purpose}</td>
-                                        <td className="text-center font-mono text-slate-300">{l.access_card_no || '-'}</td>
-                                        <td className="text-center">
-                                            <span
-                                                className={`px-2 py-0.5 rounded text-[10px] font-bold ${l.status === 'Masuk'
-                                                        ? 'bg-amber-950/80 text-amber-400 border border-amber-800/40'
-                                                        : 'bg-emerald-950/80 text-emerald-400 border border-emerald-800/40'
-                                                    }`}
-                                            >
-                                                {l.status.toUpperCase()}
-                                            </span>
-                                        </td>
-                                        <td className="text-slate-400">{l.guard_name}</td>
-                                    </tr>
-                                ))
+                                filteredLogs.map((l) => {
+                                    const isInside = l.entry_status === 'Di Dalam Site'
+                                    return (
+                                        <tr key={l.id}>
+                                            <td className="py-2.5 font-mono text-slate-400 text-[11px]">
+                                                {l.created_at ? new Date(l.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : 'Baru saja'}
+                                            </td>
+                                            <td className="font-bold text-white">{l.visitor_name}</td>
+                                            <td className="text-slate-300">{l.institution}</td>
+                                            <td className="font-mono text-amber-400 font-bold">{l.vehicle_plate}</td>
+                                            <td className="text-slate-300 max-w-xs truncate">{l.purpose_visit}</td>
+                                            <td className="text-center font-mono text-slate-300">{l.access_card_no}</td>
+                                            <td className="text-center">
+                                                <span
+                                                    className={`px-2 py-0.5 rounded text-[10px] font-bold ${isInside
+                                                            ? 'bg-amber-950/80 text-amber-400 border border-amber-800/40'
+                                                            : 'bg-emerald-950/80 text-emerald-400 border border-emerald-800/40'
+                                                        }`}
+                                                >
+                                                    {l.entry_status.toUpperCase()}
+                                                </span>
+                                            </td>
+                                            <td className="text-slate-400">{l.security_officer}</td>
+                                        </tr>
+                                    )
+                                })
                             ) : (
                                 <tr>
                                     <td colSpan={8} className="py-8 text-center text-slate-500 italic">
-                                        Tidak ada catatan gerbang yang cocok dengan pencarian.
+                                        Tidak ada catatan security yang cocok dengan pencarian.
                                     </td>
                                 </tr>
                             )}
@@ -365,92 +362,94 @@ export default function SecurityManagementPage() {
                 </div>
             </div>
 
-            {/* Modal Input Tamu / Kendaraan */}
+            {/* Modal Input Tamu Security */}
             {showModal && (
                 <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
                     <div className="bg-[#0a1625] border border-[#1b2e46] rounded-xl p-6 w-full max-w-md shadow-2xl space-y-4">
-                        <h2 className="text-sm font-bold text-white uppercase tracking-wider">Catat Akses Masuk Gerbang Utama</h2>
-                        <form onSubmit={handleAddLog} className="space-y-3">
-                            <div>
-                                <label className="text-[11px] text-slate-400 block mb-1">Nama Pengemudi / Tamu</label>
-                                <input
-                                    type="text"
-                                    required
-                                    value={visitorName}
-                                    onChange={(e) => setVisitorName(e.target.value)}
-                                    placeholder="Contoh: Agus Pratama"
-                                    className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="text-[11px] text-slate-400 block mb-1">Asal Perusahaan / Instansi</label>
-                                <input
-                                    type="text"
-                                    required
-                                    value={companyOrigin}
-                                    onChange={(e) => setCompanyOrigin(e.target.value)}
-                                    placeholder="Contoh: PT Surya Ekspedisi Logistik"
-                                    className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400"
-                                />
-                            </div>
-
+                        <h2 className="text-sm font-bold text-white uppercase tracking-wider">Catat Buku Tamu & Kendaraan (Security Gate)</h2>
+                        <form onSubmit={handleAddSecurityLog} className="space-y-3">
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className="text-[11px] text-slate-400 block mb-1">Nomor Plat Kendaraan</label>
+                                    <label className="text-[11px] text-slate-400 block mb-1">Nama Tamu / Driver</label>
                                     <input
                                         type="text"
                                         required
-                                        value={vehicleNo}
-                                        onChange={(e) => setVehicleNo(e.target.value)}
-                                        placeholder="Contoh: KT-8821-AJ"
+                                        value={visitorName}
+                                        onChange={(e) => setVisitorName(e.target.value)}
+                                        placeholder="Contoh: Budi Santoso"
+                                        className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[11px] text-slate-400 block mb-1">Asal Instansi / Vendor</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        value={institution}
+                                        onChange={(e) => setInstitution(e.target.value)}
+                                        placeholder="PT Supplier Mandiri"
+                                        className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-[11px] text-slate-400 block mb-1">Nomor Polisi Kendaraan</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        value={vehiclePlate}
+                                        onChange={(e) => setVehiclePlate(e.target.value)}
+                                        placeholder="DD 8821 XA"
                                         className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400 font-mono"
                                     />
                                 </div>
                                 <div>
-                                    <label className="text-[11px] text-slate-400 block mb-1">No. Kartu Tamu (Visitor)</label>
+                                    <label className="text-[11px] text-slate-400 block mb-1">No. Kartu Akses Visitor</label>
                                     <input
                                         type="text"
+                                        required
                                         value={accessCardNo}
                                         onChange={(e) => setAccessCardNo(e.target.value)}
-                                        placeholder="Contoh: V-012"
+                                        placeholder="CARD-015"
                                         className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400 font-mono"
                                     />
                                 </div>
                             </div>
 
                             <div>
-                                <label className="text-[11px] text-slate-400 block mb-1">Keperluan Kunjungan / Pengiriman</label>
+                                <label className="text-[11px] text-slate-400 block mb-1">Keperluan Kunjungan</label>
                                 <input
                                     type="text"
                                     required
-                                    value={purpose}
-                                    onChange={(e) => setPurpose(e.target.value)}
-                                    placeholder="Contoh: Pengiriman suku cadang & filter workshop"
+                                    value={purposeVisit}
+                                    onChange={(e) => setPurposeVisit(e.target.value)}
+                                    placeholder="Contoh: Pengiriman suku cadang ke workshop"
                                     className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400"
                                 />
                             </div>
 
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className="text-[11px] text-slate-400 block mb-1">Status Gerbang</label>
+                                    <label className="text-[11px] text-slate-400 block mb-1">Status Posisi</label>
                                     <select
-                                        value={status}
-                                        onChange={(e) => setStatus(e.target.value)}
-                                        className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400"
+                                        value={entryStatus}
+                                        onChange={(e) => setEntryStatus(e.target.value)}
+                                        className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400 font-bold"
                                     >
-                                        <option value="Masuk">Masuk Area Site</option>
-                                        <option value="Keluar">Keluar Area Site</option>
+                                        <option value="Di Dalam Site">Di Dalam Site</option>
+                                        <option value="Sudah Keluar">Sudah Keluar</option>
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="text-[11px] text-slate-400 block mb-1">Komandan / Petugas Jaga</label>
+                                    <label className="text-[11px] text-slate-400 block mb-1">Security Jaga</label>
                                     <input
                                         type="text"
                                         required
-                                        value={guardName}
-                                        onChange={(e) => setGuardName(e.target.value)}
-                                        placeholder="Nama security"
+                                        value={securityOfficer}
+                                        onChange={(e) => setSecurityOfficer(e.target.value)}
+                                        placeholder="Nama petugas security"
                                         className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400"
                                     />
                                 </div>
@@ -469,7 +468,7 @@ export default function SecurityManagementPage() {
                                     disabled={submitting}
                                     className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs transition cursor-pointer"
                                 >
-                                    {submitting ? 'Menyimpan...' : 'Simpan Data Gerbang'}
+                                    {submitting ? 'Menyimpan...' : 'Simpan Buku Tamu'}
                                 </button>
                             </div>
                         </form>
