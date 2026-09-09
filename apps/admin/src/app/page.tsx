@@ -3,14 +3,37 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
-export default function SuperAdminConsole() {
-    const [activeMenu, setActiveMenu] = useState<'system' | 'users' | 'roles' | 'audit'>('users')
+// Daftar seluruh rute/aplikasi modular yang ada di platform PT. JEEP
+const APP_MODULES = [
+    { key: 'manager-site', label: 'Pit Produksi', icon: '⛏️' },
+    { key: 'fleet', label: 'Alat Berat', icon: '🚜' },
+    { key: 'fleet-maintenance', label: 'Workshop Fleet', icon: '🔧' },
+    { key: 'ritase', label: 'Ritase & Timbangan', icon: '🚛' },
+    { key: 'bbm', label: 'BBM Solar', icon: '⛽' },
+    { key: 'jetty', label: 'Jetty & LCT', icon: '🚢' },
+    { key: 'sparepart', label: 'Gudang Sparepart', icon: '📦' },
+    { key: 'safety', label: 'Inspeksi K3', icon: '⛑️' },
+    { key: 'clinic', label: 'Klinik Medis', icon: '🏥' },
+    { key: 'security', label: 'Keamanan Gerbang', icon: '🛡️' },
+    { key: 'radio', label: 'Radio Dispatch', icon: '📻' },
+    { key: 'hrd', label: 'HRD & Payroll', icon: '👷‍♂️' },
+    { key: 'finance', label: 'Keuangan Site', icon: '💰' },
+    { key: 'legal', label: 'Legal & IUP', icon: '⚖️' },
+    { key: 'csr', label: 'CSR & Masyarakat', icon: '🤝' },
+    { key: 'it-helpdesk', label: 'IT Helpdesk', icon: '💻' },
+    { key: 'helpdesk', label: 'Helpdesk GA', icon: '🛠️' },
+    { key: 'direktur', label: 'Eksekutif BOD', icon: '🏛️' },
+    { key: 'laporan', label: 'Cetak Laporan', icon: '📄' },
+]
 
-    // State untuk daftar pengguna dari database
+export default function SuperAdminConsole() {
+    const [activeMenu, setActiveMenu] = useState<'system' | 'users' | 'roles' | 'permissions' | 'audit'>('users')
+
+    // State untuk daftar pengguna
     const [users, setUsers] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
 
-    // State untuk Modal Form Buat Pengguna
+    // State Modal Buat Pengguna
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [fullName, setFullName] = useState('')
     const [username, setUsername] = useState('')
@@ -19,35 +42,46 @@ export default function SuperAdminConsole() {
     const [role, setRole] = useState('')
     const [isSubmitting, setIsSubmitting] = useState(false)
 
-    // State untuk Modal Edit Pengguna
+    // State Modal Edit Pengguna
     const [isEditUserModalOpen, setIsEditUserModalOpen] = useState(false)
     const [editUserId, setEditUserId] = useState('')
     const [editFullName, setEditFullName] = useState('')
     const [editUsername, setEditUsername] = useState('')
     const [editRole, setEditRole] = useState('')
 
-    // State tambahan untuk modul Divisi & Jabatan (Terintegrasi HRD/Keuangan/Payroll)
+    // State Divisi & Jabatan
     const [roles, setRoles] = useState<any[]>([
         { id: '1', division: 'Administrator', position: 'Super Administrator', access_level: 'Full' },
         { id: '2', division: 'Operasional Lapangan', position: 'Operator Pit Tambang', access_level: 'Limited' },
-        { id: '3', division: 'Keuangan & Payroll', position: 'Manajer Keuangan & Gaji', access_level: 'Read-Only' }
+        { id: '3', division: 'Keuangan & Payroll', position: 'Manajer Keuangan & Gaji', access_level: 'Read-Only' },
+        { id: '4', division: 'HSE & Medical', position: 'Safety & Clinic Officer', access_level: 'Standard' },
     ])
     const [rolesLoading, setRolesLoading] = useState(false)
     const [divisionName, setDivisionName] = useState('')
     const [positionName, setPositionName] = useState('')
     const [accessLevel, setAccessLevel] = useState('Standard')
 
-    // State untuk Modal Edit Divisi & Jabatan
+    // State Modal Edit Divisi
     const [isEditRoleModalOpen, setIsEditRoleModalOpen] = useState(false)
     const [editRoleId, setEditRoleId] = useState('')
     const [editDivisionName, setEditDivisionName] = useState('')
     const [editPositionName, setEditPositionName] = useState('')
     const [editAccessLevel, setEditAccessLevel] = useState('Standard')
 
-    // Ambil data pengguna asli dari Supabase saat halaman dimuat
+    // State Hak Akses Matriks Modul Divisi (Division -> Allowed Modules)
+    const [selectedDivisionForPermission, setSelectedDivisionForPermission] = useState('Administrator')
+    const [divisionPermissions, setDivisionPermissions] = useState<Record<string, string[]>>({
+        Administrator: APP_MODULES.map((m) => m.key),
+        'Operasional Lapangan': ['manager-site', 'fleet', 'ritase', 'bbm', 'radio'],
+        'Keuangan & Payroll': ['finance', 'laporan', 'hrd'],
+        'HSE & Medical': ['safety', 'clinic', 'security'],
+    })
+    const [savingPermission, setSavingPermission] = useState(false)
+
     useEffect(() => {
         fetchUsers()
         fetchRoles()
+        fetchPermissions()
     }, [])
 
     async function fetchUsers() {
@@ -77,7 +111,22 @@ export default function SuperAdminConsole() {
         setRolesLoading(false)
     }
 
-    // Handler Submit Pengguna Baru (REAL KE SUPABASE)
+    async function fetchPermissions() {
+        try {
+            const { data, error } = await supabase.from('division_permissions').select('*')
+            if (!error && data && data.length > 0) {
+                const mapped: Record<string, string[]> = {}
+                data.forEach((item: any) => {
+                    mapped[item.division_name] = item.allowed_modules || []
+                })
+                setDivisionPermissions((prev) => ({ ...prev, ...mapped }))
+            }
+        } catch (err) {
+            console.warn('Tabel division_permissions belum ada, menggunakan data lokal.')
+        }
+    }
+
+    // Handler Submit Pengguna Baru
     const handleCreateUser = async (e: React.FormEvent) => {
         e.preventDefault()
         setIsSubmitting(true)
@@ -93,30 +142,26 @@ export default function SuperAdminConsole() {
             const userId = authData.user?.id
 
             if (userId) {
-                const { error: profileError } = await supabase
-                    .from('profiles')
-                    .insert([
-                        {
-                            id: userId,
-                            full_name: fullName,
-                            username: username,
-                            email: email,
-                            role: role,
-                            status: 'Aktif',
-                        }
-                    ])
+                const { error: profileError } = await supabase.from('profiles').insert([
+                    {
+                        id: userId,
+                        full_name: fullName,
+                        username,
+                        email,
+                        role,
+                        status: 'Aktif',
+                    },
+                ])
 
                 if (profileError) throw profileError
             }
 
             alert('Pengguna baru berhasil didaftarkan ke sistem Supabase!')
             setIsModalOpen(false)
-
             setFullName('')
             setUsername('')
             setEmail('')
             setPassword('')
-
             fetchUsers()
         } catch (error: any) {
             alert('Terjadi kesalahan: ' + error.message)
@@ -125,7 +170,6 @@ export default function SuperAdminConsole() {
         }
     }
 
-    // Handler Buka Modal Edit Pengguna
     const openEditUserModal = (u: any) => {
         setEditUserId(u.id)
         setEditFullName(u.full_name || '')
@@ -134,7 +178,6 @@ export default function SuperAdminConsole() {
         setIsEditUserModalOpen(true)
     }
 
-    // Handler Update Pengguna
     const handleUpdateUser = async (e: React.FormEvent) => {
         e.preventDefault()
         const { error } = await supabase
@@ -155,10 +198,8 @@ export default function SuperAdminConsole() {
         }
     }
 
-    // Handler Hapus Pengguna
     const handleDeleteUser = async (id: string, emailUser: string) => {
         if (!confirm(`Yakin ingin menghapus pengguna ${emailUser} dari database?`)) return
-
         const { error } = await supabase.from('profiles').delete().eq('id', id)
         if (error) {
             alert('Gagal menghapus pengguna: ' + error.message)
@@ -168,10 +209,8 @@ export default function SuperAdminConsole() {
         }
     }
 
-    // Handler Ubah Status Aktif / Non-Aktif
     const handleToggleStatus = async (id: string, currentStatus: string) => {
         const newStatus = currentStatus === 'Aktif' ? 'Non-Aktif' : 'Aktif'
-
         const { error } = await supabase
             .from('profiles')
             .update({ status: newStatus })
@@ -184,7 +223,6 @@ export default function SuperAdminConsole() {
         }
     }
 
-    // Handler Tambah Divisi & Jabatan Baru
     const handleAddRole = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!divisionName) return
@@ -196,26 +234,33 @@ export default function SuperAdminConsole() {
             access_level: accessLevel,
         }
 
-        const { error } = await supabase.from('roles').insert([{
-            division: divisionName,
-            position: positionName,
-            access_level: accessLevel,
-        }])
+        const { error } = await supabase.from('roles').insert([
+            {
+                division: divisionName,
+                position: positionName,
+                access_level: accessLevel,
+            },
+        ])
 
         if (error) {
             setRoles([newRoleItem, ...roles])
-            alert('Data Divisi & Jabatan berhasil ditambahkan secara lokal (Tabel Supabase belum dibuat).')
+            alert('Data Divisi & Jabatan berhasil ditambahkan secara lokal.')
         } else {
             alert('Data Divisi & Jabatan berhasil disimpan ke database Supabase!')
             fetchRoles()
         }
+
+        // Default akses izin awal untuk divisi baru
+        setDivisionPermissions((prev) => ({
+            ...prev,
+            [divisionName]: ['manager-site', 'safety', 'laporan'],
+        }))
 
         setDivisionName('')
         setPositionName('')
         setAccessLevel('Standard')
     }
 
-    // Handler Buka Modal Edit Divisi
     const openEditRoleModal = (r: any) => {
         setEditRoleId(r.id)
         setEditDivisionName(r.division || r.name || '')
@@ -224,7 +269,6 @@ export default function SuperAdminConsole() {
         setIsEditRoleModalOpen(true)
     }
 
-    // Handler Update Divisi & Jabatan
     const handleUpdateRole = async (e: React.FormEvent) => {
         e.preventDefault()
         const { error } = await supabase
@@ -237,22 +281,22 @@ export default function SuperAdminConsole() {
             .eq('id', editRoleId)
 
         if (error) {
-            setRoles(roles.map((item) => (
-                item.id === editRoleId
-                    ? { ...item, division: editDivisionName, position: editPositionName, access_level: editAccessLevel }
-                    : item
-            )))
-            alert('Data diperbarui secara lokal.')
+            setRoles(
+                roles.map((item) =>
+                    item.id === editRoleId
+                        ? { ...item, division: editDivisionName, position: editPositionName, access_level: editAccessLevel }
+                        : item
+                )
+            )
         } else {
-            alert('Data Divisi & Jabatan berhasil diperbarui di database!')
+            alert('Data Divisi berhasil diperbarui!')
             fetchRoles()
         }
         setIsEditRoleModalOpen(false)
     }
 
-    // Handler Hapus Divisi/Jabatan
     const handleDeleteRole = async (id: string) => {
-        if (!confirm('Yakin ingin menghapus data ini?')) return
+        if (!confirm('Yakin ingin menghapus data divisi ini?')) return
         const { error } = await supabase.from('roles').delete().eq('id', id)
         if (error) {
             setRoles(roles.filter((r) => r.id !== id))
@@ -261,7 +305,50 @@ export default function SuperAdminConsole() {
         }
     }
 
-    // Handler Keluar (Logout)
+    // Handler Checkbox Modul Divisi
+    const handleToggleModulePermission = (moduleKey: string) => {
+        const currentList = divisionPermissions[selectedDivisionForPermission] || []
+        const exists = currentList.includes(moduleKey)
+
+        const updated = exists
+            ? currentList.filter((k) => k !== moduleKey)
+            : [...currentList, moduleKey]
+
+        setDivisionPermissions({
+            ...divisionPermissions,
+            [selectedDivisionForPermission]: updated,
+        })
+    }
+
+    // Handler Simpan Hak Akses ke Database Supabase
+    const handleSavePermissions = async () => {
+        setSavingPermission(true)
+        const allowedModules = divisionPermissions[selectedDivisionForPermission] || []
+
+        try {
+            const { error } = await supabase
+                .from('division_permissions')
+                .upsert(
+                    {
+                        division_name: selectedDivisionForPermission,
+                        allowed_modules: allowedModules,
+                        updated_at: new Date().toISOString(),
+                    },
+                    { onConflict: 'division_name' }
+                )
+
+            if (error) {
+                alert('Hak akses berhasil disimpan secara lokal.')
+            } else {
+                alert(`Hak akses untuk divisi ${selectedDivisionForPermission} berhasil disimpan ke database Supabase!`)
+            }
+        } catch {
+            alert('Hak akses tersimpan secara lokal di state.')
+        } finally {
+            setSavingPermission(false)
+        }
+    }
+
     const handleLogout = async () => {
         await supabase.auth.signOut()
         const landingUrl = process.env.NEXT_PUBLIC_LANDING_URL || 'https://pt-jeep.vercel.app'
@@ -270,7 +357,6 @@ export default function SuperAdminConsole() {
 
     return (
         <div className="flex h-screen bg-[#0a0a0a] text-slate-200 font-sans overflow-hidden selection:bg-amber-500 selection:text-black relative">
-
             {/* Sidebar Pengembang */}
             <aside className="w-64 bg-[#111] border-r border-[#333] flex flex-col">
                 <div className="p-5 border-b border-[#333]">
@@ -280,18 +366,51 @@ export default function SuperAdminConsole() {
 
                 <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
                     <p className="px-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 mt-4">Sistem Inti</p>
-                    <button onClick={() => setActiveMenu('system')} className={`w-full flex items-center space-x-3 px-3 py-2 rounded-md text-sm transition ${activeMenu === 'system' ? 'bg-[#222] text-amber-400 border border-[#444]' : 'text-slate-400 hover:bg-[#1a1a1a] hover:text-white'}`}>
+                    <button
+                        onClick={() => setActiveMenu('system')}
+                        className={`w-full flex items-center space-x-3 px-3 py-2 rounded-md text-sm transition cursor-pointer ${activeMenu === 'system'
+                                ? 'bg-[#222] text-amber-400 border border-[#444]'
+                                : 'text-slate-400 hover:bg-[#1a1a1a] hover:text-white'
+                            }`}
+                    >
                         <span>⚡</span> <span>Kesehatan Sistem</span>
                     </button>
 
                     <p className="px-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 mt-6">Akses & Identitas</p>
-                    <button onClick={() => setActiveMenu('users')} className={`w-full flex items-center space-x-3 px-3 py-2 rounded-md text-sm transition ${activeMenu === 'users' ? 'bg-[#222] text-amber-400 border border-[#444]' : 'text-slate-400 hover:bg-[#1a1a1a] hover:text-white'}`}>
+                    <button
+                        onClick={() => setActiveMenu('users')}
+                        className={`w-full flex items-center space-x-3 px-3 py-2 rounded-md text-sm transition cursor-pointer ${activeMenu === 'users'
+                                ? 'bg-[#222] text-amber-400 border border-[#444]'
+                                : 'text-slate-400 hover:bg-[#1a1a1a] hover:text-white'
+                            }`}
+                    >
                         <span>👥</span> <span>Manajemen Pengguna</span>
                     </button>
-                    <button onClick={() => setActiveMenu('roles')} className={`w-full flex items-center space-x-3 px-3 py-2 rounded-md text-sm transition ${activeMenu === 'roles' ? 'bg-[#222] text-amber-400 border border-[#444]' : 'text-slate-400 hover:bg-[#1a1a1a] hover:text-white'}`}>
+                    <button
+                        onClick={() => setActiveMenu('roles')}
+                        className={`w-full flex items-center space-x-3 px-3 py-2 rounded-md text-sm transition cursor-pointer ${activeMenu === 'roles'
+                                ? 'bg-[#222] text-amber-400 border border-[#444]'
+                                : 'text-slate-400 hover:bg-[#1a1a1a] hover:text-white'
+                            }`}
+                    >
                         <span>🛡️</span> <span>Divisi & Jabatan</span>
                     </button>
-                    <button onClick={() => setActiveMenu('audit')} className={`w-full flex items-center space-x-3 px-3 py-2 rounded-md text-sm transition ${activeMenu === 'audit' ? 'bg-[#222] text-amber-400 border border-[#444]' : 'text-slate-400 hover:bg-[#1a1a1a] hover:text-white'}`}>
+                    <button
+                        onClick={() => setActiveMenu('permissions')}
+                        className={`w-full flex items-center space-x-3 px-3 py-2 rounded-md text-sm transition cursor-pointer ${activeMenu === 'permissions'
+                                ? 'bg-[#222] text-amber-400 border border-[#444]'
+                                : 'text-slate-400 hover:bg-[#1a1a1a] hover:text-white'
+                            }`}
+                    >
+                        <span>🔑</span> <span>Hak Akses Modul App</span>
+                    </button>
+                    <button
+                        onClick={() => setActiveMenu('audit')}
+                        className={`w-full flex items-center space-x-3 px-3 py-2 rounded-md text-sm transition cursor-pointer ${activeMenu === 'audit'
+                                ? 'bg-[#222] text-amber-400 border border-[#444]'
+                                : 'text-slate-400 hover:bg-[#1a1a1a] hover:text-white'
+                            }`}
+                    >
                         <span>📜</span> <span>Log Audit</span>
                     </button>
                 </nav>
@@ -311,6 +430,7 @@ export default function SuperAdminConsole() {
 
             {/* Area Konten Utama */}
             <main className="flex-1 overflow-y-auto bg-[#0a0a0a] p-8">
+                {/* TAB 1: MANAJEMEN PENGGUNA */}
                 {activeMenu === 'users' && (
                     <div className="space-y-6">
                         <div className="flex justify-between items-end">
@@ -343,7 +463,9 @@ export default function SuperAdminConsole() {
                                     <tbody className="divide-y divide-[#222]">
                                         {users.length === 0 ? (
                                             <tr>
-                                                <td colSpan={5} className="p-8 text-center text-slate-500">Belum ada pengguna terdaftar di database.</td>
+                                                <td colSpan={5} className="p-8 text-center text-slate-500">
+                                                    Belum ada pengguna terdaftar di database.
+                                                </td>
                                             </tr>
                                         ) : (
                                             users.map((u) => (
@@ -354,14 +476,16 @@ export default function SuperAdminConsole() {
                                                     </td>
                                                     <td className="p-4 font-mono text-slate-300">{u.email}</td>
                                                     <td className="p-4">
-                                                        <span className="bg-[#222] border border-[#444] px-2 py-1 rounded text-xs text-amber-400">{u.role}</span>
+                                                        <span className="bg-[#222] border border-[#444] px-2 py-1 rounded text-xs text-amber-400">
+                                                            {u.role}
+                                                        </span>
                                                     </td>
                                                     <td className="p-4">
                                                         <button
                                                             onClick={() => handleToggleStatus(u.id, u.status)}
                                                             className={`flex items-center space-x-2 text-xs px-2.5 py-1 rounded-full border transition cursor-pointer ${u.status === 'Aktif'
-                                                                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20'
-                                                                : 'bg-rose-500/10 border-rose-500/30 text-rose-400 hover:bg-rose-500/20'
+                                                                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20'
+                                                                    : 'bg-rose-500/10 border-rose-500/30 text-rose-400 hover:bg-rose-500/20'
                                                                 }`}
                                                             title="Klik untuk mengubah status Aktif / Non-Aktif"
                                                         >
@@ -393,16 +517,14 @@ export default function SuperAdminConsole() {
                     </div>
                 )}
 
+                {/* TAB 2: MANAJEMEN DIVISI & JABATAN */}
                 {activeMenu === 'roles' && (
                     <div className="space-y-6">
-                        <div className="flex justify-between items-end">
-                            <div>
-                                <h2 className="text-2xl font-bold text-white mb-1">Manajemen Divisi & Jabatan</h2>
-                                <p className="text-sm text-slate-500">Struktur organisasi yang terhubung ke modul Admin, HRD, Keuangan, dan Payroll.</p>
-                            </div>
+                        <div>
+                            <h2 className="text-2xl font-bold text-white mb-1">Manajemen Divisi & Jabatan</h2>
+                            <p className="text-sm text-slate-500">Struktur organisasi yang terhubung ke modul Admin, HRD, Keuangan, dan Payroll.</p>
                         </div>
 
-                        {/* Form Tambah Divisi & Jabatan */}
                         <section className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 shadow-lg">
                             <h3 className="text-lg font-semibold text-white mb-4">Tambah Divisi & Jabatan Baru</h3>
                             <form onSubmit={handleAddRole} className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -450,7 +572,6 @@ export default function SuperAdminConsole() {
                             </form>
                         </section>
 
-                        {/* Tabel Daftar Divisi & Jabatan */}
                         <section className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-lg">
                             <div className="px-6 py-4 border-b border-zinc-800">
                                 <h3 className="text-md font-semibold text-white">Daftar Divisi & Jabatan Terintegrasi</h3>
@@ -473,10 +594,14 @@ export default function SuperAdminConsole() {
                                                 <td className="py-4 px-6 font-bold text-white">{r.division || r.name}</td>
                                                 <td className="py-4 px-6 text-slate-400">{r.position || r.description}</td>
                                                 <td className="py-4 px-6">
-                                                    <span className={`px-2 py-1 rounded text-xs font-medium ${r.access_level === 'Full' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
-                                                        r.access_level === 'Limited' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
-                                                            'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                                                        }`}>
+                                                    <span
+                                                        className={`px-2 py-1 rounded text-xs font-medium ${r.access_level === 'Full'
+                                                                ? 'bg-red-500/10 text-red-400 border border-red-500/20'
+                                                                : r.access_level === 'Limited'
+                                                                    ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                                                                    : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                                            }`}
+                                                    >
                                                         {r.access_level}
                                                     </span>
                                                 </td>
@@ -502,14 +627,106 @@ export default function SuperAdminConsole() {
                         </section>
                     </div>
                 )}
+
+                {/* TAB 3: HAK AKSES SETIAP DIVISI UNTUK MEMBUKA APLIKASI */}
+                {activeMenu === 'permissions' && (
+                    <div className="space-y-6">
+                        <div className="flex flex-wrap justify-between items-end gap-3">
+                            <div>
+                                <h2 className="text-2xl font-bold text-white mb-1">Hak Akses Modul Setiap Divisi</h2>
+                                <p className="text-sm text-slate-500">
+                                    Tentukan aplikasi mana saja yang diizinkan untuk dibuka dan dioperasikan oleh setiap divisi karyawan.
+                                </p>
+                            </div>
+
+                            <button
+                                onClick={handleSavePermissions}
+                                disabled={savingPermission}
+                                className="bg-amber-500 hover:bg-amber-600 text-black font-bold px-5 py-2.5 rounded text-sm transition cursor-pointer flex items-center gap-2"
+                            >
+                                {savingPermission ? (
+                                    <>
+                                        <span className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"></span>
+                                        <span>Menyimpan...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <span>💾</span> <span>Simpan Hak Akses Divisi</span>
+                                    </>
+                                )}
+                            </button>
+                        </div>
+
+                        {/* Pemilihan Divisi Target */}
+                        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 shadow-lg flex flex-wrap items-center justify-between gap-4">
+                            <div className="flex items-center gap-3">
+                                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Pilih Divisi:</label>
+                                <select
+                                    value={selectedDivisionForPermission}
+                                    onChange={(e) => setSelectedDivisionForPermission(e.target.value)}
+                                    className="bg-black border border-zinc-700 text-amber-400 font-bold text-sm px-4 py-2 rounded focus:outline-none focus:border-amber-500"
+                                >
+                                    {roles.map((r) => {
+                                        const name = r.division || r.name
+                                        return (
+                                            <option key={r.id} value={name}>
+                                                {name}
+                                            </option>
+                                        )
+                                    })}
+                                </select>
+                            </div>
+
+                            <div className="text-xs text-slate-400">
+                                Aplikasi yang diizinkan:{' '}
+                                <span className="text-white font-mono font-bold">
+                                    {(divisionPermissions[selectedDivisionForPermission] || []).length} dari {APP_MODULES.length} Modul
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* Grid Kartu Modul yang Bisa Diberikan Akses */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                            {APP_MODULES.map((mod) => {
+                                const currentAllowed = divisionPermissions[selectedDivisionForPermission] || []
+                                const isChecked = currentAllowed.includes(mod.key)
+
+                                return (
+                                    <div
+                                        key={mod.key}
+                                        onClick={() => handleToggleModulePermission(mod.key)}
+                                        className={`p-4 rounded-xl border transition cursor-pointer select-none flex items-center justify-between ${isChecked
+                                                ? 'bg-amber-500/10 border-amber-500/60 text-white shadow-md'
+                                                : 'bg-zinc-900/60 border-zinc-800 text-slate-400 hover:border-zinc-700'
+                                            }`}
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <span className="text-2xl">{mod.icon}</span>
+                                            <div>
+                                                <div className="font-bold text-sm">{mod.label}</div>
+                                                <div className="text-[10px] font-mono text-slate-500">/{mod.key}</div>
+                                            </div>
+                                        </div>
+
+                                        <input
+                                            type="checkbox"
+                                            checked={isChecked}
+                                            onChange={() => { }} // Handler dipicu oleh div pembungkus
+                                            className="w-4 h-4 accent-amber-500 rounded cursor-pointer"
+                                        />
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    </div>
+                )}
             </main>
 
-            {/* Overlay Modal Form Pembuatan Pengguna */}
+            {/* Modal Buat Pengguna */}
             {isModalOpen && (
                 <div className="absolute inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                     <div className="bg-[#111] border border-[#333] rounded-xl w-full max-w-lg p-6 shadow-2xl">
                         <h3 className="text-xl font-bold text-white mb-4">Buat Pengguna Sistem Baru (Real Supabase)</h3>
-
                         <form onSubmit={handleCreateUser} className="space-y-4">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
@@ -550,7 +767,7 @@ export default function SuperAdminConsole() {
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Kata Sandi (Password)</label>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Kata Sandi</label>
                                     <input
                                         type="password"
                                         required
@@ -606,12 +823,11 @@ export default function SuperAdminConsole() {
                 </div>
             )}
 
-            {/* Overlay Modal Edit Pengguna */}
+            {/* Modal Edit Pengguna */}
             {isEditUserModalOpen && (
                 <div className="absolute inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                     <div className="bg-[#111] border border-[#333] rounded-xl w-full max-w-lg p-6 shadow-2xl">
                         <h3 className="text-xl font-bold text-white mb-4">Edit Data Pengguna</h3>
-
                         <form onSubmit={handleUpdateUser} className="space-y-4">
                             <div>
                                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Nama Lengkap</label>
@@ -672,12 +888,11 @@ export default function SuperAdminConsole() {
                 </div>
             )}
 
-            {/* Overlay Modal Edit Divisi & Jabatan */}
+            {/* Modal Edit Divisi & Jabatan */}
             {isEditRoleModalOpen && (
                 <div className="absolute inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                     <div className="bg-[#111] border border-[#333] rounded-xl w-full max-w-lg p-6 shadow-2xl">
                         <h3 className="text-xl font-bold text-white mb-4">Edit Divisi & Jabatan</h3>
-
                         <form onSubmit={handleUpdateRole} className="space-y-4">
                             <div>
                                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Divisi</label>
@@ -731,7 +946,6 @@ export default function SuperAdminConsole() {
                     </div>
                 </div>
             )}
-
         </div>
     )
 }
