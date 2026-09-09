@@ -78,18 +78,19 @@ export default function FinanceDashboard() {
         initFinance()
     }, [landingUrl])
 
-    // Simpan Transaksi Baru ke Supabase (Field-Safe Payload)
+    // Simpan Transaksi Baru ke Supabase
     const handleAddTransaction = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!newDesc || !newAmount) return
 
         setSubmitting(true)
 
-        // Payload yang aman dari mismatch skema kolom
+        // Sertakan transaction_type ('expense') agar memenuhi constraint NOT NULL
         const payload: Record<string, any> = {
             description: newDesc,
             amount: parseFloat(newAmount),
             category: newCategory,
+            transaction_type: 'expense',
         }
 
         if (userId) {
