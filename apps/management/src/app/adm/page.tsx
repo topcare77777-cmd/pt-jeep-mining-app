@@ -19,7 +19,6 @@ interface DocumentLog {
     status: string
 }
 
-// 30 Modul Lengkap Tambang Nikel PT. JEEP
 const ALL_MODULES = [
     { key: 'manager-site', label: 'Pit Produksi', icon: '⛏️', href: '/manager-site' },
     { key: 'fleet', label: 'Alat Berat', icon: '🚜', href: '/fleet' },
@@ -65,7 +64,6 @@ export default function AdmDashboard() {
     const [documents, setDocuments] = useState<DocumentLog[]>([])
     const [searchQuery, setSearchQuery] = useState('')
 
-    // Modal Input Dokumen Baru
     const [showModal, setShowModal] = useState(false)
     const [agendaNo, setAgendaNo] = useState('')
     const [title, setTitle] = useState('')
@@ -105,7 +103,6 @@ export default function AdmDashboard() {
 
                 setUserId(session.user.id)
 
-                // 1. Ambil Profil Pengguna
                 const { data: profile } = await supabase
                     .from('profiles')
                     .select('full_name, role, status')
@@ -125,7 +122,6 @@ export default function AdmDashboard() {
                     const division = (profile?.role || 'ADM').trim()
                     setUserRole(division)
 
-                    // 2. Ambil Izin Divisi dari Supabase
                     const isSuperAdmin = ['admin', 'administrator', 'superadmin'].includes(division.toLowerCase())
 
                     let grantedKeys: string[] = []
@@ -159,7 +155,6 @@ export default function AdmDashboard() {
                         }
                     }
 
-                    // Route Guard: Bila user tidak memiliki izin modul 'adm', tendang ke beranda
                     if (!isSuperAdmin && grantedKeys.length > 0 && !grantedKeys.includes('adm')) {
                         alert('Divisi Anda tidak memiliki hak akses ke modul Administrasi & Surat.')
                         router.replace('/')
@@ -168,7 +163,6 @@ export default function AdmDashboard() {
 
                     setAllowedModules(grantedKeys)
 
-                    // 3. Ambil Data Dokumen
                     const { data: docData } = await supabase
                         .from('adm_documents')
                         .select('*')
@@ -241,7 +235,6 @@ export default function AdmDashboard() {
         (doc.sender || '').toLowerCase().includes(searchQuery.toLowerCase())
     )
 
-    // FILTER STRICT: Hanya modul yang diizinkan untuk divisi pengguna yang dirender
     const authorizedNavItems = ALL_MODULES.filter((item) =>
         allowedModules.includes(item.key)
     )
@@ -257,18 +250,17 @@ export default function AdmDashboard() {
 
     return (
         <div className="min-h-screen bg-[#060c14] text-slate-100 font-sans p-4 md:p-6 select-none">
-            {/* Header Utama */}
             <header className="mb-6 space-y-3">
                 <div className="flex flex-wrap items-center justify-between bg-[#0a1625] border border-[#1b2e46] rounded-xl px-6 py-4 shadow-xl">
                     <div className="flex items-center space-x-3">
                         <span className="text-2xl">📋</span>
                         <div>
                             <h1 className="text-xl md:text-2xl font-black tracking-wide text-white">
-                                Dashboard Administrasi (ADM) PT. JEEP
+                                Dashboard Administrasi (ADM) PT. Jangkar Energi Eka Perkasa
                             </h1>
                             <p className="text-xs text-sky-400 flex items-center gap-1.5 mt-0.5">
                                 <span className="w-2 h-2 rounded-full bg-sky-500 animate-pulse"></span>
-                                <span>Live Sync Dokumen & Surat Jalan Nikel</span>
+                                <span>Live Sync Dokumen & Surat Jalan Tambang Nikel</span>
                                 <span className="text-slate-600">•</span>
                                 <span className="text-slate-300 font-semibold">{userName}</span>
                                 <span className="bg-[#112233] border border-[#1e3a5f] text-slate-300 text-[10px] px-2 py-0.5 rounded font-mono">
@@ -286,7 +278,6 @@ export default function AdmDashboard() {
                     </button>
                 </div>
 
-                {/* Bilah Navigasi Dinamis: HANYA MERENDER TOMBOL MODUL YANG MEMILIKI IZIN */}
                 <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
                     {authorizedNavItems.map((item) => {
                         const isActive = pathname === item.href
@@ -307,7 +298,6 @@ export default function AdmDashboard() {
                 </div>
             </header>
 
-            {/* Nav Tabs Kategori Berkas */}
             <nav className="flex flex-wrap gap-2 mb-6">
                 {[
                     { id: 'surat', label: 'SURAT MASUK & KELUAR', badge: `${documents.length} BERKAS` },
@@ -333,7 +323,6 @@ export default function AdmDashboard() {
                 ))}
             </nav>
 
-            {/* Konten Utama */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 <aside className="lg:col-span-3 space-y-3">
                     <div
@@ -435,7 +424,6 @@ export default function AdmDashboard() {
                 </main>
             </div>
 
-            {/* Modal Form Tambah Dokumen */}
             {showModal && (
                 <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
                     <div className="bg-[#0a1625] border border-[#1b2e46] rounded-xl p-6 w-full max-w-md shadow-2xl space-y-4">
