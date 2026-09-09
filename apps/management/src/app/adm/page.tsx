@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react'
 import { createClient } from '@supabase/supabase-js'
-import NavigationHeader from '@/components/NavigationHeader'
+import NavigationHeader from '../../components/NavigationHeader'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
@@ -204,8 +204,8 @@ export default function AdmDashboard() {
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id)}
                         className={`px-4 py-2.5 rounded-lg text-xs font-bold transition flex items-center gap-2 border cursor-pointer ${activeTab === tab.id
-                                ? 'bg-[#1b3b5f] border-sky-400 text-white shadow-lg shadow-sky-950/50'
-                                : 'bg-[#0c1a2d] border-[#1b2e46] text-slate-400 hover:text-white hover:bg-[#12243d]'
+                            ? 'bg-[#1b3b5f] border-sky-400 text-white shadow-lg shadow-sky-950/50'
+                            : 'bg-[#0c1a2d] border-[#1b2e46] text-slate-400 hover:text-white hover:bg-[#12243d]'
                             }`}
                     >
                         <span>{tab.label}</span>

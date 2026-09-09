@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react'
 import { createClient } from '@supabase/supabase-js'
-import NavigationHeader from '@/components/NavigationHeader'
+import NavigationHeader from '../../components/NavigationHeader'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
@@ -251,8 +251,8 @@ export default function FuelManagementPage() {
                                         <td>
                                             <span
                                                 className={`px-2 py-0.5 rounded text-[10px] font-bold ${item.transaction_type === 'Penerimaan'
-                                                        ? 'bg-sky-950/80 text-sky-400 border border-sky-800/40'
-                                                        : 'bg-amber-950/80 text-amber-400 border border-amber-800/40'
+                                                    ? 'bg-sky-950/80 text-sky-400 border border-sky-800/40'
+                                                    : 'bg-amber-950/80 text-amber-400 border border-amber-800/40'
                                                     }`}
                                             >
                                                 {item.transaction_type}
