@@ -38,49 +38,89 @@ export default function ManagerSiteDashboard() {
     const landingUrl = process.env.NEXT_PUBLIC_LANDING_URL || 'https://pt-jeep.vercel.app'
 
     useEffect(() => {
-        async function initManager() {
-            try {
-                // 1. Ambil token dari URL hash jika dialihkan lintas-domain
-                if (typeof window !== 'undefined' && window.location.hash.includes('access_token')) {
-                    const hashParams = new URLSearchParams(window.location.hash.replace('#', '?'))
-                    const accessToken = hashParams.get('access_token')
-                    const refreshToken = hashParams.get('refresh_token')
+        let isMounted = true
 
-                    if (accessToken && refreshToken) {
+        async function processAuth() {
+            try {
+                // 1. Tangkap token lintas-domain dari hash (#access_token=...) atau query string (?access_token=...)
+                if (typeof window !== 'undefined') {
+                    let accessToken = ''
+                    let refreshToken = ''
+
+                    if (window.location.hash && window.location.hash.includes('access_token')) {
+                        const hashClean = window.location.hash.startsWith('#')
+                            ? window.location.hash.substring(1)
+                            : window.location.hash
+                        const hashParams = new URLSearchParams(hashClean)
+                        accessToken = hashParams.get('access_token') || ''
+                        refreshToken = hashParams.get('refresh_token') || ''
+                    } else if (window.location.search && window.location.search.includes('access_token')) {
+                        const searchParams = new URLSearchParams(window.location.search)
+                        accessToken = searchParams.get('access_token') || ''
+                        refreshToken = searchParams.get('refresh_token') || ''
+                    }
+
+                    if (accessToken) {
                         await supabase.auth.setSession({
                             access_token: accessToken,
-                            refresh_token: refreshToken,
+                            refresh_token: refreshToken || '',
                         })
                         window.history.replaceState(null, '', window.location.pathname)
                     }
                 }
 
-                // 2. Proteksi Sesi Supabase
+                // 2. Ambil sesi Supabase aktif
                 const { data: { session } } = await supabase.auth.getSession()
+
                 if (!session) {
-                    window.location.href = landingUrl
-                    return
+                    // Berikan toleransi listener jika sesi sedang proses persistensi
+                    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
+                        if (currentSession && isMounted) {
+                            await loadUserData(currentSession)
+                        } else if (!currentSession && isMounted) {
+                            window.location.href = landingUrl
+                        }
+                    })
+                    return () => {
+                        authListener.subscription.unsubscribe()
+                    }
                 }
 
-                // 3. Verifikasi Profil Pengguna
+                if (isMounted) {
+                    await loadUserData(session)
+                }
+            } catch (err) {
+                console.error('Auth error:', err)
+                if (isMounted) setLoading(false)
+            }
+        }
+
+        async function loadUserData(session: any) {
+            try {
+                // 3. Ambil data profil pengguna secara aman
                 const { data: profile } = await supabase
                     .from('profiles')
                     .select('full_name, role, status')
                     .eq('id', session.user.id)
-                    .single()
+                    .maybeSingle()
 
-                // Periksa status aktif secara fleksibel (case-insensitive)
-                const userStatus = (profile?.status || '').toLowerCase()
-                if (profile && userStatus && userStatus !== 'aktif') {
-                    alert('Akun Anda dinonaktifkan.')
+                // Jangan tendang jika profil sedang dibuat/kosong; hanya blokir jika eksplisit Nonaktif
+                const statusClean = (profile?.status || '').toLowerCase().trim()
+                if (statusClean === 'nonaktif' || statusClean === 'banned' || statusClean === 'suspended') {
+                    alert('Akun Anda dinonaktifkan oleh Administrator.')
                     await supabase.auth.signOut()
                     window.location.href = landingUrl
                     return
                 }
 
-                setManagerName(profile?.full_name || 'Kepala Teknik Tambang / Site Manager')
+                setManagerName(
+                    profile?.full_name ||
+                    session.user.user_metadata?.full_name ||
+                    session.user.email?.split('@')[0] ||
+                    'Kepala Teknik Tambang / Site Manager'
+                )
 
-                // 4. Ambil data dari tabel site_production_logs
+                // 4. Ambil data tabel site_production_logs
                 const { data: logsData, error } = await supabase
                     .from('site_production_logs')
                     .select('*')
@@ -112,15 +152,18 @@ export default function ManagerSiteDashboard() {
                         },
                     ])
                 }
-
-                setLoading(false)
-            } catch (err) {
-                console.error('Error init site manager:', err)
-                setLoading(false)
+            } catch (e) {
+                console.error('Error fetching production logs:', e)
+            } finally {
+                if (isMounted) setLoading(false)
             }
         }
 
-        initManager()
+        processAuth()
+
+        return () => {
+            isMounted = false
+        }
     }, [landingUrl])
 
     // Simpan Laporan Produksi Harian Site
@@ -151,7 +194,7 @@ export default function ManagerSiteDashboard() {
             setCoalTon('')
             setFuelLiter('')
         } else {
-            alert('Gagal menyimpan laporan produksi: ' + (error?.message || ''))
+            alert('Gagal menyimpan laporan produksi: ' + (error?.message || 'Terjadi kesalahan'))
         }
 
         setSubmitting(false)
