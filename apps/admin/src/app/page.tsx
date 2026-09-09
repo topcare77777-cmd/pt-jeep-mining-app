@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
-// Daftar lengkap 30 modul aplikasi tambang nikel PT. Jangkar Energi Eka Perkasa
+// Daftar lengkap modul operasional tambang nikel PT. Jangkar Energi Eka Perkasa (Sesuai folder aktual apps/management/src/app)
 const OPERATIONAL_MODULE_CARDS = [
     {
         key: 'manager-site',
@@ -11,6 +11,13 @@ const OPERATIONAL_MODULE_CARDS = [
         badge: 'Operasional Pit',
         desc: 'Monitoring ritase bijih nikel, pengupasan overburden (OB), dan shift DOR tambang.',
         icon: '⛏️',
+    },
+    {
+        key: 'geologi',
+        title: 'Geologi & Eksplorasi',
+        badge: 'Grade Control',
+        desc: 'Database titik bor eksplorasi nikel, uji assay (%Ni, %Fe), dan pemodelan cadangan ore.',
+        icon: '🧭',
     },
     {
         key: 'fleet',
@@ -72,7 +79,7 @@ const OPERATIONAL_MODULE_CARDS = [
         key: 'bbm',
         title: 'Tangki & BBM Solar',
         badge: 'Fuel Management',
-        desc: 'Stok solar industri, pencatatan nozzle dispenser unit pit, dan burn rate.',
+        desc: 'Stok solar industri B35, pencatatan nozzle dispenser unit pit, dan burn rate.',
         icon: '⛽',
     },
     {
@@ -102,6 +109,13 @@ const OPERATIONAL_MODULE_CARDS = [
         badge: 'Fasilitas & Sarana',
         desc: 'Manajemen armada LV operasional, sarana genset site, dan infrastruktur camp.',
         icon: '🚙',
+    },
+    {
+        key: 'assets',
+        title: 'Manajemen Aset Tambang',
+        badge: 'Asset Management',
+        desc: 'Inventarisasi fisik fasilitas, penomoran kode barcode aset, dan audit depresiasi.',
+        icon: '🏷️',
     },
     {
         key: 'mess',
@@ -198,7 +212,7 @@ const OPERATIONAL_MODULE_CARDS = [
         key: 'investor',
         title: 'Portal Investor Tambang',
         badge: 'Investor Relations',
-        desc: 'Data keterbukaan perkembangan cadangan nikel dan laporan kinerja finansial.',
+        desc: 'Transparansi pengapalan ore nikel, pendapatan, dan kepatuhan kuota RKAB ESDM.',
         icon: '📊',
     },
     {
@@ -229,7 +243,6 @@ interface CustomField {
 
 export default function SuperAdminConsole() {
     const [activeMenu, setActiveMenu] = useState<'permissions' | 'form_builder' | 'users' | 'roles' | 'system' | 'audit'>('permissions')
-
     const [users, setUsers] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
 
@@ -253,9 +266,10 @@ export default function SuperAdminConsole() {
     const [roles, setRoles] = useState<any[]>([
         { id: '1', division: 'Administrator', position: 'Super Administrator', access_level: 'Full' },
         { id: '2', division: 'Operasional Pit Nikel', position: 'Pit Superintendent', access_level: 'Standard' },
-        { id: '3', division: 'Keuangan & Administrasi', position: 'Finance & ADM Officer', access_level: 'Standard' },
-        { id: '4', division: 'HSE & K3 Tambang', position: 'Safety Coordinator', access_level: 'Standard' },
-        { id: '5', division: 'General Affair & Logistik', position: 'GA Supervisor', access_level: 'Standard' },
+        { id: '3', division: 'Geologi & Eksplorasi', position: 'Senior Geologist', access_level: 'Standard' },
+        { id: '4', division: 'Keuangan & Administrasi', position: 'Finance & ADM Officer', access_level: 'Standard' },
+        { id: '5', division: 'HSE & K3 Tambang', position: 'Safety Coordinator', access_level: 'Standard' },
+        { id: '6', division: 'General Affair & Logistik', position: 'GA Supervisor', access_level: 'Standard' },
     ])
     const [rolesLoading, setRolesLoading] = useState(false)
     const [divisionName, setDivisionName] = useState('')
@@ -270,13 +284,14 @@ export default function SuperAdminConsole() {
     const [editAccessLevel, setEditAccessLevel] = useState('Standard')
 
     // State Izin Modul per Divisi
-    const [selectedDivisionForPermission, setSelectedDivisionForPermission] = useState('Operasional Pit Nikel')
+    const [selectedDivisionForPermission, setSelectedDivisionForPermission] = useState('Administrator')
     const [divisionPermissions, setDivisionPermissions] = useState<Record<string, string[]>>({
         Administrator: OPERATIONAL_MODULE_CARDS.map((m) => m.key),
-        'Operasional Pit Nikel': ['manager-site', 'fleet', 'fleet-maintenance', 'ritase', 'bbm', 'radio'],
-        'Keuangan & Administrasi': ['finance', 'adm', 'hrd', 'legal', 'laporan'],
-        'HSE & K3 Tambang': ['safety', 'clinic', 'environment', 'lingkungan'],
-        'General Affair & Logistik': ['adm', 'ga', 'mess', 'catering', 'transport', 'sparepart', 'bbm'],
+        'Operasional Pit Nikel': ['manager-site', 'geologi', 'fleet', 'fleet-maintenance', 'ritase', 'bbm', 'radio'],
+        'Geologi & Eksplorasi': ['geologi', 'manager-site', 'ritase', 'laporan'],
+        'Keuangan & Administrasi': ['finance', 'adm', 'hrd', 'assets', 'legal', 'laporan'],
+        'HSE & K3 Tambang': ['safety', 'clinic', 'environment', 'lingkungan', 'training'],
+        'General Affair & Logistik': ['adm', 'ga', 'assets', 'mess', 'catering', 'transport', 'sparepart', 'bbm', 'helpdesk'],
     })
     const [savingPermission, setSavingPermission] = useState(false)
 
@@ -335,7 +350,7 @@ export default function SuperAdminConsole() {
                 setDivisionPermissions((prev) => ({ ...prev, ...mapped }))
             }
         } catch {
-            // Fallback state
+            // Fallback
         }
     }
 
@@ -382,7 +397,7 @@ export default function SuperAdminConsole() {
             setNewFieldLabel('')
             setNewFieldPlaceholder('')
             setNewFieldRequired(false)
-            alert(`Kolom "${newFieldLabel}" berhasil ditambahkan ke modul ${selectedModuleForField}!`)
+            alert(`Kolom "${newFieldLabel}" berhasil ditambahkan ke modul [${selectedModuleForField}]!`)
         } else {
             alert('Gagal membuat kolom: ' + (error?.message || 'Periksa tabel custom_form_fields di Supabase.'))
         }
@@ -396,7 +411,7 @@ export default function SuperAdminConsole() {
         if (!error) {
             setCustomFields(customFields.filter((f) => f.id !== fieldId))
         } else {
-            alert('Gagal menghapus: ' + error.message)
+            alert('Gagal menghapus kolom: ' + error.message)
         }
     }
 
@@ -502,7 +517,7 @@ export default function SuperAdminConsole() {
 
         setDivisionPermissions((prev) => ({
             ...prev,
-            [divisionName]: ['manager-site', 'ritase', 'adm'],
+            [divisionName]: ['manager-site', 'geologi', 'ritase', 'adm'],
         }))
 
         setDivisionName('')
@@ -597,7 +612,7 @@ export default function SuperAdminConsole() {
             if (error) {
                 alert('Gagal simpan ke Supabase: ' + error.message)
             } else {
-                alert(`Hak akses divisi "${selectedDivisionForPermission}" BERHASIL disimpan ke database Supabase!`)
+                alert(`Hak akses divisi "${selectedDivisionForPermission}" (${allowedModules.length} modul) BERHASIL disimpan ke database!`)
             }
         } catch (err: any) {
             alert('Kendala koneksi database: ' + (err?.message || err))
@@ -630,25 +645,24 @@ export default function SuperAdminConsole() {
                     <button
                         onClick={() => setActiveMenu('permissions')}
                         className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-xs font-bold transition cursor-pointer ${activeMenu === 'permissions'
-                                ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
-                                : 'text-slate-400 hover:bg-[#131d2e] hover:text-white'
+                            ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+                            : 'text-slate-400 hover:bg-[#131d2e] hover:text-white'
                             }`}
                     >
                         <div className="flex items-center gap-2.5">
                             <span>🔑</span>
                             <span>Hak Akses Modul Divisi</span>
                         </div>
-                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-black/30 font-mono">
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-black/30 font-mono font-bold">
                             {OPERATIONAL_MODULE_CARDS.length} MODUL
                         </span>
                     </button>
 
-                    {/* MENU BARU: FORM BUILDER DINAMIS */}
                     <button
                         onClick={() => setActiveMenu('form_builder')}
                         className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-xs font-bold transition cursor-pointer ${activeMenu === 'form_builder'
-                                ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20'
-                                : 'text-slate-400 hover:bg-[#131d2e] hover:text-white'
+                            ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20'
+                            : 'text-slate-400 hover:bg-[#131d2e] hover:text-white'
                             }`}
                     >
                         <div className="flex items-center gap-2.5">
@@ -661,8 +675,8 @@ export default function SuperAdminConsole() {
                     <button
                         onClick={() => setActiveMenu('users')}
                         className={`w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-lg text-xs font-bold transition cursor-pointer ${activeMenu === 'users'
-                                ? 'bg-[#1b263b] text-amber-400 border border-[#2b3a54]'
-                                : 'text-slate-400 hover:bg-[#131d2e] hover:text-white'
+                            ? 'bg-[#1b263b] text-amber-400 border border-[#2b3a54]'
+                            : 'text-slate-400 hover:bg-[#131d2e] hover:text-white'
                             }`}
                     >
                         <span>👥</span> <span>Manajemen Pengguna</span>
@@ -671,8 +685,8 @@ export default function SuperAdminConsole() {
                     <button
                         onClick={() => setActiveMenu('roles')}
                         className={`w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-lg text-xs font-bold transition cursor-pointer ${activeMenu === 'roles'
-                                ? 'bg-[#1b263b] text-amber-400 border border-[#2b3a54]'
-                                : 'text-slate-400 hover:bg-[#131d2e] hover:text-white'
+                            ? 'bg-[#1b263b] text-amber-400 border border-[#2b3a54]'
+                            : 'text-slate-400 hover:bg-[#131d2e] hover:text-white'
                             }`}
                     >
                         <span>🛡️</span> <span>Divisi & Jabatan</span>
@@ -682,8 +696,8 @@ export default function SuperAdminConsole() {
                     <button
                         onClick={() => setActiveMenu('system')}
                         className={`w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-lg text-xs font-bold transition cursor-pointer ${activeMenu === 'system'
-                                ? 'bg-[#1b263b] text-amber-400 border border-[#2b3a54]'
-                                : 'text-slate-400 hover:bg-[#131d2e] hover:text-white'
+                            ? 'bg-[#1b263b] text-amber-400 border border-[#2b3a54]'
+                            : 'text-slate-400 hover:bg-[#131d2e] hover:text-white'
                             }`}
                     >
                         <span>⚡</span> <span>Kesehatan Sistem</span>
@@ -691,8 +705,8 @@ export default function SuperAdminConsole() {
                     <button
                         onClick={() => setActiveMenu('audit')}
                         className={`w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-lg text-xs font-bold transition cursor-pointer ${activeMenu === 'audit'
-                                ? 'bg-[#1b263b] text-amber-400 border border-[#2b3a54]'
-                                : 'text-slate-400 hover:bg-[#131d2e] hover:text-white'
+                            ? 'bg-[#1b263b] text-amber-400 border border-[#2b3a54]'
+                            : 'text-slate-400 hover:bg-[#131d2e] hover:text-white'
                             }`}
                     >
                         <span>📜</span> <span>Log Audit</span>
@@ -724,7 +738,7 @@ export default function SuperAdminConsole() {
                                     <span>🔑</span> Hak Akses Modul Operasional Tambang Nikel
                                 </h2>
                                 <p className="text-xs text-slate-400 mt-0.5">
-                                    Pilih divisi untuk mengonfigurasi aplikasi mana saja (dari seluruh 30 modul site) yang diizinkan untuk dibuka.
+                                    Pilih divisi untuk mengonfigurasi aplikasi mana saja (dari seluruh {OPERATIONAL_MODULE_CARDS.length} modul site) yang diizinkan untuk dibuka.
                                 </p>
                             </div>
 
@@ -783,16 +797,16 @@ export default function SuperAdminConsole() {
                                         key={mod.key}
                                         onClick={() => handleToggleModulePermission(mod.key)}
                                         className={`relative rounded-xl border p-4 transition cursor-pointer flex flex-col justify-between select-none ${isChecked
-                                                ? 'bg-[#102033] border-cyan-400 shadow-md shadow-cyan-950/40'
-                                                : 'bg-[#09101a] border-[#162233] text-slate-400 hover:border-[#22354f]'
+                                            ? 'bg-[#102033] border-cyan-400 shadow-md shadow-cyan-950/40'
+                                            : 'bg-[#09101a] border-[#162233] text-slate-400 hover:border-[#22354f]'
                                             }`}
                                     >
                                         <div className="flex items-start justify-between mb-3">
                                             <span className="text-2xl">{mod.icon}</span>
                                             <span
                                                 className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded border ${isChecked
-                                                        ? 'bg-cyan-950 text-cyan-400 border-cyan-800'
-                                                        : 'bg-[#060a10] text-slate-500 border-[#1c2b42]'
+                                                    ? 'bg-cyan-950 text-cyan-400 border-cyan-800'
+                                                    : 'bg-[#060a10] text-slate-500 border-[#1c2b42]'
                                                     }`}
                                             >
                                                 {mod.badge}
@@ -826,7 +840,7 @@ export default function SuperAdminConsole() {
                     </div>
                 )}
 
-                {/* TAB BARU: KUSTOMISASI FORM MODUL (FORM BUILDER) */}
+                {/* TAB: KUSTOMISASI FORM MODUL */}
                 {activeMenu === 'form_builder' && (
                     <div className="space-y-6 max-w-5xl mx-auto">
                         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#1a273b] pb-4">
@@ -847,7 +861,6 @@ export default function SuperAdminConsole() {
                             </button>
                         </div>
 
-                        {/* Pemilihan Modul Target */}
                         <div className="bg-[#0b1320] border border-[#1a273b] rounded-xl p-5 shadow-xl flex items-center gap-4">
                             <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">
                                 Pilih Modul yang Ingin Ditambahkan Form:
@@ -865,7 +878,6 @@ export default function SuperAdminConsole() {
                             </select>
                         </div>
 
-                        {/* Tabel Daftar Kolom Kustom yang Aktif */}
                         <div className="bg-[#0b1320] border border-[#1a273b] rounded-xl p-5 shadow-xl space-y-4">
                             <div className="flex items-center justify-between">
                                 <h3 className="text-sm font-bold text-white uppercase tracking-wider">
@@ -976,8 +988,8 @@ export default function SuperAdminConsole() {
                                                     <button
                                                         onClick={() => handleToggleStatus(u.id, u.status)}
                                                         className={`flex items-center space-x-2 text-xs px-2.5 py-1 rounded-full border transition cursor-pointer ${u.status === 'Aktif'
-                                                                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20'
-                                                                : 'bg-rose-500/10 border-rose-500/30 text-rose-400 hover:bg-rose-500/20'
+                                                            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20'
+                                                            : 'bg-rose-500/10 border-rose-500/30 text-rose-400 hover:bg-rose-500/20'
                                                             }`}
                                                     >
                                                         <span className={`w-2 h-2 rounded-full ${u.status === 'Aktif' ? 'bg-emerald-400' : 'bg-rose-400'}`}></span>
