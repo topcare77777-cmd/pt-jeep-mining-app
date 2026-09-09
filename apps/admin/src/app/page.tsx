@@ -3,31 +3,37 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
-// Daftar seluruh rute/aplikasi modular yang ada di platform PT. JEEP
+// Daftar lengkap seluruh modul/aplikasi platform PT. JEEP
 const APP_MODULES = [
-    { key: 'manager-site', label: 'Pit Produksi', icon: '⛏️' },
-    { key: 'fleet', label: 'Alat Berat', icon: '🚜' },
+    { key: 'manager-site', label: 'Pit Produksi Nikel', icon: '⛏️' },
+    { key: 'fleet', label: 'Alat Berat & Hauling', icon: '🚜' },
     { key: 'fleet-maintenance', label: 'Workshop Fleet', icon: '🔧' },
     { key: 'ritase', label: 'Ritase & Timbangan', icon: '🚛' },
-    { key: 'bbm', label: 'BBM Solar', icon: '⛽' },
-    { key: 'jetty', label: 'Jetty & LCT', icon: '🚢' },
+    { key: 'bbm', label: 'BBM Solar Industri', icon: '⛽' },
+    { key: 'jetty', label: 'Jetty & LCT Port', icon: '🚢' },
     { key: 'sparepart', label: 'Gudang Sparepart', icon: '📦' },
-    { key: 'safety', label: 'Inspeksi K3', icon: '⛑️' },
-    { key: 'clinic', label: 'Klinik Medis', icon: '🏥' },
-    { key: 'security', label: 'Keamanan Gerbang', icon: '🛡️' },
-    { key: 'radio', label: 'Radio Dispatch', icon: '📻' },
+    { key: 'adm', label: 'Administrasi & Persuratan', icon: '📋' },
+    { key: 'assets', label: 'Manajemen Aset Site', icon: '🏷️' },
+    { key: 'mess', label: 'Mess Hall & Hunian Camp', icon: '🏠' },
+    { key: 'ga', label: 'General Affair (GA)', icon: '🚙' },
+    { key: 'vendor', label: 'Vendor & Kontraktor', icon: '🤝' },
+    { key: 'safety', label: 'Inspeksi K3 Tambang', icon: '⛑️' },
+    { key: 'clinic', label: 'Klinik Medis Site', icon: '🏥' },
+    { key: 'security', label: 'Keamanan Gerbang & Pos', icon: '🛡️' },
+    { key: 'radio', label: 'Radio Dispatch & SSB', icon: '📻' },
     { key: 'hrd', label: 'HRD & Payroll', icon: '👷‍♂️' },
-    { key: 'finance', label: 'Keuangan Site', icon: '💰' },
-    { key: 'legal', label: 'Legal & IUP', icon: '⚖️' },
-    { key: 'csr', label: 'CSR & Masyarakat', icon: '🤝' },
-    { key: 'it-helpdesk', label: 'IT Helpdesk', icon: '💻' },
-    { key: 'helpdesk', label: 'Helpdesk GA', icon: '🛠️' },
+    { key: 'finance', label: 'Keuangan & Kas Site', icon: '💰' },
+    { key: 'legal', label: 'Legal & IUP-OP', icon: '⚖️' },
+    { key: 'csr', label: 'CSR & Pemberdayaan', icon: '🤝' },
+    { key: 'it-helpdesk', label: 'IT Support & VSAT', icon: '💻' },
+    { key: 'helpdesk', label: 'Helpdesk Fasilitas GA', icon: '🛠️' },
     { key: 'direktur', label: 'Eksekutif BOD', icon: '🏛️' },
-    { key: 'laporan', label: 'Cetak Laporan', icon: '📄' },
+    { key: 'laporan', label: 'Cetak Laporan Resmi', icon: '📄' },
 ]
 
 export default function SuperAdminConsole() {
-    const [activeMenu, setActiveMenu] = useState<'system' | 'users' | 'roles' | 'permissions' | 'audit'>('users')
+    // Menu default disetel ke 'permissions' agar modul hak akses langsung tampil
+    const [activeMenu, setActiveMenu] = useState<'permissions' | 'users' | 'roles' | 'system' | 'audit'>('permissions')
 
     // State untuk daftar pengguna
     const [users, setUsers] = useState<any[]>([])
@@ -55,6 +61,7 @@ export default function SuperAdminConsole() {
         { id: '2', division: 'Operasional Lapangan', position: 'Operator Pit Tambang', access_level: 'Limited' },
         { id: '3', division: 'Keuangan & Payroll', position: 'Manajer Keuangan & Gaji', access_level: 'Read-Only' },
         { id: '4', division: 'HSE & Medical', position: 'Safety & Clinic Officer', access_level: 'Standard' },
+        { id: '5', division: 'General Affair & Logistik', position: 'GA Supervisor', access_level: 'Standard' },
     ])
     const [rolesLoading, setRolesLoading] = useState(false)
     const [divisionName, setDivisionName] = useState('')
@@ -69,12 +76,13 @@ export default function SuperAdminConsole() {
     const [editAccessLevel, setEditAccessLevel] = useState('Standard')
 
     // State Hak Akses Matriks Modul Divisi (Division -> Allowed Modules)
-    const [selectedDivisionForPermission, setSelectedDivisionForPermission] = useState('Administrator')
+    const [selectedDivisionForPermission, setSelectedDivisionForPermission] = useState('Operasional Lapangan')
     const [divisionPermissions, setDivisionPermissions] = useState<Record<string, string[]>>({
         Administrator: APP_MODULES.map((m) => m.key),
-        'Operasional Lapangan': ['manager-site', 'fleet', 'ritase', 'bbm', 'radio'],
-        'Keuangan & Payroll': ['finance', 'laporan', 'hrd'],
+        'Operasional Lapangan': ['manager-site', 'fleet', 'fleet-maintenance', 'ritase', 'bbm', 'radio'],
+        'Keuangan & Payroll': ['finance', 'hrd', 'legal', 'laporan'],
         'HSE & Medical': ['safety', 'clinic', 'security'],
+        'General Affair & Logistik': ['adm', 'assets', 'mess', 'ga', 'vendor', 'helpdesk', 'bbm'],
     })
     const [savingPermission, setSavingPermission] = useState(false)
 
@@ -250,7 +258,6 @@ export default function SuperAdminConsole() {
             fetchRoles()
         }
 
-        // Default akses izin awal untuk divisi baru
         setDivisionPermissions((prev) => ({
             ...prev,
             [divisionName]: ['manager-site', 'safety', 'laporan'],
@@ -305,7 +312,7 @@ export default function SuperAdminConsole() {
         }
     }
 
-    // Handler Checkbox Modul Divisi
+    // Handler Pemilihan Modul Checklist
     const handleToggleModulePermission = (moduleKey: string) => {
         const currentList = divisionPermissions[selectedDivisionForPermission] || []
         const exists = currentList.includes(moduleKey)
@@ -320,7 +327,23 @@ export default function SuperAdminConsole() {
         })
     }
 
-    // Handler Simpan Hak Akses ke Database Supabase
+    // Handler Pilih Semua Modul
+    const handleSelectAll = () => {
+        setDivisionPermissions({
+            ...divisionPermissions,
+            [selectedDivisionForPermission]: APP_MODULES.map((m) => m.key),
+        })
+    }
+
+    // Handler Hapus Semua Modul
+    const handleClearAll = () => {
+        setDivisionPermissions({
+            ...divisionPermissions,
+            [selectedDivisionForPermission]: [],
+        })
+    }
+
+    // Handler Simpan Hak Akses ke Supabase
     const handleSavePermissions = async () => {
         setSavingPermission(true)
         const allowedModules = divisionPermissions[selectedDivisionForPermission] || []
@@ -338,12 +361,12 @@ export default function SuperAdminConsole() {
                 )
 
             if (error) {
-                alert('Hak akses berhasil disimpan secara lokal.')
+                alert(`Hak akses tersimpan lokal untuk divisi: ${selectedDivisionForPermission}`)
             } else {
-                alert(`Hak akses untuk divisi ${selectedDivisionForPermission} berhasil disimpan ke database Supabase!`)
+                alert(`Hak akses divisi "${selectedDivisionForPermission}" berhasil disimpan ke database!`)
             }
         } catch {
-            alert('Hak akses tersimpan secara lokal di state.')
+            alert(`Hak akses tersimpan lokal untuk divisi: ${selectedDivisionForPermission}`)
         } finally {
             setSavingPermission(false)
         }
@@ -355,6 +378,8 @@ export default function SuperAdminConsole() {
         window.location.href = landingUrl
     }
 
+    const currentAllowed = divisionPermissions[selectedDivisionForPermission] || []
+
     return (
         <div className="flex h-screen bg-[#0a0a0a] text-slate-200 font-sans overflow-hidden selection:bg-amber-500 selection:text-black relative">
             {/* Sidebar Pengembang */}
@@ -365,18 +390,23 @@ export default function SuperAdminConsole() {
                 </div>
 
                 <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
-                    <p className="px-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 mt-4">Sistem Inti</p>
+                    <p className="px-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 mt-2">Akses & Identitas</p>
+
+                    {/* Menu Hak Akses Divisi (Ditempatkan di Atas) */}
                     <button
-                        onClick={() => setActiveMenu('system')}
-                        className={`w-full flex items-center space-x-3 px-3 py-2 rounded-md text-sm transition cursor-pointer ${activeMenu === 'system'
-                                ? 'bg-[#222] text-amber-400 border border-[#444]'
+                        onClick={() => setActiveMenu('permissions')}
+                        className={`w-full flex items-center justify-between px-3 py-2.5 rounded-md text-sm font-bold transition cursor-pointer ${activeMenu === 'permissions'
+                                ? 'bg-amber-500 text-slate-950 shadow-md'
                                 : 'text-slate-400 hover:bg-[#1a1a1a] hover:text-white'
                             }`}
                     >
-                        <span>⚡</span> <span>Kesehatan Sistem</span>
+                        <div className="flex items-center gap-2.5">
+                            <span>🔑</span>
+                            <span>Hak Akses Divisi</span>
+                        </div>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-black/20 font-mono">AKTIF</span>
                     </button>
 
-                    <p className="px-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 mt-6">Akses & Identitas</p>
                     <button
                         onClick={() => setActiveMenu('users')}
                         className={`w-full flex items-center space-x-3 px-3 py-2 rounded-md text-sm transition cursor-pointer ${activeMenu === 'users'
@@ -386,6 +416,7 @@ export default function SuperAdminConsole() {
                     >
                         <span>👥</span> <span>Manajemen Pengguna</span>
                     </button>
+
                     <button
                         onClick={() => setActiveMenu('roles')}
                         className={`w-full flex items-center space-x-3 px-3 py-2 rounded-md text-sm transition cursor-pointer ${activeMenu === 'roles'
@@ -395,14 +426,16 @@ export default function SuperAdminConsole() {
                     >
                         <span>🛡️</span> <span>Divisi & Jabatan</span>
                     </button>
+
+                    <p className="px-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 mt-6">Sistem Inti</p>
                     <button
-                        onClick={() => setActiveMenu('permissions')}
-                        className={`w-full flex items-center space-x-3 px-3 py-2 rounded-md text-sm transition cursor-pointer ${activeMenu === 'permissions'
+                        onClick={() => setActiveMenu('system')}
+                        className={`w-full flex items-center space-x-3 px-3 py-2 rounded-md text-sm transition cursor-pointer ${activeMenu === 'system'
                                 ? 'bg-[#222] text-amber-400 border border-[#444]'
                                 : 'text-slate-400 hover:bg-[#1a1a1a] hover:text-white'
                             }`}
                     >
-                        <span>🔑</span> <span>Hak Akses Modul App</span>
+                        <span>⚡</span> <span>Kesehatan Sistem</span>
                     </button>
                     <button
                         onClick={() => setActiveMenu('audit')}
@@ -430,7 +463,119 @@ export default function SuperAdminConsole() {
 
             {/* Area Konten Utama */}
             <main className="flex-1 overflow-y-auto bg-[#0a0a0a] p-8">
-                {/* TAB 1: MANAJEMEN PENGGUNA */}
+                {/* TAB UTAMA: HAK AKSES SETIAP DIVISI UNTUK MEMBUKA APLIKASI */}
+                {activeMenu === 'permissions' && (
+                    <div className="space-y-6">
+                        <div className="flex flex-wrap justify-between items-end gap-3 border-b border-zinc-800 pb-4">
+                            <div>
+                                <h2 className="text-2xl font-bold text-white mb-1 flex items-center gap-2">
+                                    <span>🔑</span> Hak Akses Pembagian Modul Setiap Divisi
+                                </h2>
+                                <p className="text-xs text-slate-400">
+                                    Pilih divisi untuk mengonfigurasi aplikasi dan halaman mana saja (ADM, BBM, Asset, Mess, dll.) yang berhak dibuka.
+                                </p>
+                            </div>
+
+                            <button
+                                onClick={handleSavePermissions}
+                                disabled={savingPermission}
+                                className="bg-amber-500 hover:bg-amber-600 text-black font-bold px-5 py-2.5 rounded text-sm transition cursor-pointer flex items-center gap-2 shadow-lg shadow-amber-500/10"
+                            >
+                                {savingPermission ? (
+                                    <>
+                                        <span className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"></span>
+                                        <span>Menyimpan...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <span>💾</span> <span>Simpan Pengaturan Hak Akses</span>
+                                    </>
+                                )}
+                            </button>
+                        </div>
+
+                        {/* Pemilihan Divisi Target & Tombol Tindakan Cepat */}
+                        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 shadow-lg flex flex-wrap items-center justify-between gap-4">
+                            <div className="flex items-center gap-3">
+                                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Pilih Divisi:</label>
+                                <select
+                                    value={selectedDivisionForPermission}
+                                    onChange={(e) => setSelectedDivisionForPermission(e.target.value)}
+                                    className="bg-black border border-amber-500/80 text-amber-400 font-bold text-sm px-4 py-2 rounded focus:outline-none"
+                                >
+                                    {roles.map((r) => {
+                                        const name = r.division || r.name
+                                        return (
+                                            <option key={r.id} value={name}>
+                                                {name}
+                                            </option>
+                                        )
+                                    })}
+                                </select>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={handleSelectAll}
+                                    className="bg-zinc-800 hover:bg-zinc-700 text-xs text-slate-200 px-3 py-1.5 rounded transition cursor-pointer"
+                                >
+                                    Pilih Semua
+                                </button>
+                                <button
+                                    onClick={handleClearAll}
+                                    className="bg-zinc-800 hover:bg-rose-950/50 text-xs text-rose-400 px-3 py-1.5 rounded transition cursor-pointer"
+                                >
+                                    Hapus Semua
+                                </button>
+                                <span className="text-xs text-slate-400 ml-2">
+                                    Modul Diizinkan:{' '}
+                                    <strong className="text-amber-400 font-mono">{currentAllowed.length}</strong> / {APP_MODULES.length} Modul
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* Grid Checklist Modul Aplikasi Lengkap */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                            {APP_MODULES.map((mod) => {
+                                const isChecked = currentAllowed.includes(mod.key)
+                                return (
+                                    <div
+                                        key={mod.key}
+                                        onClick={() => handleToggleModulePermission(mod.key)}
+                                        className={`p-4 rounded-xl border transition cursor-pointer select-none flex items-center justify-between ${isChecked
+                                                ? 'bg-amber-500/10 border-amber-500/60 text-white shadow-md'
+                                                : 'bg-zinc-900/60 border-zinc-800 text-slate-500 hover:border-zinc-700 hover:text-slate-300'
+                                            }`}
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <span className="text-2xl">{mod.icon}</span>
+                                            <div>
+                                                <div className={`font-bold text-sm ${isChecked ? 'text-amber-300' : 'text-slate-300'}`}>
+                                                    {mod.label}
+                                                </div>
+                                                <div className="text-[10px] font-mono text-slate-500">/{mod.key}</div>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex flex-col items-end">
+                                            <input
+                                                type="checkbox"
+                                                checked={isChecked}
+                                                onChange={() => { }}
+                                                className="w-4 h-4 accent-amber-500 rounded cursor-pointer"
+                                            />
+                                            <span className="text-[9px] mt-1 font-mono uppercase font-bold text-slate-500">
+                                                {isChecked ? 'DIIZINKAN' : 'DIKUNCI'}
+                                            </span>
+                                        </div>
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    </div>
+                )}
+
+                {/* TAB 2: MANAJEMEN PENGGUNA */}
                 {activeMenu === 'users' && (
                     <div className="space-y-6">
                         <div className="flex justify-between items-end">
@@ -517,7 +662,7 @@ export default function SuperAdminConsole() {
                     </div>
                 )}
 
-                {/* TAB 2: MANAJEMEN DIVISI & JABATAN */}
+                {/* TAB 3: MANAJEMEN DIVISI & JABATAN */}
                 {activeMenu === 'roles' && (
                     <div className="space-y-6">
                         <div>
@@ -625,99 +770,6 @@ export default function SuperAdminConsole() {
                                 </table>
                             )}
                         </section>
-                    </div>
-                )}
-
-                {/* TAB 3: HAK AKSES SETIAP DIVISI UNTUK MEMBUKA APLIKASI */}
-                {activeMenu === 'permissions' && (
-                    <div className="space-y-6">
-                        <div className="flex flex-wrap justify-between items-end gap-3">
-                            <div>
-                                <h2 className="text-2xl font-bold text-white mb-1">Hak Akses Modul Setiap Divisi</h2>
-                                <p className="text-sm text-slate-500">
-                                    Tentukan aplikasi mana saja yang diizinkan untuk dibuka dan dioperasikan oleh setiap divisi karyawan.
-                                </p>
-                            </div>
-
-                            <button
-                                onClick={handleSavePermissions}
-                                disabled={savingPermission}
-                                className="bg-amber-500 hover:bg-amber-600 text-black font-bold px-5 py-2.5 rounded text-sm transition cursor-pointer flex items-center gap-2"
-                            >
-                                {savingPermission ? (
-                                    <>
-                                        <span className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"></span>
-                                        <span>Menyimpan...</span>
-                                    </>
-                                ) : (
-                                    <>
-                                        <span>💾</span> <span>Simpan Hak Akses Divisi</span>
-                                    </>
-                                )}
-                            </button>
-                        </div>
-
-                        {/* Pemilihan Divisi Target */}
-                        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 shadow-lg flex flex-wrap items-center justify-between gap-4">
-                            <div className="flex items-center gap-3">
-                                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Pilih Divisi:</label>
-                                <select
-                                    value={selectedDivisionForPermission}
-                                    onChange={(e) => setSelectedDivisionForPermission(e.target.value)}
-                                    className="bg-black border border-zinc-700 text-amber-400 font-bold text-sm px-4 py-2 rounded focus:outline-none focus:border-amber-500"
-                                >
-                                    {roles.map((r) => {
-                                        const name = r.division || r.name
-                                        return (
-                                            <option key={r.id} value={name}>
-                                                {name}
-                                            </option>
-                                        )
-                                    })}
-                                </select>
-                            </div>
-
-                            <div className="text-xs text-slate-400">
-                                Aplikasi yang diizinkan:{' '}
-                                <span className="text-white font-mono font-bold">
-                                    {(divisionPermissions[selectedDivisionForPermission] || []).length} dari {APP_MODULES.length} Modul
-                                </span>
-                            </div>
-                        </div>
-
-                        {/* Grid Kartu Modul yang Bisa Diberikan Akses */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                            {APP_MODULES.map((mod) => {
-                                const currentAllowed = divisionPermissions[selectedDivisionForPermission] || []
-                                const isChecked = currentAllowed.includes(mod.key)
-
-                                return (
-                                    <div
-                                        key={mod.key}
-                                        onClick={() => handleToggleModulePermission(mod.key)}
-                                        className={`p-4 rounded-xl border transition cursor-pointer select-none flex items-center justify-between ${isChecked
-                                                ? 'bg-amber-500/10 border-amber-500/60 text-white shadow-md'
-                                                : 'bg-zinc-900/60 border-zinc-800 text-slate-400 hover:border-zinc-700'
-                                            }`}
-                                    >
-                                        <div className="flex items-center gap-3">
-                                            <span className="text-2xl">{mod.icon}</span>
-                                            <div>
-                                                <div className="font-bold text-sm">{mod.label}</div>
-                                                <div className="text-[10px] font-mono text-slate-500">/{mod.key}</div>
-                                            </div>
-                                        </div>
-
-                                        <input
-                                            type="checkbox"
-                                            checked={isChecked}
-                                            onChange={() => { }} // Handler dipicu oleh div pembungkus
-                                            className="w-4 h-4 accent-amber-500 rounded cursor-pointer"
-                                        />
-                                    </div>
-                                )
-                            })}
-                        </div>
                     </div>
                 )}
             </main>
