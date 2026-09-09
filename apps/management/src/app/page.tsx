@@ -2,27 +2,28 @@
 
 import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@supabase/supabase-js'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
-// 30 Modul Lengkap Tambang Nikel PT. JEEP
-const ALL_OPERATIONAL_MODULES = [
+// 30 Modul Tambang Nikel PT. Jangkar Energi Eka Perkasa
+const OPERATIONAL_MODULES = [
     {
         key: 'manager-site',
         title: 'Pusat Komando Pit Nikel',
         badge: 'Operasional Pit',
-        desc: 'Monitoring ritase bijih nikel, pengupasan overburden, dan laporan shift DOR.',
+        desc: 'Monitoring ritase bijih nikel, pengupasan overburden (OB), dan laporan shift DOR.',
         icon: '⛏️',
         href: '/manager-site',
     },
     {
         key: 'fleet',
         title: 'Kesiapan Alat Berat',
-        badge: 'Plant & Bengkel',
-        desc: 'Kontrol status unit (OP/ST/BD), jam kerja (HM), serta rasio PA dan MA.',
+        badge: 'Plant & Alat Berat',
+        desc: 'Kontrol unit excavator, dump truck nikel, rasio PA/MA, dan jam kerja (HM).',
         icon: '🚜',
         href: '/fleet',
     },
@@ -38,7 +39,7 @@ const ALL_OPERATIONAL_MODULES = [
         key: 'sparepart',
         title: 'Gudang & Sparepart',
         badge: 'Logistik Workshop',
-        desc: 'Inventaris suku cadang, reorder point, dan ketersediaan part fast-moving.',
+        desc: 'Inventaris suku cadang, reorder point, dan stok komponen kritis tambang nikel.',
         icon: '📦',
         href: '/sparepart',
     },
@@ -46,23 +47,23 @@ const ALL_OPERATIONAL_MODULES = [
         key: 'safety',
         title: 'Inspeksi K3 & HSE',
         badge: 'K3 Tambang Nikel',
-        desc: 'Pencatatan temuan hazard, mitigasi risiko K3, dan jam kerja selamat.',
+        desc: 'Pencatatan hazard tambang nikel, investigasi insiden, dan jam kerja selamat.',
         icon: '⛑️',
         href: '/safety',
     },
     {
         key: 'ritase',
-        title: 'Ritase & Timbangan',
-        badge: 'Weighbridge',
-        desc: 'Verifikasi tonase bruto, tare, dan netto armada hauling dump truck nikel.',
+        title: 'Ritase & Timbangan Ore',
+        badge: 'Weighbridge Site',
+        desc: 'Verifikasi tonase bruto, tare, dan netto bijih nikel armada hauling.',
         icon: '🚛',
         href: '/ritase',
     },
     {
         key: 'jetty',
-        title: 'Jetty & Barging',
+        title: 'Jetty & Tongkang LCT',
         badge: 'Pelabuhan Jetty',
-        desc: 'Pemuatan ore nikel ke tongkang LCT, draught survey, dan status SPB.',
+        desc: 'Pemuatan ore nikel ke tongkang LCT, draught survey, dan izin berlayar.',
         icon: '🚢',
         href: '/jetty',
     },
@@ -70,7 +71,7 @@ const ALL_OPERATIONAL_MODULES = [
         key: 'environment',
         title: 'Lingkungan & Reklamasi',
         badge: 'Lingkungan Hidup',
-        desc: 'Uji baku mutu settling pond (pH & TSS), penataan lahan, serta revegetasi.',
+        desc: 'Pemantauan settling pond nikel, baku mutu TSS & pH, dan revegetasi pascatambang.',
         icon: '🌱',
         href: '/environment',
     },
@@ -78,7 +79,7 @@ const ALL_OPERATIONAL_MODULES = [
         key: 'lingkungan',
         title: 'Kanal Pengendali Sedimen',
         badge: 'Sedimen & Air',
-        desc: 'Pengendalian limpasan air tambang dan audit rona lingkungan tambang nikel.',
+        desc: 'Pengendalian limpasan air tambang dan sediment trap tambang nikel.',
         icon: '🏞️',
         href: '/lingkungan',
     },
@@ -86,15 +87,15 @@ const ALL_OPERATIONAL_MODULES = [
         key: 'bbm',
         title: 'Tangki & BBM Solar',
         badge: 'Fuel Management',
-        desc: 'Stok solar industri, pencatatan nozzle alat berat, dan burn rate operasional.',
+        desc: 'Stok solar industri B35, pencatatan nozzle dispenser unit pit, dan burn rate.',
         icon: '⛽',
         href: '/bbm',
     },
     {
         key: 'finance',
         title: 'Kas & Finansial Site',
-        badge: 'Finance & Kas',
-        desc: 'Ledger pengeluaran kas kecil, dropping dana pusat, dan biaya lapangan.',
+        badge: 'Finance Site',
+        desc: 'Ledger kas kecil site, dropping dana operasional nikel, dan rekonsiliasi.',
         icon: '💰',
         href: '/finance',
     },
@@ -102,15 +103,15 @@ const ALL_OPERATIONAL_MODULES = [
         key: 'adm',
         title: 'Administrasi & Surat',
         badge: 'Site ADM',
-        desc: 'Pengarsipan surat jalan ritase nikel, izin masuk SIMP, dan administrasi berkas.',
+        desc: 'Pengarsipan surat jalan pengangkutan ore nikel, izin masuk SIMP, dan persuratan.',
         icon: '📋',
         href: '/adm',
     },
     {
         key: 'hrd',
-        title: 'HRD & Manpower',
+        title: 'HRD & Ketenagakerjaan',
         badge: 'Human Resources',
-        desc: 'Database pekerja tambang nikel, shift kerja, kebugaran, dan status kru.',
+        desc: 'Database pekerja tambang nikel, rotasi roster kerja, absensi, dan kebugaran.',
         icon: '👷‍♂️',
         href: '/hrd',
     },
@@ -118,7 +119,7 @@ const ALL_OPERATIONAL_MODULES = [
         key: 'ga',
         title: 'General Affair (GA)',
         badge: 'Fasilitas & Sarana',
-        desc: 'Log armada LV operasional, sarana mess camp, genset, dan logistik makan.',
+        desc: 'Manajemen armada LV operasional, sarana genset site, dan fasilitas camp.',
         icon: '🚙',
         href: '/ga',
     },
@@ -126,7 +127,7 @@ const ALL_OPERATIONAL_MODULES = [
         key: 'mess',
         title: 'Hunian & Mess Karyawan',
         badge: 'Camp Accommodation',
-        desc: 'Alokasi tempat tidur mess, pemeliharaan fasilitas kamar, dan kebersihan camp.',
+        desc: 'Alokasi kamar mess kru tambang, pemeliharaan sarana, dan kebersihan.',
         icon: '🏠',
         href: '/mess',
     },
@@ -134,7 +135,7 @@ const ALL_OPERATIONAL_MODULES = [
         key: 'catering',
         title: 'Katering & Logistik Pangan',
         badge: 'Food Service',
-        desc: 'Kontrol menu makanan bergizi kru tambang nikel dan jadwal suplai mess hall.',
+        desc: 'Kontrol menu makanan bergizi pekerja tambang dan jadwal suplai mess hall.',
         icon: '🍱',
         href: '/catering',
     },
@@ -142,7 +143,7 @@ const ALL_OPERATIONAL_MODULES = [
         key: 'clinic',
         title: 'Klinik Medis Site',
         badge: 'Pelayanan Medis',
-        desc: 'Pemeriksaan kesehatan pekerja tambang, surat fit-to-work, dan darurat.',
+        desc: 'Pemeriksaan kesehatan pekerja, surat fit-to-work, dan penanganan darurat.',
         icon: '🏥',
         href: '/clinic',
     },
@@ -150,15 +151,15 @@ const ALL_OPERATIONAL_MODULES = [
         key: 'security',
         title: 'Security & Akses Gerbang',
         badge: 'Keamanan Site',
-        desc: 'Pemeriksaan ID card gerbang masuk tambang nikel dan cek bagasi logistik.',
+        desc: 'Pemeriksaan gerbang masuk tambang, buku tamu logistik, dan verifikasi SIMP.',
         icon: '🛡️',
         href: '/security',
     },
     {
         key: 'radio',
-        title: 'Radio Dispatch & SSB',
+        title: 'Radio Komunikasi & Dispatch',
         badge: 'Dispatch Tambang',
-        desc: 'Log komunikasi radio HT/SSB, pemanggilan unit pit, dan koordinasi darurat.',
+        desc: 'Log komunikasi radio HT/SSB, dispatch unit pit, dan koordinasi darurat.',
         icon: '📻',
         href: '/radio',
     },
@@ -174,7 +175,7 @@ const ALL_OPERATIONAL_MODULES = [
         key: 'csr',
         title: 'CSR & Hubungan Masyarakat',
         badge: 'Community Relations',
-        desc: 'Program PPM/CSR desa lingkar tambang nikel dan komunikasi warga lokal.',
+        desc: 'Program PPM/CSR desa lingkar tambang nikel dan hubungan warga lokal.',
         icon: '🤝',
         href: '/csr',
     },
@@ -182,7 +183,7 @@ const ALL_OPERATIONAL_MODULES = [
         key: 'vendor',
         title: 'Vendor & Kontraktor',
         badge: 'Mitra Usaha',
-        desc: 'Daftar rekanan kontraktor penambangan nikel, subkontraktor, dan evaluasi vendor.',
+        desc: 'Daftar rekanan kontraktor penambangan nikel, subkontraktor, dan evaluasi.',
         icon: '🏬',
         href: '/vendor',
     },
@@ -190,7 +191,7 @@ const ALL_OPERATIONAL_MODULES = [
         key: 'transport',
         title: 'Transportasi & Logistik Kru',
         badge: 'Mobilisasi Kru',
-        desc: 'Jadwal bus penjemputan kru tambang nikel, mobilisasi bandara, dan izin keluar.',
+        desc: 'Jadwal bus penjemputan kru tambang, mobilisasi bandara, dan izin keluar.',
         icon: '🚌',
         href: '/transport',
     },
@@ -198,7 +199,7 @@ const ALL_OPERATIONAL_MODULES = [
         key: 'training',
         title: 'Pelatihan & Sertifikasi',
         badge: 'Training Center',
-        desc: 'Pelatihan POP/POM, sertifikasi operator alat berat, dan induksi keselamatan.',
+        desc: 'Pelatihan POP/POM, sertifikasi operator alat berat nikel, dan induksi K3.',
         icon: '🎓',
         href: '/training',
     },
@@ -214,7 +215,7 @@ const ALL_OPERATIONAL_MODULES = [
         key: 'it-helpdesk',
         title: 'IT Helpdesk & Jaringan VSAT',
         badge: 'Teknologi Informasi',
-        desc: 'Kendala internet VSAT site tambang nikel, perawatan komputer, dan printer kantor.',
+        desc: 'Kendala internet VSAT site tambang nikel, pemeliharaan komputer, dan jaringan.',
         icon: '💻',
         href: '/it-helpdesk',
     },
@@ -222,7 +223,7 @@ const ALL_OPERATIONAL_MODULES = [
         key: 'helpdesk',
         title: 'Helpdesk Sarana GA',
         badge: 'Bantuan Fasilitas',
-        desc: 'Permintaan perbaikan fasilitas mess, AC kantor, dan saluran air bersih camp.',
+        desc: 'Permintaan perbaikan sarana mess, pendingin udara, dan suplai air bersih.',
         icon: '🛠️',
         href: '/helpdesk',
     },
@@ -230,7 +231,7 @@ const ALL_OPERATIONAL_MODULES = [
         key: 'investor',
         title: 'Portal Investor Tambang',
         badge: 'Investor Relations',
-        desc: 'Data keterbukaan perkembangan cadangan nikel dan laporan kinerja finansial.',
+        desc: 'Transparansi pengapalan ore nikel, pendapatan, dan kepatuhan kuota RKAB.',
         icon: '📊',
         href: '/investor',
     },
@@ -238,55 +239,39 @@ const ALL_OPERATIONAL_MODULES = [
         key: 'direktur',
         title: 'Eksekutif Direksi (BOD)',
         badge: 'Executive BOD',
-        desc: 'Executive summary tambang nikel, ringkasan produksi, dan anggaran tambang.',
+        desc: 'Executive summary tambang nikel, tren produksi ore, dan ringkasan anggaran.',
         icon: '🏛️',
         href: '/direktur',
     },
     {
         key: 'laporan',
         title: 'Cetak Laporan Resmi',
-        badge: 'Laporan DOR',
+        badge: 'Laporan DOR Nikel',
         desc: 'Format cetak resmi Daily Operation Report produksi nikel siap unduh PDF.',
         icon: '📄',
         href: '/laporan',
     },
 ]
 
-export default function ManagementPortalPage() {
+export default function PortalDashboard() {
+    const router = useRouter()
     const [loading, setLoading] = useState(true)
     const [userProfile, setUserProfile] = useState<any>(null)
     const [allowedModules, setAllowedModules] = useState<string[]>([])
+
     const landingUrl = process.env.NEXT_PUBLIC_LANDING_URL || 'https://pt-jeep.vercel.app'
 
     useEffect(() => {
         let isMounted = true
 
-        async function checkAuthAndPermissions() {
+        async function loadUserAndPermissions() {
             try {
-                if (typeof window !== 'undefined' && window.location.hash.includes('access_token')) {
-                    const hashClean = window.location.hash.startsWith('#')
-                        ? window.location.hash.substring(1)
-                        : window.location.hash
-                    const hashParams = new URLSearchParams(hashClean)
-                    const accessToken = hashParams.get('access_token')
-                    const refreshToken = hashParams.get('refresh_token')
-
-                    if (accessToken) {
-                        await supabase.auth.setSession({
-                            access_token: accessToken,
-                            refresh_token: refreshToken || '',
-                        })
-                        window.history.replaceState(null, '', window.location.pathname)
-                    }
-                }
-
                 const { data: { session } } = await supabase.auth.getSession()
                 if (!session) {
                     window.location.href = landingUrl
                     return
                 }
 
-                // 1. Ambil Profil Karyawan
                 const { data: profile } = await supabase
                     .from('profiles')
                     .select('full_name, role, status')
@@ -303,53 +288,56 @@ export default function ManagementPortalPage() {
 
                 if (isMounted) {
                     setUserProfile(profile)
-                    const userDivision = (profile?.role || '').trim()
+                    const division = (profile?.role || '').trim().toLowerCase()
 
-                    // 2. Jika Superadmin murni (bukan ADM), berikan semua modul
-                    const isSuperAdmin = userDivision.toLowerCase() === 'admin' ||
-                        userDivision.toLowerCase() === 'administrator' ||
-                        userDivision.toLowerCase() === 'superadmin'
+                    const isSuperAdmin = ['admin', 'administrator', 'superadmin'].includes(division)
 
                     if (isSuperAdmin) {
-                        setAllowedModules(ALL_OPERATIONAL_MODULES.map((m) => m.key))
+                        setAllowedModules(OPERATIONAL_MODULE_CARDS.map((m) => m.key))
                     } else {
-                        // 3. Ambil data izin divisi dari Supabase dengan penanganan fuzzy matching
-                        const { data: allPerms } = await supabase
+                        const { data: perms } = await supabase
                             .from('division_permissions')
                             .select('division_name, allowed_modules')
 
-                        if (allPerms && allPerms.length > 0) {
-                            const cleanDiv = userDivision.toLowerCase()
-
-                            const matched = allPerms.find((p) => {
+                        let granted: string[] = []
+                        if (perms && perms.length > 0) {
+                            const matched = perms.find((p) => {
                                 const target = (p.division_name || '').toLowerCase().trim()
                                 return (
-                                    target === cleanDiv ||
-                                    target.includes(cleanDiv) ||
-                                    cleanDiv.includes(target) ||
-                                    (cleanDiv === 'adm' && (target.includes('administrasi') || target.includes('adm')))
+                                    target === division ||
+                                    target.includes(division) ||
+                                    division.includes(target) ||
+                                    (division === 'finance' && target.includes('keuangan')) ||
+                                    (division === 'adm' && (target.includes('administrasi') || target.includes('adm')))
                                 )
                             })
 
                             if (matched && Array.isArray(matched.allowed_modules)) {
-                                setAllowedModules(matched.allowed_modules)
-                            } else {
-                                setAllowedModules(['adm']) // fallback khusus role ADM
+                                granted = matched.allowed_modules
                             }
-                        } else {
-                            setAllowedModules(['adm'])
                         }
+
+                        // Jika belum ada matriks izin, buka modul yang sesuai dengan role-nya
+                        if (granted.length === 0) {
+                            granted = [division]
+                        }
+
+                        setAllowedModules(granted)
                     }
+
                     setLoading(false)
                 }
             } catch (err) {
-                console.error('Error memuat otorisasi portal:', err)
+                console.error('Error load portal:', err)
                 if (isMounted) setLoading(false)
             }
         }
 
-        checkAuthAndPermissions()
-        return () => { isMounted = false }
+        loadUserAndPermissions()
+
+        return () => {
+            isMounted = false
+        }
     }, [landingUrl])
 
     const handleLogout = async () => {
@@ -357,107 +345,103 @@ export default function ManagementPortalPage() {
         window.location.href = landingUrl
     }
 
-    // Filter modul hanya yang ada di allowedModules
-    const visibleModules = ALL_OPERATIONAL_MODULES.filter((m) =>
-        allowedModules.includes(m.key)
+    // Filter modul: hanya yang diizinkan untuk divisi pengguna yang ditampilkan di kartu portal
+    const visibleCards = OPERATIONAL_MODULES.filter((mod) =>
+        allowedModules.includes(mod.key)
     )
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-[#060c14] flex flex-col items-center justify-center text-white font-sans">
-                <div className="w-10 h-10 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-                <p className="text-xs text-slate-400 font-mono">Memvalidasi Otorisasi Divisi Tambang Nikel...</p>
+            <div className="min-h-screen bg-[#070b12] flex flex-col items-center justify-center text-slate-300 font-sans">
+                <div className="w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mb-3"></div>
+                <p className="text-xs font-mono">Sinkronisasi Portal Operasi Tambang Nikel...</p>
             </div>
         )
     }
 
     return (
-        <div className="min-h-screen bg-[#080d16] text-slate-100 font-sans p-6 md:p-10 select-none">
-            {/* Header Portal Terpadu */}
-            <header className="max-w-7xl mx-auto mb-8">
-                <div className="text-[11px] font-mono tracking-widest text-emerald-400 uppercase flex items-center gap-2 mb-2">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                    <span>PT. JANGKAR ENERGI EKA PERKASA • NICKEL MINING SUITE</span>
+        <div className="min-h-screen bg-[#070b12] text-slate-100 font-sans p-6 md:p-8 select-none">
+            <div className="max-w-7xl mx-auto space-y-6">
+                {/* Banner Utama */}
+                <div className="bg-[#0b1320] border border-[#1b2a40] rounded-2xl p-6 md:p-8 shadow-2xl relative overflow-hidden">
+                    <div className="relative z-10 flex flex-wrap items-center justify-between gap-4">
+                        <div>
+                            <div className="flex items-center gap-2 text-[11px] font-mono tracking-wider text-amber-400 mb-2 font-bold">
+                                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                                <span>PT. JANGKAR ENERGI EKA PERKASA • MANAGEMENT SUITE</span>
+                            </div>
+                            <h1 className="text-2xl md:text-3xl font-black text-white tracking-tight">
+                                Portal Operasi Terpadu Tambang Nikel
+                            </h1>
+                            <p className="text-xs text-slate-400 mt-1 flex flex-wrap items-center gap-2">
+                                <span>Terhubung sebagai</span>
+                                <strong className="text-white">{userProfile?.full_name || 'Karyawan Site'}</strong>
+                                <span className="bg-[#122236] border border-[#1b3659] text-cyan-300 text-[10px] px-2 py-0.5 rounded font-mono font-bold">
+                                    {userProfile?.role || 'Staff'}
+                                </span>
+                                <span>• Site Konawe Utara / IUP-OP Nikel</span>
+                            </p>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                            <Link
+                                href="/laporan"
+                                className="bg-[#132238] hover:bg-[#1a2f4d] border border-[#213a5e] text-slate-200 text-xs font-semibold px-4 py-2.5 rounded-lg transition"
+                            >
+                                📄 Cetak Rekap DOR
+                            </Link>
+                            <button
+                                onClick={handleLogout}
+                                className="bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/50 text-rose-300 text-xs font-semibold px-4 py-2.5 rounded-lg transition cursor-pointer"
+                            >
+                                Keluar ke Beranda
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
-                <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#1b2a40] pb-6">
-                    <div>
-                        <h1 className="text-2xl md:text-4xl font-black tracking-tight text-white">
-                            Portal Operasi Terpadu Tambang Nikel
-                        </h1>
-                        <p className="text-xs text-slate-400 mt-1.5 flex items-center gap-2">
-                            <span>Terhubung sebagai</span>
-                            <strong className="text-amber-400 font-semibold">{userProfile?.full_name || 'Karyawan Site'}</strong>
-                            <span className="bg-[#122033] border border-[#1f3756] text-cyan-300 text-[10px] px-2 py-0.5 rounded font-mono font-bold">
-                                {userProfile?.role || 'Umum'}
-                            </span>
-                        </p>
+                {/* Grid Modul Sesuai Hak Akses Divisi */}
+                <div>
+                    <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider">
+                            Modul Operasional yang Diizinkan ({visibleCards.length} Modul Aktif)
+                        </h2>
                     </div>
 
-                    <div className="flex items-center gap-3">
-                        <Link
-                            href="/laporan"
-                            className="bg-[#122033] hover:bg-[#1a2e49] border border-[#1f3756] text-slate-200 text-xs font-semibold px-4 py-2.5 rounded-lg transition flex items-center gap-2"
-                        >
-                            <span>📄</span> <span>Cetak Rekap DOR</span>
-                        </Link>
-                        <button
-                            onClick={handleLogout}
-                            className="bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/50 text-rose-300 text-xs font-semibold px-4 py-2.5 rounded-lg transition cursor-pointer"
-                        >
-                            Keluar ke Beranda
-                        </button>
-                    </div>
-                </div>
-            </header>
-
-            {/* Grid Kartu Modul Sesuai Hak Akses Divisi */}
-            <main className="max-w-7xl mx-auto">
-                {visibleModules.length === 0 ? (
-                    <div className="bg-[#0c1626] border border-[#1b2a40] rounded-2xl p-12 text-center max-w-lg mx-auto my-12 space-y-3">
-                        <span className="text-4xl block">🔒</span>
-                        <h2 className="text-lg font-bold text-white">Belum Ada Hak Akses Modul</h2>
-                        <p className="text-xs text-slate-400 leading-relaxed">
-                            Divisi <strong className="text-amber-400">{userProfile?.role}</strong> belum diberikan izin untuk membuka modul operasional apa pun oleh Superadmin. Silakan hubungi Administrator sistem.
-                        </p>
-                    </div>
-                ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-                        {visibleModules.map((mod) => (
-                            <div
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                        {visibleCards.map((mod) => (
+                            <Link
                                 key={mod.key}
-                                className="bg-[#0c1626] border border-[#1b2a40] hover:border-cyan-500/50 rounded-2xl p-5 flex flex-col justify-between transition-all duration-200 hover:-translate-y-1 hover:shadow-xl hover:shadow-cyan-950/20 group"
+                                href={mod.href}
+                                className="bg-[#0b1320] border border-[#162336] hover:border-cyan-400/80 rounded-xl p-5 transition flex flex-col justify-between group hover:shadow-lg hover:shadow-cyan-950/30"
                             >
                                 <div>
-                                    <div className="flex items-center justify-between mb-4">
-                                        <span className="text-3xl">{mod.icon}</span>
-                                        <span className="text-[10px] font-bold uppercase px-2.5 py-1 rounded-md bg-[#08101c] border border-[#1a2d47] text-cyan-400">
+                                    <div className="flex items-start justify-between mb-3">
+                                        <span className="text-2xl p-2 bg-[#070e18] border border-[#142030] rounded-lg group-hover:scale-105 transition">
+                                            {mod.icon}
+                                        </span>
+                                        <span className="text-[10px] font-bold text-slate-400 bg-[#070e18] border border-[#162336] px-2 py-0.5 rounded">
                                             {mod.badge}
                                         </span>
                                     </div>
 
-                                    <h3 className="text-base font-bold text-white mb-2 group-hover:text-amber-400 transition">
+                                    <h3 className="text-sm font-bold text-white group-hover:text-cyan-300 transition">
                                         {mod.title}
                                     </h3>
-                                    <p className="text-xs text-slate-400 line-clamp-3 leading-relaxed">
+                                    <p className="text-xs text-slate-400 mt-1.5 line-clamp-2 leading-relaxed">
                                         {mod.desc}
                                     </p>
                                 </div>
 
-                                <div className="mt-6 pt-4 border-t border-[#16253a]">
-                                    <Link
-                                        href={mod.href}
-                                        className="flex items-center justify-between text-xs font-bold text-slate-300 group-hover:text-cyan-400 transition"
-                                    >
-                                        <span>Buka Modul</span>
-                                        <span>→</span>
-                                    </Link>
+                                <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between text-xs text-slate-400 group-hover:text-cyan-400 font-semibold">
+                                    <span>Buka Modul</span>
+                                    <span>→</span>
                                 </div>
-                            </div>
+                            </Link>
                         ))}
                     </div>
-                )}
-            </main>
+                </div>
+            </div>
         </div>
     )
 }
