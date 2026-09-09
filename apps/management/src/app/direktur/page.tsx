@@ -1,6 +1,8 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { createClient } from '@supabase/supabase-js'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
@@ -8,6 +10,7 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 export default function DirekturDashboard() {
+    const pathname = usePathname()
     const [loading, setLoading] = useState(true)
     const [directorName, setDirectorName] = useState('Direktur Utama')
     const [activeTab, setActiveTab] = useState('executive')
@@ -20,6 +23,8 @@ export default function DirekturDashboard() {
     const landingUrl = process.env.NEXT_PUBLIC_LANDING_URL || 'https://pt-jeep.vercel.app'
 
     useEffect(() => {
+        let isMounted = true
+
         async function initDirector() {
             try {
                 if (typeof window !== 'undefined' && window.location.hash.includes('access_token')) {
@@ -27,10 +32,10 @@ export default function DirekturDashboard() {
                     const accessToken = hashParams.get('access_token')
                     const refreshToken = hashParams.get('refresh_token')
 
-                    if (accessToken && refreshToken) {
+                    if (accessToken) {
                         await supabase.auth.setSession({
                             access_token: accessToken,
-                            refresh_token: refreshToken,
+                            refresh_token: refreshToken || '',
                         })
                         window.history.replaceState(null, '', window.location.pathname)
                     }
@@ -46,53 +51,75 @@ export default function DirekturDashboard() {
                     .from('profiles')
                     .select('full_name, role, status')
                     .eq('id', session.user.id)
-                    .single()
+                    .maybeSingle()
 
-                const userStatus = (profile?.status || '').toLowerCase()
-                if (profile && userStatus && userStatus !== 'aktif') {
+                const userStatus = (profile?.status || '').toLowerCase().trim()
+                if (userStatus === 'nonaktif' || userStatus === 'banned') {
                     alert('Akun Anda dinonaktifkan.')
                     await supabase.auth.signOut()
                     window.location.href = landingUrl
                     return
                 }
 
-                setDirectorName(profile?.full_name || 'Direktur Utama')
+                if (isMounted) {
+                    setDirectorName(profile?.full_name || 'Direktur Utama')
 
-                const { data: financeData } = await supabase
-                    .from('finance_transactions')
-                    .select('amount')
+                    // Tarik data keuangan agregat
+                    const { data: financeData } = await supabase
+                        .from('finance_transactions')
+                        .select('amount, transaction_type')
 
-                if (financeData && financeData.length > 0) {
-                    const sumExp = financeData.reduce((acc, curr) => acc + Number(curr.amount || 0), 0)
-                    setTotalExpense(sumExp)
+                    if (financeData && financeData.length > 0) {
+                        const sumExp = financeData
+                            .filter((t) => (t.transaction_type || 'expense') === 'expense')
+                            .reduce((acc, curr) => acc + Number(curr.amount || 0), 0)
+                        setTotalExpense(sumExp)
+                    }
+
+                    // Tarik data produksi pit agregat
+                    const { data: prodData } = await supabase
+                        .from('site_production_logs')
+                        .select('overburden_bcm, coal_getting_ton')
+
+                    if (prodData && prodData.length > 0) {
+                        setProductionCount(prodData.length)
+                        const sumOb = prodData.reduce((acc, curr) => acc + Number(curr.overburden_bcm || 0), 0)
+                        const sumCoal = prodData.reduce((acc, curr) => acc + Number(curr.coal_getting_ton || 0), 0)
+                        setTotalObBcm(sumOb)
+                        setTotalCoalTon(sumCoal)
+                    }
+
+                    setLoading(false)
                 }
-
-                const { data: prodData } = await supabase
-                    .from('site_production_logs')
-                    .select('overburden_bcm, coal_getting_ton')
-
-                if (prodData && prodData.length > 0) {
-                    setProductionCount(prodData.length)
-                    const sumOb = prodData.reduce((acc, curr) => acc + Number(curr.overburden_bcm || 0), 0)
-                    const sumCoal = prodData.reduce((acc, curr) => acc + Number(curr.coal_getting_ton || 0), 0)
-                    setTotalObBcm(sumOb)
-                    setTotalCoalTon(sumCoal)
-                }
-
-                setLoading(false)
             } catch (err) {
                 console.error('Error init director:', err)
-                setLoading(false)
+                if (isMounted) setLoading(false)
             }
         }
 
         initDirector()
+
+        return () => {
+            isMounted = false
+        }
     }, [landingUrl])
 
     const handleLogout = async () => {
         await supabase.auth.signOut()
         window.location.href = landingUrl
     }
+
+    const navLinks = [
+        { href: '/manager-site', label: 'Pit Produksi', icon: '⛏️' },
+        { href: '/ritase', label: 'Ritase & Timbangan', icon: '🚛' },
+        { href: '/bbm', label: 'Tangki BBM', icon: '⛽' },
+        { href: '/finance', label: 'Keuangan', icon: '💰' },
+        { href: '/adm', label: 'ADM & Surat', icon: '📋' },
+        { href: '/hrd', label: 'HRD & K3', icon: '👷‍♂️' },
+        { href: '/ga', label: 'GA & Fasilitas', icon: '🚙' },
+        { href: '/direktur', label: 'Eksekutif', icon: '🏛️' },
+        { href: '/laporan', label: 'Cetak Laporan', icon: '📄' },
+    ]
 
     if (loading) {
         return (
@@ -105,28 +132,57 @@ export default function DirekturDashboard() {
 
     return (
         <div className="min-h-screen bg-[#060c14] text-slate-100 font-sans p-4 md:p-6 select-none">
-            <header className="flex flex-wrap items-center justify-between bg-[#0a1625] border border-[#1b2e46] rounded-xl px-6 py-4 mb-6 shadow-xl">
-                <div className="flex items-center space-x-3">
-                    <span className="text-2xl">🏛️</span>
-                    <div>
-                        <h1 className="text-xl md:text-2xl font-black tracking-wide text-white">
-                            Executive Console PT. Jangkar Energi Eka Perkasa
-                        </h1>
-                        <p className="text-xs text-amber-400 flex items-center gap-1.5 mt-0.5">
-                            <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
-                            High-Level Overview & Financial KPI • {directorName} (Direktur Utama)
-                        </p>
+            {/* Header Mandiri */}
+            <header className="mb-6 space-y-3">
+                <div className="flex flex-wrap items-center justify-between bg-[#0a1625] border border-[#1b2e46] rounded-xl px-6 py-4 shadow-xl">
+                    <div className="flex items-center space-x-3">
+                        <span className="text-2xl">🏛️</span>
+                        <div>
+                            <h1 className="text-xl md:text-2xl font-black tracking-wide text-white">
+                                Executive Console PT. JEEP
+                            </h1>
+                            <p className="text-xs text-amber-400 flex items-center gap-1.5 mt-0.5">
+                                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                                <span>High-Level Overview & Financial KPI</span>
+                                <span className="text-slate-600">•</span>
+                                <span className="text-slate-300 font-semibold">{directorName}</span>
+                                <span className="bg-[#112233] border border-[#1e3a5f] text-slate-300 text-[10px] px-2 py-0.5 rounded font-mono">
+                                    Board of Directors
+                                </span>
+                            </p>
+                        </div>
                     </div>
+
+                    <button
+                        onClick={handleLogout}
+                        className="bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/50 text-rose-300 text-xs px-4 py-2 rounded-lg transition cursor-pointer"
+                    >
+                        Keluar ke Beranda
+                    </button>
                 </div>
 
-                <button
-                    onClick={handleLogout}
-                    className="bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/50 text-rose-300 text-xs px-4 py-2 rounded-lg transition cursor-pointer"
-                >
-                    Keluar ke Beranda
-                </button>
+                {/* Global Module Switcher */}
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+                    {navLinks.map((item) => {
+                        const isActive = pathname === item.href
+                        return (
+                            <Link
+                                key={item.href}
+                                href={item.href}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border whitespace-nowrap font-medium transition cursor-pointer ${isActive
+                                        ? 'bg-[#162d47] text-white border-amber-400/80 shadow-sm'
+                                        : 'bg-[#0a1625] text-slate-400 border-[#1b2e46] hover:text-slate-200 hover:bg-[#0f2137]'
+                                    }`}
+                            >
+                                <span>{item.icon}</span>
+                                <span>{item.label}</span>
+                            </Link>
+                        )
+                    })}
+                </div>
             </header>
 
+            {/* Nav Tabs */}
             <nav className="flex flex-wrap gap-2 mb-6">
                 {[
                     { id: 'executive', label: 'RINGKASAN EKSEKUTIF', badge: 'LIVE SYNC' },
@@ -152,18 +208,19 @@ export default function DirekturDashboard() {
                 ))}
             </nav>
 
+            {/* Metrik KPI */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
                 <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
-                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Total Pengeluaran Site (Live)</h3>
-                    <div className="text-2xl font-black text-amber-400">
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Total Pengeluaran Kas Site</h3>
+                    <div className="text-2xl font-black text-rose-400 font-mono">
                         Rp {totalExpense.toLocaleString('id-ID')}
                     </div>
-                    <p className="mt-2 text-[11px] text-emerald-400 font-semibold">Tercatat di Divisi Finance</p>
+                    <p className="mt-2 text-[11px] text-slate-400">Tercatat di Divisi Finance</p>
                 </div>
 
                 <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
                     <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Total Overburden Pit</h3>
-                    <div className="text-2xl font-black text-white">
+                    <div className="text-2xl font-black text-white font-mono">
                         {totalObBcm.toLocaleString('id-ID')} BCM
                     </div>
                     <p className="mt-2 text-[11px] text-emerald-400 font-semibold">Dari {productionCount} shift pelaporan</p>
@@ -171,7 +228,7 @@ export default function DirekturDashboard() {
 
                 <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
                     <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Total Produksi Batubara</h3>
-                    <div className="text-2xl font-black text-amber-400">
+                    <div className="text-2xl font-black text-amber-400 font-mono">
                         {totalCoalTon.toLocaleString('id-ID')} Ton
                     </div>
                     <p className="mt-2 text-[11px] text-slate-300">Siap Angkut ke Jetty Stockpile</p>
@@ -184,6 +241,7 @@ export default function DirekturDashboard() {
                 </div>
             </div>
 
+            {/* Grid Kolom */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 <div className="lg:col-span-8 bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
                     <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-4">
@@ -203,13 +261,13 @@ export default function DirekturDashboard() {
                                 <tr>
                                     <td className="py-3 font-bold text-white">Keuangan Site (Finance)</td>
                                     <td>Arus Pengeluaran Kas Lapangan</td>
-                                    <td className="text-amber-400 font-bold">Rp {totalExpense.toLocaleString('id-ID')}</td>
+                                    <td className="text-rose-400 font-bold font-mono">Rp {totalExpense.toLocaleString('id-ID')}</td>
                                     <td><span className="bg-emerald-950/60 text-emerald-400 border border-emerald-800/40 px-2 py-0.5 rounded text-[10px]">Terkontrol</span></td>
                                 </tr>
                                 <tr>
                                     <td className="py-3 font-bold text-white">Pit & Produksi Tambang</td>
                                     <td>Overburden & Coal Getting</td>
-                                    <td className="text-emerald-400 font-bold">{totalCoalTon.toLocaleString('id-ID')} Ton Coal</td>
+                                    <td className="text-amber-400 font-bold font-mono">{totalCoalTon.toLocaleString('id-ID')} Ton Coal</td>
                                     <td><span className="bg-emerald-950/60 text-emerald-400 border border-emerald-800/40 px-2 py-0.5 rounded text-[10px]">Optimal</span></td>
                                 </tr>
                                 <tr>
@@ -229,9 +287,9 @@ export default function DirekturDashboard() {
                     </div>
                 </div>
 
-                {/* Kolom Kanan: Arahan Strategis Direktur & Shortcut PDF */}
+                {/* Kolom Kanan: Arahan Strategis & Shortcut PDF */}
                 <div className="lg:col-span-4 space-y-4">
-                    <a
+                    <Link
                         href="/laporan"
                         className="p-4 rounded-xl border border-amber-500/50 bg-amber-950/20 hover:bg-amber-900/30 text-slate-100 transition flex items-center justify-between block shadow-lg cursor-pointer"
                     >
@@ -243,7 +301,7 @@ export default function DirekturDashboard() {
                             </div>
                         </div>
                         <span className="text-amber-400 text-xs">Buka →</span>
-                    </a>
+                    </Link>
 
                     <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg space-y-3">
                         <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider">
