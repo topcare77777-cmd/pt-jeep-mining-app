@@ -11,7 +11,7 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 interface DocumentLog {
     id: string
-    created_at?: string
+    created_at: string
     agenda_no: string
     title: string
     sender: string
@@ -74,8 +74,8 @@ export default function AdmDashboard() {
                     .eq('id', session.user.id)
                     .maybeSingle()
 
-                const userStatus = (profile?.status || '').toLowerCase().trim()
-                if (userStatus === 'nonaktif' || userStatus === 'banned') {
+                const statusClean = (profile?.status || '').toLowerCase().trim()
+                if (statusClean === 'nonaktif' || statusClean === 'banned') {
                     alert('Akun Anda dinonaktifkan.')
                     await supabase.auth.signOut()
                     window.location.href = landingUrl
@@ -89,31 +89,9 @@ export default function AdmDashboard() {
                         .from('adm_documents')
                         .select('*')
                         .order('created_at', { ascending: false })
-                        .limit(20)
 
                     if (docData && docData.length > 0) {
                         setDocuments(docData)
-                    } else {
-                        setDocuments([
-                            {
-                                id: '1',
-                                created_at: new Date().toISOString(),
-                                agenda_no: 'ADM/2026/09/012',
-                                title: 'Surat Jalan Pengiriman Solar 16.000L',
-                                sender: 'PT Solar Pasifik',
-                                category: 'Surat Jalan',
-                                status: 'Tervalidasi',
-                            },
-                            {
-                                id: '2',
-                                created_at: new Date().toISOString(),
-                                agenda_no: 'ADM/2026/09/011',
-                                title: 'Permohonan Izin Masuk Pit (SIMP Site)',
-                                sender: 'PT United Tractors',
-                                category: 'SIMP',
-                                status: 'Diproses K3',
-                            },
-                        ])
                     }
 
                     setLoading(false)
@@ -162,7 +140,7 @@ export default function AdmDashboard() {
             setSender('')
             setAgendaNo('')
         } else {
-            alert('Gagal menyimpan berkas: ' + (error?.message || 'Terjadi kesalahan sistem.'))
+            alert('Gagal menyimpan dokumen: ' + (error?.message || 'Terjadi kesalahan sistem.'))
         }
 
         setSubmitting(false)
@@ -174,15 +152,20 @@ export default function AdmDashboard() {
     }
 
     const filteredDocs = documents.filter((doc) =>
-        doc.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        doc.agenda_no.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        doc.sender.toLowerCase().includes(searchQuery.toLowerCase())
+        (doc.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (doc.agenda_no || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (doc.sender || '').toLowerCase().includes(searchQuery.toLowerCase())
     )
 
     const navLinks = [
         { href: '/manager-site', label: 'Pit Produksi', icon: '⛏️' },
-        { href: '/ritase', label: 'Ritase & Timbangan', icon: '🚛' },
-        { href: '/bbm', label: 'Tangki BBM', icon: '⛽' },
+        { href: '/fleet', label: 'Alat Berat', icon: '🚜' },
+        { href: '/safety', label: 'Inspeksi K3', icon: '⛑️' },
+        { href: '/sparepart', label: 'Sparepart', icon: '📦' },
+        { href: '/ritase', label: 'Ritase', icon: '🚛' },
+        { href: '/jetty', label: 'Jetty Port', icon: '🚢' },
+        { href: '/lingkungan', label: 'Lingkungan', icon: '🌱' },
+        { href: '/bbm', label: 'BBM Solar', icon: '⛽' },
         { href: '/finance', label: 'Keuangan', icon: '💰' },
         { href: '/adm', label: 'ADM & Surat', icon: '📋' },
         { href: '/hrd', label: 'HRD & K3', icon: '👷‍♂️' },
@@ -205,19 +188,22 @@ export default function AdmDashboard() {
             {/* Header Mandiri */}
             <header className="mb-6 space-y-3">
                 <div className="flex flex-wrap items-center justify-between bg-[#0a1625] border border-[#1b2e46] rounded-xl px-6 py-4 shadow-xl">
-                    <div>
-                        <h1 className="text-xl md:text-2xl font-black tracking-wide text-white flex items-center gap-2">
-                            Dashboard Administrasi (ADM) PT. JEEP
-                        </h1>
-                        <p className="text-xs text-slate-400 flex items-center gap-2 mt-1">
-                            <span className="w-2 h-2 rounded-full bg-sky-500 animate-pulse"></span>
-                            <span>Live Sync Dokumen, Surat Jalan, & Perizinan Site</span>
-                            <span className="text-slate-600">•</span>
-                            <span className="text-slate-300 font-semibold">{userName}</span>
-                            <span className="bg-[#112233] border border-[#1e3a5f] text-slate-300 text-[10px] px-2 py-0.5 rounded font-mono">
-                                Site Administration
-                            </span>
-                        </p>
+                    <div className="flex items-center space-x-3">
+                        <span className="text-2xl">📋</span>
+                        <div>
+                            <h1 className="text-xl md:text-2xl font-black tracking-wide text-white">
+                                Dashboard Administrasi (ADM) PT. JEEP
+                            </h1>
+                            <p className="text-xs text-sky-400 flex items-center gap-1.5 mt-0.5">
+                                <span className="w-2 h-2 rounded-full bg-sky-500 animate-pulse"></span>
+                                <span>Live Sync Dokumen & Surat Jalan</span>
+                                <span className="text-slate-600">•</span>
+                                <span className="text-slate-300 font-semibold">{userName}</span>
+                                <span className="bg-[#112233] border border-[#1e3a5f] text-slate-300 text-[10px] px-2 py-0.5 rounded font-mono">
+                                    Site Administration
+                                </span>
+                            </p>
+                        </div>
                     </div>
 
                     <button
@@ -237,7 +223,7 @@ export default function AdmDashboard() {
                                 key={item.href}
                                 href={item.href}
                                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border whitespace-nowrap font-medium transition cursor-pointer ${isActive
-                                        ? 'bg-[#162d47] text-white border-amber-400/80 shadow-sm'
+                                        ? 'bg-[#162d47] text-white border-sky-400/80 shadow-sm'
                                         : 'bg-[#0a1625] text-slate-400 border-[#1b2e46] hover:text-slate-200 hover:bg-[#0f2137]'
                                     }`}
                             >
@@ -249,13 +235,13 @@ export default function AdmDashboard() {
                 </div>
             </header>
 
-            {/* Nav Tabs Kategori */}
+            {/* Nav Tabs */}
             <nav className="flex flex-wrap gap-2 mb-6">
                 {[
-                    { id: 'surat', label: 'SURAT MASUK & KELUAR', badge: `${documents.length} DOKUMEN` },
-                    { id: 'suratjalan', label: 'SURAT JALAN & RITASE', badge: '' },
-                    { id: 'po', label: 'PURCHASE ORDER (PO)', badge: '' },
-                    { id: 'simp', label: 'BUKU TAMU & SIMP', badge: '' },
+                    { id: 'surat', label: 'SURAT MASUK & KELUAR', badge: `${documents.length} BERKAS` },
+                    { id: 'suratjalan', label: 'SURAT JALAN & RITASE' },
+                    { id: 'po', label: 'PURCHASE ORDER (PO)' },
+                    { id: 'simp', label: 'BUKU TAMU & SIMP' },
                 ].map((tab) => (
                     <button
                         key={tab.id}
@@ -277,7 +263,7 @@ export default function AdmDashboard() {
 
             {/* Konten Utama */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                {/* Kolom Kiri */}
+                {/* Kolom Kiri: Action Bar */}
                 <aside className="lg:col-span-3 space-y-3">
                     <div
                         onClick={() => setShowModal(true)}
@@ -302,19 +288,19 @@ export default function AdmDashboard() {
                     </Link>
 
                     <div className="p-4 rounded-xl border border-[#16273c] bg-[#0a1625] text-slate-400 space-y-2">
-                        <span className="text-xs font-bold text-white uppercase tracking-wider block">Status Arsip</span>
+                        <span className="text-xs font-bold text-white uppercase tracking-wider block">Database ADM</span>
                         <div className="text-[11px] flex justify-between">
-                            <span>Total Terarsip</span>
-                            <span className="text-slate-200 font-bold">{documents.length} berkas</span>
+                            <span>Tabel Terhubung</span>
+                            <span className="text-emerald-400 font-semibold">adm_documents</span>
                         </div>
                         <div className="text-[11px] flex justify-between">
-                            <span>Tabel Supabase</span>
-                            <span className="text-emerald-400 font-semibold">adm_documents</span>
+                            <span>Total Berkas</span>
+                            <span className="text-slate-200 font-bold">{documents.length} baris</span>
                         </div>
                     </div>
                 </aside>
 
-                {/* Kolom Kanan */}
+                {/* Kolom Kanan: Tabel Dokumen */}
                 <main className="lg:col-span-9 space-y-6">
                     <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg space-y-4">
                         <div className="flex flex-wrap justify-between items-center gap-3">
@@ -323,7 +309,7 @@ export default function AdmDashboard() {
                                     type="text"
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
-                                    placeholder="Cari no agenda, perihal, pengirim..."
+                                    placeholder="Cari no. agenda, perihal, pengirim..."
                                     className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-sky-400"
                                 />
                             </div>
@@ -341,7 +327,7 @@ export default function AdmDashboard() {
                                     <tr className="border-b border-[#1b2e46] text-slate-400">
                                         <th className="pb-2">No. Agenda</th>
                                         <th className="pb-2">Perihal / Berkas</th>
-                                        <th className="pb-2">Pengirim / Pihak Luar</th>
+                                        <th className="pb-2">Pengirim</th>
                                         <th className="pb-2">Kategori</th>
                                         <th className="pb-2">Status</th>
                                     </tr>
@@ -368,7 +354,7 @@ export default function AdmDashboard() {
                                     ) : (
                                         <tr>
                                             <td colSpan={5} className="py-8 text-center text-slate-500 italic">
-                                                Tidak ada dokumen yang sesuai dengan pencarian.
+                                                Belum ada dokumen yang cocok dengan pencarian.
                                             </td>
                                         </tr>
                                     )}
@@ -379,7 +365,7 @@ export default function AdmDashboard() {
                 </main>
             </div>
 
-            {/* Modal Input Dokumen */}
+            {/* Modal Form Tambah Dokumen */}
             {showModal && (
                 <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
                     <div className="bg-[#0a1625] border border-[#1b2e46] rounded-xl p-6 w-full max-w-md shadow-2xl space-y-4">
@@ -391,7 +377,7 @@ export default function AdmDashboard() {
                                     type="text"
                                     value={agendaNo}
                                     onChange={(e) => setAgendaNo(e.target.value)}
-                                    placeholder="Otomatis jika kosong"
+                                    placeholder="Otomatis jika dikosongkan"
                                     className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-sky-400 font-mono"
                                 />
                             </div>
@@ -402,7 +388,7 @@ export default function AdmDashboard() {
                                     required
                                     value={title}
                                     onChange={(e) => setTitle(e.target.value)}
-                                    placeholder="Contoh: Surat Jalan Batubara Ritase 4"
+                                    placeholder="Contoh: Surat Jalan Solar 16.000L"
                                     className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-sky-400"
                                 />
                             </div>
