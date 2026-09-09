@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
-import Link from 'next/navigation' // Diperbaiki dari 'next/navigation' untuk Link Next.js
+import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { createClient } from '@supabase/supabase-js'
 
@@ -9,34 +9,34 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
-interface ClinicLog {
+interface ClinicItem {
     id: string
     created_at?: string
     patient_name: string
     department: string
     complaint: string
     diagnosis: string
-    action_taken: string
-    fit_status: string
-    medic_name: string
+    treatment_given: string
+    medical_status: string
+    doctor_name: string
 }
 
 export default function ClinicManagementPage() {
     const pathname = usePathname()
     const [loading, setLoading] = useState(true)
-    const [userName, setUserName] = useState('Petugas Medis Klinik')
-    const [logs, setLogs] = useState<ClinicLog[]>([])
+    const [userName, setUserName] = useState('Dokter Penanggung Jawab Klinik')
+    const [patients, setPatients] = useState<ClinicItem[]>([])
     const [searchQuery, setSearchQuery] = useState('')
 
-    // State Modal Input Pemeriksaan Pasien Baru
+    // State Modal Input Kunjungan Pasien Baru
     const [showModal, setShowModal] = useState(false)
     const [patientName, setPatientName] = useState('')
-    const [department, setDepartment] = useState('Operasional Pit')
+    const [department, setDepartment] = useState('Produksi Pit')
     const [complaint, setComplaint] = useState('')
-    const [diagnosis, setDiagnosis] = useState('')
-    const [actionTaken, setActionTaken] = useState('Pemberian Obat Simtomatik & Istirahat')
-    const [fitStatus, setFitStatus] = useState('Fit to Work')
-    const [medicName, setMedicName] = useState('')
+    const [diagnosis, setDiagnosis] = useState('Pusing & Kelelahan Ringan')
+    const [treatmentGiven, setTreatmentGiven] = useState('Pemberian Vitamin & Istirahat 1 Jam')
+    const [medicalStatus, setMedicalStatus] = useState('Fit to Work')
+    const [doctorName, setDoctorName] = useState('')
     const [submitting, setSubmitting] = useState(false)
 
     const landingUrl = process.env.NEXT_PUBLIC_LANDING_URL || 'https://pt-jeep.vercel.app'
@@ -84,7 +84,7 @@ export default function ClinicManagementPage() {
                 }
 
                 if (isMounted) {
-                    setUserName(profile?.full_name || 'Dr. Medis Site / Perawat Jaga')
+                    setUserName(profile?.full_name || 'Dr. M. Ihsan (Site Medical Doctor)')
 
                     const { data, error } = await supabase
                         .from('clinic_patient_logs')
@@ -92,30 +92,30 @@ export default function ClinicManagementPage() {
                         .order('created_at', { ascending: false })
 
                     if (!error && data && data.length > 0) {
-                        setLogs(data)
+                        setPatients(data)
                     } else {
-                        setLogs([
+                        setPatients([
                             {
                                 id: '1',
                                 created_at: new Date().toISOString(),
-                                patient_name: 'Budi Santoso',
-                                department: 'Operator Dump Truck',
-                                complaint: 'Pusing dan kelelahan ringan',
-                                diagnosis: 'Kelelahan fisik / Fatigue ringan',
-                                actionTaken: 'Pemberian vitamin, istirahat 2 jam di klinik',
-                                fit_status: 'Temporary Unfit (Istirahat)',
-                                medic_name: 'Ns. Ahmad, S.Kep',
+                                patient_name: 'Joko Widodo',
+                                department: 'Produksi Pit',
+                                complaint: 'Sakit kepala dan kelelahan setelah shift siang',
+                                diagnosis: 'Kelelahan ringan & dehidrasi',
+                                treatment_given: 'Pemberian elektrolit, vitamin C, dan istirahat 30 menit',
+                                medical_status: 'Fit to Work',
+                                doctor_name: 'Dr. M. Ihsan',
                             },
                             {
                                 id: '2',
                                 created_at: new Date().toISOString(),
-                                patient_name: 'Joko Widodo',
+                                patient_name: 'Budi Santoso',
                                 department: 'Plant & Workshop',
-                                complaint: 'Luka gores ringan di tangan saat ganti filter',
-                                diagnosis: 'Vulnus laceratum ringan',
-                                actionTaken: 'Pembersihan luka, antiseptik, dan dibalut perban',
-                                fit_status: 'Fit to Work',
-                                medic_name: 'Dr. Rian Pratama',
+                                complaint: 'Lecet ringan pada jari tangan saat mengganti filter',
+                                diagnosis: 'Luka gores superfisial',
+                                treatment_given: 'Pembersihan antiseptik dan penutupan luka steril',
+                                medical_status: 'Fit to Work',
+                                doctor_name: 'Dr. M. Ihsan',
                             },
                         ])
                     }
@@ -134,7 +134,7 @@ export default function ClinicManagementPage() {
         }
     }, [landingUrl])
 
-    const handleAddLog = async (e: React.FormEvent) => {
+    const handleAddPatient = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!patientName || !complaint) return
 
@@ -144,10 +144,10 @@ export default function ClinicManagementPage() {
             patient_name: patientName,
             department,
             complaint,
-            diagnosis: diagnosis || 'Pemeriksaan Rutin / Konsultasi',
-            action_taken: actionTaken,
-            fit_status: fitStatus,
-            medic_name: medicName || userName,
+            diagnosis,
+            treatment_given: treatmentGiven,
+            medical_status: medicalStatus,
+            doctor_name: doctorName || userName,
         }
 
         const { data, error } = await supabase
@@ -156,13 +156,12 @@ export default function ClinicManagementPage() {
             .select()
 
         if (!error && data) {
-            setLogs([data[0], ...logs])
+            setPatients([data[0], ...patients])
             setShowModal(false)
             setPatientName('')
             setComplaint('')
-            setDiagnosis('')
         } else {
-            alert('Gagal menyimpan rekam medis: ' + (error?.message || 'Terjadi kesalahan sistem.'))
+            alert('Gagal mencatat kunjungan klinik: ' + (error?.message || 'Terjadi kesalahan sistem.'))
         }
 
         setSubmitting(false)
@@ -173,11 +172,10 @@ export default function ClinicManagementPage() {
         window.location.href = landingUrl
     }
 
-    const totalVisits = logs.length
-    const unfitCount = logs.filter((l) => l.fit_status.includes('Unfit')).length
-    const fitCount = totalVisits - unfitCount
+    const totalPatients = patients.length
+    const fitCount = patients.filter((p) => p.medical_status === 'Fit to Work').length
 
-    const filteredLogs = logs.filter((item) =>
+    const filteredPatients = patients.filter((item) =>
         item.patient_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         item.department.toLowerCase().includes(searchQuery.toLowerCase()) ||
         item.complaint.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -185,23 +183,19 @@ export default function ClinicManagementPage() {
     )
 
     const navLinks = [
-        { href: '/manager-site', label: 'Pit Produksi', icon: '⛏️' },
-        { href: '/fleet', label: 'Alat Berat', icon: '🚜' },
-        { href: '/safety', label: 'Inspeksi K3', icon: '⛑️' },
+        { href: '/clinic', label: 'Klinik Medis', icon: '🏥' },
+        { href: '/radio', label: 'Radio Dispatch', icon: '📻' },
         { href: '/sparepart', label: 'Sparepart', icon: '📦' },
-        { href: '/mess', label: 'Mess & Camp', icon: '🏠' },
-        { href: '/vendor', label: 'Vendor', icon: '🤝' },
-        { href: '/radio', label: 'Radio', icon: '📻' },
-        { href: '/clinic', label: 'Klinik & Kesehatan', icon: '🏥' },
-        { href: '/ritase', label: 'Ritase', icon: '🚛' },
-        { href: '/jetty', label: 'Jetty Port', icon: '🚢' },
-        { href: '/lingkungan', label: 'Lingkungan', icon: '🌱' },
+        { href: '/fleet-maintenance', label: 'Maintenance', icon: '🔧' },
+        { href: '/fleet', label: 'Alat Berat', icon: '🚜' },
+        { href: '/manager-site', label: 'Pit Penambangan', icon: '⛏️' },
+        { href: '/safety', label: 'Inspeksi K3', icon: '⛑️' },
+        { href: '/jetty', label: 'Jetty & LCT', icon: '🚢' },
         { href: '/bbm', label: 'BBM Solar', icon: '⛽' },
+        { href: '/hrd', label: 'HRD & Payroll', icon: '👷‍♂️' },
         { href: '/finance', label: 'Keuangan', icon: '💰' },
-        { href: '/adm', label: 'ADM & Surat', icon: '📋' },
-        { href: '/hrd', label: 'HRD & K3', icon: '👷‍♂️' },
-        { href: '/ga', label: 'GA & Fasilitas', icon: '🚙' },
-        { href: '/direktur', label: 'Eksekutif', icon: '🏛️' },
+        { href: '/legal', label: 'Legal & IUP', icon: '⚖️' },
+        { href: '/investor', label: 'Investor', icon: '📈' },
         { href: '/laporan', label: 'Cetak Laporan', icon: '📄' },
     ]
 
@@ -209,7 +203,7 @@ export default function ClinicManagementPage() {
         return (
             <div className="min-h-screen bg-[#060c14] flex flex-col items-center justify-center text-white font-sans">
                 <div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-                <p className="text-xs text-slate-400">Sinkronisasi Rekam Medis & Poliklinik Site...</p>
+                <p className="text-xs text-slate-400">Sinkronisasi Klinik Medis & Kesehatan Tambang...</p>
             </div>
         )
     }
@@ -223,11 +217,11 @@ export default function ClinicManagementPage() {
                         <span className="text-2xl">🏥</span>
                         <div>
                             <h1 className="text-xl md:text-2xl font-black tracking-wide text-white">
-                                Klinik & Kesehatan Kerja Tambang PT. JEEP
+                                Klinik Medis & Kesehatan Tambang PT. JEEP
                             </h1>
                             <p className="text-xs text-emerald-400 flex items-center gap-1.5 mt-0.5">
                                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                                <span>Poliklinik Site, First Aid, & Status Fit to Work Karyawan</span>
+                                <span>Pemeriksaan Pasien Harian, Diagnosa Dokter, & Status Kebugaran Pekerja</span>
                                 <span className="text-slate-600">•</span>
                                 <span className="text-slate-300 font-semibold">{userName}</span>
                                 <span className="bg-[#112233] border border-[#1e3a5f] text-slate-300 text-[10px] px-2 py-0.5 rounded font-mono">
@@ -250,7 +244,7 @@ export default function ClinicManagementPage() {
                     {navLinks.map((item) => {
                         const isActive = pathname === item.href
                         return (
-                            <a
+                            <Link
                                 key={item.href}
                                 href={item.href}
                                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border whitespace-nowrap font-medium transition cursor-pointer ${isActive
@@ -260,7 +254,7 @@ export default function ClinicManagementPage() {
                             >
                                 <span>{item.icon}</span>
                                 <span>{item.label}</span>
-                            </a>
+                            </Link>
                         )
                     })}
                 </div>
@@ -270,28 +264,26 @@ export default function ClinicManagementPage() {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
                 <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
                     <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Total Kunjungan Pasien</h3>
-                    <div className="text-2xl font-black text-white font-mono">{totalVisits} Orang</div>
-                    <p className="mt-2 text-[11px] text-slate-400">Rekam Medis Tercatat di Klinik</p>
+                    <div className="text-2xl font-black text-white font-mono">{totalPatients} Orang</div>
+                    <p className="mt-2 text-[11px] text-slate-400">Pemeriksaan Medis Site</p>
                 </div>
 
                 <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
                     <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Status Fit to Work</h3>
-                    <div className="text-2xl font-black text-emerald-400 font-mono">{fitCount} Pekerja</div>
-                    <p className="mt-2 text-[11px] text-emerald-400 font-semibold">Siap Melakukan Tugas Lapangan</p>
+                    <div className="text-2xl font-black text-emerald-400 font-mono">{fitCount} Orang</div>
+                    <p className="mt-2 text-[11px] text-emerald-400 font-semibold">Layak Kembali Bekerja</p>
                 </div>
 
                 <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
-                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Temporary Unfit / Istirahat</h3>
-                    <div className={`text-2xl font-black font-mono ${unfitCount > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
-                        {unfitCount} Pekerja
-                    </div>
-                    <p className="mt-2 text-[11px] text-slate-400">Dalam Pengawasan & Pemulihan Medis</p>
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Kesiapan Obat Darurat</h3>
+                    <div className="text-2xl font-black text-cyan-400 font-mono">Lengkap</div>
+                    <p className="mt-2 text-[11px] text-cyan-400 font-medium">✓ Stok Apotek Klinik Aman</p>
                 </div>
 
                 <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
-                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Kesiapan First Aid</h3>
-                    <div className="text-2xl font-black text-cyan-400 font-mono">24 Jam OK</div>
-                    <p className="mt-2 text-[11px] text-cyan-400 font-medium">✓ Ambulans & Dokter Siaga Siaga</p>
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Kedaruratan Medis</h3>
+                    <div className="text-2xl font-black text-emerald-400 font-mono">0 Kasus Berat</div>
+                    <p className="mt-2 text-[11px] text-emerald-400 font-medium">✓ Zero Severe Injury</p>
                 </div>
             </div>
 
@@ -303,7 +295,7 @@ export default function ClinicManagementPage() {
                             type="text"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            placeholder="Cari nama pasien, keluhan, diagnosa..."
+                            placeholder="Cari pasien, keluhan, diagnosa..."
                             className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-emerald-400"
                         />
                     </div>
@@ -311,7 +303,7 @@ export default function ClinicManagementPage() {
                         onClick={() => setShowModal(true)}
                         className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold text-xs px-4 py-2 rounded-lg transition cursor-pointer"
                     >
-                        + Catat Pemeriksaan Pasien Baru
+                        + Catat Kunjungan Pasien Baru
                     </button>
                 </div>
 
@@ -319,42 +311,52 @@ export default function ClinicManagementPage() {
                     <table className="w-full text-left text-xs">
                         <thead>
                             <tr className="border-b border-[#1b2e46] text-slate-400">
-                                <th className="pb-2">Nama Pasien & Departemen</th>
+                                <th className="pb-2">Waktu Catat</th>
+                                <th className="pb-2">Nama Pasien / Pekerja</th>
+                                <th className="pb-2">Departemen</th>
                                 <th className="pb-2">Keluhan Utama</th>
                                 <th className="pb-2">Diagnosa Medis</th>
-                                <th className="pb-2">Tindakan / Penanganan</th>
-                                <th className="pb-2 text-center">Status Fit to Work</th>
-                                <th className="pb-2">Tenaga Medis Jaga</th>
+                                <th className="pb-2">Tindakan & Obat</th>
+                                <th className="pb-2 text-center">Status Kesehatan</th>
+                                <th className="pb-2">Dokter / Perawat Jaga</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-[#16273c] text-slate-300">
-                            {filteredLogs.length > 0 ? (
-                                filteredLogs.map((l) => (
-                                    <tr key={l.id}>
-                                        <td className="py-2.5">
-                                            <div className="font-bold text-white">{l.patient_name}</div>
-                                            <div className="text-[10px] text-slate-400">{l.department}</div>
-                                        </td>
-                                        <td className="text-slate-300">{l.complaint}</td>
-                                        <td className="font-semibold text-amber-400">{l.diagnosis}</td>
-                                        <td className="text-slate-300">{l.action_taken}</td>
-                                        <td className="text-center">
-                                            <span
-                                                className={`px-2 py-0.5 rounded text-[10px] font-bold ${l.fit_status.includes('Unfit')
-                                                        ? 'bg-amber-950/80 text-amber-400 border border-amber-800/40'
-                                                        : 'bg-emerald-950/80 text-emerald-400 border border-emerald-800/40'
-                                                    }`}
-                                            >
-                                                {l.fit_status.toUpperCase()}
-                                            </span>
-                                        </td>
-                                        <td className="text-slate-400">{l.medic_name}</td>
-                                    </tr>
-                                ))
+                            {filteredPatients.length > 0 ? (
+                                filteredPatients.map((p) => {
+                                    const isFit = p.medical_status === 'Fit to Work'
+                                    return (
+                                        <tr key={p.id}>
+                                            <td className="py-2.5 font-mono text-slate-400 text-[11px]">
+                                                {p.created_at ? new Date(p.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : 'Baru saja'}
+                                            </td>
+                                            <td className="font-bold text-white">{p.patient_name}</td>
+                                            <td>
+                                                <span className="bg-[#112233] border border-[#1e3a5f] text-slate-300 text-[10px] px-2 py-0.5 rounded">
+                                                    {p.department}
+                                                </span>
+                                            </td>
+                                            <td className="text-slate-300">{p.complaint}</td>
+                                            <td className="font-semibold text-amber-400">{p.diagnosis}</td>
+                                            <td className="text-slate-300">{p.treatment_given}</td>
+                                            <td className="text-center">
+                                                <span
+                                                    className={`px-2 py-0.5 rounded text-[10px] font-bold ${isFit
+                                                            ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-800/40'
+                                                            : 'bg-amber-950/80 text-amber-400 border border-amber-800/40'
+                                                        }`}
+                                                >
+                                                    {p.medical_status.toUpperCase()}
+                                                </span>
+                                            </td>
+                                            <td className="text-slate-400">{p.doctor_name}</td>
+                                        </tr>
+                                    )
+                                })
                             ) : (
                                 <tr>
-                                    <td colSpan={6} className="py-8 text-center text-slate-500 italic">
-                                        Tidak ada rekam medis yang cocok dengan pencarian.
+                                    <td colSpan={8} className="py-8 text-center text-slate-500 italic">
+                                        Tidak ada catatan pasien yang cocok dengan pencarian.
                                     </td>
                                 </tr>
                             )}
@@ -363,95 +365,100 @@ export default function ClinicManagementPage() {
                 </div>
             </div>
 
-            {/* Modal Input Pasien */}
+            {/* Modal Input Kunjungan Pasien */}
             {showModal && (
                 <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
                     <div className="bg-[#0a1625] border border-[#1b2e46] rounded-xl p-6 w-full max-w-md shadow-2xl space-y-4">
-                        <h2 className="text-sm font-bold text-white uppercase tracking-wider">Catat Pemeriksaan Pasien Klinik Site</h2>
-                        <form onSubmit={handleAddLog} className="space-y-3">
-                            <div>
-                                <label className="text-[11px] text-slate-400 block mb-1">Nama Pekerja / Pasien</label>
-                                <input
-                                    type="text"
-                                    required
-                                    value={patientName}
-                                    onChange={(e) => setPatientName(e.target.value)}
-                                    placeholder="Contoh: Budi Santoso"
-                                    className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-emerald-400"
-                                />
+                        <h2 className="text-sm font-bold text-white uppercase tracking-wider">Catat Kunjungan Medis & Pemeriksaan Klinik</h2>
+                        <form onSubmit={handleAddPatient} className="space-y-3">
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-[11px] text-slate-400 block mb-1">Nama Pasien / Pekerja</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        value={patientName}
+                                        onChange={(e) => setPatientName(e.target.value)}
+                                        placeholder="Contoh: Joko Widodo"
+                                        className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-emerald-400"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[11px] text-slate-400 block mb-1">Departemen</label>
+                                    <select
+                                        value={department}
+                                        onChange={(e) => setDepartment(e.target.value)}
+                                        className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-emerald-400"
+                                    >
+                                        <option value="Produksi Pit">Produksi Pit</option>
+                                        <option value="Plant & Workshop">Plant & Workshop</option>
+                                        <option value="HSE & K3">HSE & K3</option>
+                                        <option value="Jetty Port">Jetty Port</option>
+                                        <option value="General Affair">General Affair</option>
+                                    </select>
+                                </div>
                             </div>
 
                             <div>
-                                <label className="text-[11px] text-slate-400 block mb-1">Departemen / Perusahaan</label>
-                                <input
-                                    type="text"
-                                    required
-                                    value={department}
-                                    onChange={(e) => setDepartment(e.target.value)}
-                                    placeholder="Contoh: Operator Dump Truck / PT Surya Jaya"
-                                    className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-emerald-400"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="text-[11px] text-slate-400 block mb-1">Keluhan Utama (Gejala)</label>
+                                <label className="text-[11px] text-slate-400 block mb-1">Keluhan Utama</label>
                                 <input
                                     type="text"
                                     required
                                     value={complaint}
                                     onChange={(e) => setComplaint(e.target.value)}
-                                    placeholder="Contoh: Pusing, demam, atau luka gores"
-                                    className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-emerald-400"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="text-[11px] text-slate-400 block mb-1">Diagnosa Medis</label>
-                                <input
-                                    type="text"
-                                    value={diagnosis}
-                                    onChange={(e) => setDiagnosis(e.target.value)}
-                                    placeholder="Contoh: Kelelahan / Fatigue ringan"
-                                    className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-emerald-400"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="text-[11px] text-slate-400 block mb-1">Tindakan Medis / Pengobatan</label>
-                                <input
-                                    type="text"
-                                    required
-                                    value={actionTaken}
-                                    onChange={(e) => setActionTaken(e.target.value)}
-                                    placeholder="Contoh: Pemberian obat paracetamol & istirahat"
+                                    placeholder="Contoh: Sakit kepala / pusing setelah shift siang"
                                     className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-emerald-400"
                                 />
                             </div>
 
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className="text-[11px] text-slate-400 block mb-1">Status Kebugaran (Fit to Work)</label>
-                                    <select
-                                        value={fitStatus}
-                                        onChange={(e) => setFitStatus(e.target.value)}
-                                        className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-emerald-400"
-                                    >
-                                        <option value="Fit to Work">Fit to Work (Layak Kerja)</option>
-                                        <option value="Temporary Unfit">Temporary Unfit (Istirahat Sementara)</option>
-                                        <option value="Unfit / Rujukan RS">Unfit (Rujukan Rumah Sakit)</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="text-[11px] text-slate-400 block mb-1">Petugas Medis Jaga</label>
+                                    <label className="text-[11px] text-slate-400 block mb-1">Diagnosa Medis</label>
                                     <input
                                         type="text"
                                         required
-                                        value={medicName}
-                                        onChange={(e) => setMedicName(e.target.value)}
-                                        placeholder="Nama perawat / dokter"
+                                        value={diagnosis}
+                                        onChange={(e) => setDiagnosis(e.target.value)}
+                                        placeholder="Kelelahan ringan & dehidrasi"
                                         className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-emerald-400"
                                     />
                                 </div>
+                                <div>
+                                    <label className="text-[11px] text-slate-400 block mb-1">Status Kesehatan</label>
+                                    <select
+                                        value={medicalStatus}
+                                        onChange={(e) => setMedicalStatus(e.target.value)}
+                                        className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-emerald-400 font-bold"
+                                    >
+                                        <option value="Fit to Work">Fit to Work (Layak Kerja)</option>
+                                        <option value="Istirahat Klinik">Istirahat di Klinik (Opname Ringan)</option>
+                                        <option value="Dirujuk ke RS">Dirujuk ke Rumah Sakit</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="text-[11px] text-slate-400 block mb-1">Tindakan & Resep Obat</label>
+                                <input
+                                    type="text"
+                                    required
+                                    value={treatmentGiven}
+                                    onChange={(e) => setTreatmentGiven(e.target.value)}
+                                    placeholder="Pemberian elektrolit dan vitamin C"
+                                    className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-emerald-400"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="text-[11px] text-slate-400 block mb-1">Dokter / Perawat Penanggung Jawab</label>
+                                <input
+                                    type="text"
+                                    required
+                                    value={doctorName}
+                                    onChange={(e) => setDoctorName(e.target.value)}
+                                    placeholder="Nama dokter / perawat"
+                                    className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-emerald-400"
+                                />
                             </div>
 
                             <div className="flex justify-end gap-2 pt-2">
@@ -467,7 +474,7 @@ export default function ClinicManagementPage() {
                                     disabled={submitting}
                                     className="px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold text-xs transition cursor-pointer"
                                 >
-                                    {submitting ? 'Menyimpan...' : 'Simpan Rekam Medis'}
+                                    {submitting ? 'Menyimpan...' : 'Simpan Kunjungan'}
                                 </button>
                             </div>
                         </form>
