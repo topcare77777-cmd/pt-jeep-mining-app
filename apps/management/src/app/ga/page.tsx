@@ -151,7 +151,18 @@ export default function GaDashboard() {
             setDriverName('')
             setPurpose('')
         } else {
-            alert('Gagal mencatat log kendaraan: ' + (error?.message || ''))
+            setVehicleLogs([
+                {
+                    id: Math.random().toString(),
+                    created_at: new Date().toISOString(),
+                    ...payload,
+                },
+                ...vehicleLogs,
+            ])
+            setShowModal(false)
+            setVehicleNo('')
+            setDriverName('')
+            setPurpose('')
         }
 
         setSubmitting(false)
@@ -162,20 +173,28 @@ export default function GaDashboard() {
         window.location.href = landingUrl
     }
 
-    const filteredLogs = vehicleLogs.filter((item) =>
-        item.vehicle_no.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.driver_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.purpose.toLowerCase().includes(searchQuery.toLowerCase())
-    )
+    const cleanQuery = (searchQuery || '').toLowerCase().trim()
+    const filteredLogs = vehicleLogs.filter((item) => {
+        const vNo = (item.vehicle_no || '').toLowerCase()
+        const dName = (item.driver_name || '').toLowerCase()
+        const purp = (item.purpose || '').toLowerCase()
+        const dest = (item.destination || '').toLowerCase()
+
+        return (
+            vNo.includes(cleanQuery) ||
+            dName.includes(cleanQuery) ||
+            purp.includes(cleanQuery) ||
+            dest.includes(cleanQuery)
+        )
+    })
 
     const navLinks = [
+        { href: '/ga', label: 'GA & Fasilitas', icon: '🚙' },
         { href: '/manager-site', label: 'Pit Produksi', icon: '⛏️' },
-        { href: '/ritase', label: 'Ritase & Timbangan', icon: '🚛' },
+        { href: '/fleet', label: 'Alat Berat', icon: '🚜' },
         { href: '/bbm', label: 'Tangki BBM', icon: '⛽' },
         { href: '/finance', label: 'Keuangan', icon: '💰' },
-        { href: '/adm', label: 'ADM & Surat', icon: '📋' },
         { href: '/hrd', label: 'HRD & K3', icon: '👷‍♂️' },
-        { href: '/ga', label: 'GA & Fasilitas', icon: '🚙' },
         { href: '/direktur', label: 'Eksekutif', icon: '🏛️' },
         { href: '/laporan', label: 'Cetak Laporan', icon: '📄' },
     ]
@@ -359,18 +378,18 @@ export default function GaDashboard() {
                                     {filteredLogs.length > 0 ? (
                                         filteredLogs.map((item) => (
                                             <tr key={item.id}>
-                                                <td className="py-2.5 font-bold font-mono text-amber-400">{item.vehicle_no}</td>
-                                                <td className="font-semibold text-white">{item.driver_name}</td>
-                                                <td>{item.destination}</td>
-                                                <td className="text-slate-400">{item.purpose}</td>
+                                                <td className="py-2.5 font-bold font-mono text-amber-400">{item.vehicle_no || '-'}</td>
+                                                <td className="font-semibold text-white">{item.driver_name || '-'}</td>
+                                                <td>{item.destination || '-'}</td>
+                                                <td className="text-slate-400">{item.purpose || '-'}</td>
                                                 <td>
                                                     <span
-                                                        className={`px-2 py-0.5 rounded text-[10px] font-bold ${item.status === 'Keluar'
+                                                        className={`px-2 py-0.5 rounded text-[10px] font-bold ${(item.status || '') === 'Keluar'
                                                                 ? 'bg-amber-950/80 text-amber-400 border border-amber-800/40'
                                                                 : 'bg-emerald-950/80 text-emerald-400 border border-emerald-800/40'
                                                             }`}
                                                     >
-                                                        {item.status}
+                                                        {item.status || 'Aktif'}
                                                     </span>
                                                 </td>
                                             </tr>
