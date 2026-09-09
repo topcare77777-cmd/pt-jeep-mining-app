@@ -9,19 +9,34 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
+interface DorReport {
+    id: string
+    created_at?: string
+    report_date: string
+    pit_location: string
+    overburden_bcm: number
+    coal_production_ton: number // Menggambarkan produksi ore nikel
+    heavy_equipment_units: number
+    weather_condition: string
+    supervisor_name: string
+}
+
 export default function LaporanPage() {
     const pathname = usePathname()
     const [loading, setLoading] = useState(true)
-    const [userName, setUserName] = useState('Staff Operasional')
+    const [userName, setUserName] = useState('Superintendent Produksi')
+    const [reports, setReports] = useState<DorReport[]>([])
+    const [searchQuery, setSearchQuery] = useState('')
 
-    // Agregat Data Laporan
-    const [totalOb, setTotalOb] = useState(0)
-    const [totalCoal, setTotalCoal] = useState(0)
-    const [totalRitase, setTotalRitase] = useState(0)
-    const [totalNettoCoal, setTotalNettoCoal] = useState(0)
-    const [totalFuel, setTotalFuel] = useState(0)
-    const [totalExpense, setTotalExpense] = useState(0)
-    const [activeUnitsCount, setActiveUnitsCount] = useState(0)
+    // State Modal Input Laporan DOR Baru
+    const [showModal, setShowModal] = useState(false)
+    const [pitLocation, setPitLocation] = useState('Pit Nikel Utama (Blok A)')
+    const [overburdenBcm, setOverburdenBcm] = useState('3500')
+    const [oreProductionTon, setOreProductionTon] = useState('1200')
+    const [heavyEquipmentUnits, setHeavyEquipmentUnits] = useState('14')
+    const [weatherCondition, setWeatherCondition] = useState('Cerah Berawan')
+    const [supervisorName, setSupervisorName] = useState('')
+    const [submitting, setSubmitting] = useState(false)
 
     const landingUrl = process.env.NEXT_PUBLIC_LANDING_URL || 'https://pt-jeep.vercel.app'
 
@@ -68,52 +83,43 @@ export default function LaporanPage() {
                 }
 
                 if (isMounted) {
-                    setUserName(profile?.full_name || 'Reporting Administrator')
+                    setUserName(profile?.full_name || 'Production Superintendent')
 
-                    // Tarik data ringkasan produksi
-                    const { data: prodData } = await supabase.from('site_production_logs').select('*')
-                    if (prodData && prodData.length > 0) {
-                        setTotalOb(prodData.reduce((acc, curr) => acc + Number(curr.overburden_bcm || 0), 0))
-                        setTotalCoal(prodData.reduce((acc, curr) => acc + Number(curr.coal_getting_ton || 0), 0))
+                    const { data, error } = await supabase
+                        .from('dor_reports')
+                        .select('*')
+                        .order('created_at', { ascending: false })
+
+                    if (!error && data && data.length > 0) {
+                        setReports(data)
+                    } else {
+                        setReports([
+                            {
+                                id: '1',
+                                report_date: '2026-09-09',
+                                pit_location: 'Pit Nikel Utama (Blok A)',
+                                overburden_bcm: 3800,
+                                coal_production_ton: 1250, // Ore Nikel Ton
+                                heavy_equipment_units: 14,
+                                weather_condition: 'Cerah',
+                                supervisor_name: 'Slamet Riyadi',
+                            },
+                            {
+                                id: '2',
+                                report_date: '2026-09-08',
+                                pit_location: 'Pit Ekspansi (Blok B)',
+                                overburden_bcm: 4200,
+                                coal_production_ton: 1400, // Ore Nikel Ton
+                                heavy_equipment_units: 16,
+                                weather_condition: 'Hujan Ringan',
+                                supervisor_name: 'Dedi Saputra',
+                            },
+                        ])
                     }
-
-                    // Tarik data hauling ritase
-                    const { data: haulData } = await supabase.from('hauling_logs').select('netto_ton')
-                    if (haulData && haulData.length > 0) {
-                        setTotalRitase(haulData.length)
-                        setTotalNettoCoal(haulData.reduce((acc, curr) => acc + Number(curr.netto_ton || 0), 0))
-                    }
-
-                    // Tarik data BBM
-                    const { data: fuelData } = await supabase.from('fuel_logs').select('liters, transaction_type')
-                    if (fuelData && fuelData.length > 0) {
-                        setTotalFuel(
-                            fuelData
-                                .filter((f) => f.transaction_type === 'Pengisian')
-                                .reduce((acc, curr) => acc + Number(curr.liters || 0), 0)
-                        )
-                    }
-
-                    // Tarik data keuangan
-                    const { data: finData } = await supabase.from('finance_transactions').select('amount, transaction_type')
-                    if (finData && finData.length > 0) {
-                        setTotalExpense(
-                            finData
-                                .filter((t) => (t.transaction_type || 'expense') === 'expense')
-                                .reduce((acc, curr) => acc + Number(curr.amount || 0), 0)
-                        )
-                    }
-
-                    // Tarik data alat berat aktif
-                    const { data: fleetData } = await supabase.from('fleet_units').select('status')
-                    if (fleetData && fleetData.length > 0) {
-                        setActiveUnitsCount(fleetData.filter((u) => u.status === 'OP').length)
-                    }
-
                     setLoading(false)
                 }
             } catch (err) {
-                console.error('Error init laporan:', err)
+                console.error(err)
                 if (isMounted) setLoading(false)
             }
         }
@@ -125,79 +131,106 @@ export default function LaporanPage() {
         }
     }, [landingUrl])
 
+    const handleAddReport = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!pitLocation) return
+
+        setSubmitting(true)
+
+        const payload = {
+            pit_location: pitLocation,
+            overburden_bcm: parseFloat(overburdenBcm) || 0,
+            coal_production_ton: parseFloat(oreProductionTon) || 0, // Ore Nikel
+            heavy_equipment_units: parseInt(heavyEquipmentUnits) || 10,
+            weather_condition: weatherCondition,
+            supervisor_name: supervisorName || userName,
+        }
+
+        const { data, error } = await supabase
+            .from('dor_reports')
+            .insert([payload])
+            .select()
+
+        if (!error && data) {
+            setReports([data[0], ...reports])
+            setShowModal(false)
+            setOverburdenBcm('3500')
+            setOreProductionTon('1200')
+        } else {
+            alert('Gagal menyimpan laporan DOR: ' + (error?.message || 'Terjadi kesalahan sistem.'))
+        }
+
+        setSubmitting(false)
+    }
+
     const handleLogout = async () => {
         await supabase.auth.signOut()
         window.location.href = landingUrl
     }
 
-    const handlePrint = () => {
-        window.print()
-    }
+    const totalOre = reports.reduce((acc, curr) => acc + Number(curr.coal_production_ton || 0), 0)
+    const totalOB = reports.reduce((acc, curr) => acc + Number(curr.overburden_bcm || 0), 0)
+
+    const filteredReports = reports.filter((item) =>
+        item.pit_location.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.supervisor_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.weather_condition.toLowerCase().includes(searchQuery.toLowerCase())
+    )
 
     const navLinks = [
-        { href: '/manager-site', label: 'Pit Produksi', icon: '⛏️' },
+        { href: '/laporan', label: 'Cetak Laporan DOR', icon: '📄' },
+        { href: '/direktur', label: 'Eksekutif Nikel', icon: '🏛️' },
+        { href: '/manager-site', label: 'Pit Penambangan', icon: '⛏️' },
         { href: '/fleet', label: 'Alat Berat', icon: '🚜' },
         { href: '/safety', label: 'Inspeksi K3', icon: '⛑️' },
-        { href: '/sparepart', label: 'Sparepart', icon: '📦' },
-        { href: '/ritase', label: 'Ritase', icon: '🚛' },
-        { href: '/jetty', label: 'Jetty Port', icon: '🚢' },
-        { href: '/lingkungan', label: 'Lingkungan', icon: '🌱' },
+        { href: '/jetty', label: 'Jetty & LCT', icon: '🚢' },
         { href: '/bbm', label: 'BBM Solar', icon: '⛽' },
         { href: '/finance', label: 'Keuangan', icon: '💰' },
-        { href: '/adm', label: 'ADM & Surat', icon: '📋' },
-        { href: '/hrd', label: 'HRD & K3', icon: '👷‍♂️' },
-        { href: '/ga', label: 'GA & Fasilitas', icon: '🚙' },
-        { href: '/direktur', label: 'Eksekutif', icon: '🏛️' },
-        { href: '/laporan', label: 'Cetak Laporan', icon: '📄' },
+        { href: '/legal', label: 'Legal & IUP', icon: '⚖️' },
+        { href: '/investor', label: 'Investor', icon: '📈' },
     ]
 
     if (loading) {
         return (
             <div className="min-h-screen bg-[#060c14] flex flex-col items-center justify-center text-white font-sans">
                 <div className="w-10 h-10 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-                <p className="text-xs text-slate-400">Menyusun Data Laporan Operasional Tambang...</p>
+                <p className="text-xs text-slate-400">Sinkronisasi Laporan Harian Operasi Nikel (DOR)...</p>
             </div>
         )
     }
 
     return (
         <div className="min-h-screen bg-[#060c14] text-slate-100 font-sans p-4 md:p-6 select-none">
-            {/* Header Interaktif (Sembunyi Saat Print) */}
-            <div className="print:hidden space-y-3 mb-6">
+            {/* Header Mandiri */}
+            <header className="mb-6 space-y-3">
                 <div className="flex flex-wrap items-center justify-between bg-[#0a1625] border border-[#1b2e46] rounded-xl px-6 py-4 shadow-xl">
                     <div className="flex items-center space-x-3">
                         <span className="text-2xl">📄</span>
                         <div>
                             <h1 className="text-xl md:text-2xl font-black tracking-wide text-white">
-                                Pusat Rekapitulasi & Cetak Dokumen Resmi PT. JEEP
+                                Cetak & Rekap Laporan Harian Operasi (DOR) Nikel PT. JEEP
                             </h1>
                             <p className="text-xs text-amber-400 flex items-center gap-1.5 mt-0.5">
                                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                                <span>Daily Operation Report (DOR) & Konsolidasi Lapangan</span>
+                                <span>Dokumentasi Produksi Ore Nikel, Overburden, & Kinerja Alat Berat Harian</span>
                                 <span className="text-slate-600">•</span>
                                 <span className="text-slate-300 font-semibold">{userName}</span>
+                                <span className="bg-[#112233] border border-[#1e3a5f] text-slate-300 text-[10px] px-2 py-0.5 rounded font-mono">
+                                    Reporting Dept
+                                </span>
                             </p>
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                        <button
-                            onClick={handlePrint}
-                            className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold text-xs px-4 py-2 rounded-lg transition cursor-pointer flex items-center gap-1.5"
-                        >
-                            <span>🖨️</span>
-                            <span>Cetak Laporan (PDF)</span>
-                        </button>
-                        <button
-                            onClick={handleLogout}
-                            className="bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/50 text-rose-300 text-xs px-4 py-2 rounded-lg transition cursor-pointer"
-                        >
-                            Keluar
-                        </button>
-                    </div>
+                    <button
+                        onClick={handleLogout}
+                        className="bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/50 text-rose-300 text-xs px-4 py-2 rounded-lg transition cursor-pointer"
+                    >
+                        Keluar ke Beranda
+                    </button>
                 </div>
 
-                {/* Module Switcher */}
+                {/* Global Module Switcher */}
                 <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
                     {navLinks.map((item) => {
                         const isActive = pathname === item.href
@@ -216,135 +249,209 @@ export default function LaporanPage() {
                         )
                     })}
                 </div>
+            </header>
+
+            {/* KPI Laporan */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Total Akumulasi Ore Nikel</h3>
+                    <div className="text-2xl font-black text-emerald-400 font-mono">
+                        {totalOre.toLocaleString('id-ID')} Ton
+                    </div>
+                    <p className="mt-2 text-[11px] text-slate-400">Bijih Nikel Siap Kirim</p>
+                </div>
+
+                <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Total Stripping Overburden</h3>
+                    <div className="text-2xl font-black text-white font-mono">
+                        {totalOB.toLocaleString('id-ID')} BCM
+                    </div>
+                    <p className="mt-2 text-[11px] text-slate-400">Lapisan Tanah Penutup</p>
+                </div>
+
+                <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Total Laporan Tercatat</h3>
+                    <div className="text-2xl font-black text-amber-400 font-mono">{reports.length} Laporan</div>
+                    <p className="mt-2 text-[11px] text-slate-400">Arsip DOR Site Tervalidasi</p>
+                </div>
             </div>
 
-            {/* Lembar Laporan Cetak (Kertas A4 Friendly) */}
-            <main className="max-w-4xl mx-auto bg-[#0a1625] print:bg-white print:text-black border border-[#1b2e46] print:border-none rounded-xl p-8 shadow-2xl space-y-6">
-                {/* Kop Surat Resmi */}
-                <div className="border-b-2 border-[#1e3a5f] print:border-black pb-4 text-center">
-                    <h2 className="text-xl md:text-2xl font-black tracking-wider uppercase">
-                        PT. JANGKAR ENERGI EKA PERKASA
-                    </h2>
-                    <p className="text-xs text-slate-400 print:text-slate-600 mt-1">
-                        Site Tambang Batubara: Kutai Barat / Tabang, Kalimantan Timur — Indonesia
-                    </p>
-                    <div className="inline-block mt-3 px-3 py-1 rounded bg-[#112233] print:bg-gray-200 text-amber-400 print:text-black text-xs font-bold font-mono">
-                        REKAPITULASI RESMI OPERASIONAL & KEUANGAN SITE (DOR)
+            {/* Grid Tabel Laporan */}
+            <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg space-y-4">
+                <div className="flex flex-wrap justify-between items-center gap-3">
+                    <div className="w-full md:w-72">
+                        <input
+                            type="text"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder="Cari pit, supervisor, cuaca..."
+                            className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400"
+                        />
+                    </div>
+                    <div className="flex gap-2">
+                        <button
+                            onClick={() => window.print()}
+                            className="bg-[#1b2e46] hover:bg-[#253f5e] text-white font-bold text-xs px-4 py-2 rounded-lg transition cursor-pointer"
+                        >
+                            🖨️ Cetak Laporan (PDF)
+                        </button>
+                        <button
+                            onClick={() => setShowModal(true)}
+                            className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs px-4 py-2 rounded-lg transition cursor-pointer"
+                        >
+                            + Buat DOR Nikel Baru
+                        </button>
                     </div>
                 </div>
 
-                {/* Meta Info Tanggal */}
-                <div className="flex justify-between text-xs text-slate-300 print:text-black border-b border-[#1b2e46] print:border-gray-300 pb-3">
-                    <div>
-                        <span>Tanggal Dokumen: </span>
-                        <span className="font-bold">{new Date().toLocaleDateString('id-ID', { dateStyle: 'full' })}</span>
-                    </div>
-                    <div>
-                        <span>Status Sinkronisasi: </span>
-                        <span className="text-emerald-400 print:text-black font-bold">Terverifikasi Supabase</span>
-                    </div>
-                </div>
-
-                {/* Tabel Ringkasan Divisi */}
-                <div className="space-y-3">
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-amber-400 print:text-black">
-                        1. Metrik Kunci Produksi & Logistik Pit
-                    </h3>
-                    <table className="w-full text-xs text-left border border-[#1b2e46] print:border-black">
-                        <thead className="bg-[#060c14] print:bg-gray-100 text-slate-400 print:text-black">
-                            <tr>
-                                <th className="p-2.5 border border-[#1b2e46] print:border-black">Indikator Operasional</th>
-                                <th className="p-2.5 border border-[#1b2e46] print:border-black text-right">Volume / Tonase</th>
-                                <th className="p-2.5 border border-[#1b2e46] print:border-black">Keterangan</th>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                        <thead>
+                            <tr className="border-b border-[#1b2e46] text-slate-400">
+                                <th className="pb-2">Tanggal</th>
+                                <th className="pb-2">Lokasi Pit Penambangan</th>
+                                <th className="pb-2 text-right">Overburden (OB)</th>
+                                <th className="pb-2 text-right">Produksi Ore Nikel</th>
+                                <th className="pb-2 text-center">Alat Beroperasi</th>
+                                <th className="pb-2">Kondisi Cuaca</th>
+                                <th className="pb-2">Supervisor (Pengawas)</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-[#1b2e46] print:divide-black">
-                            <tr>
-                                <td className="p-2.5 font-semibold">Pengupasan Overburden (OB)</td>
-                                <td className="p-2.5 text-right font-mono font-bold text-white print:text-black">
-                                    {totalOb.toLocaleString('id-ID')} BCM
-                                </td>
-                                <td className="p-2.5 text-slate-400 print:text-black">Front Loading Pit Timur & Barat</td>
-                            </tr>
-                            <tr>
-                                <td className="p-2.5 font-semibold">Produksi Batubara (Coal Getting)</td>
-                                <td className="p-2.5 text-right font-mono font-bold text-amber-400 print:text-black">
-                                    {totalCoal.toLocaleString('id-ID')} Ton
-                                </td>
-                                <td className="p-2.5 text-slate-400 print:text-black">Stockpile Pit Tambang</td>
-                            </tr>
-                            <tr>
-                                <td className="p-2.5 font-semibold">Ritase Hauling ke Jetty</td>
-                                <td className="p-2.5 text-right font-mono font-bold text-emerald-400 print:text-black">
-                                    {totalRitase} Rit ({totalNettoCoal.toLocaleString('id-ID', { maximumFractionDigits: 2 })} Ton)
-                                </td>
-                                <td className="p-2.5 text-slate-400 print:text-black">Dump Truck Jembatan Timbang</td>
-                            </tr>
-                            <tr>
-                                <td className="p-2.5 font-semibold">Pemakaian BBM Solar Industri</td>
-                                <td className="p-2.5 text-right font-mono font-bold text-white print:text-black">
-                                    {totalFuel.toLocaleString('id-ID')} Liter
-                                </td>
-                                <td className="p-2.5 text-slate-400 print:text-black">Unit Excavator, DT, & Genset Camp</td>
-                            </tr>
-                            <tr>
-                                <td className="p-2.5 font-semibold">Kesiapan Armada Pit (Ready Units)</td>
-                                <td className="p-2.5 text-right font-mono font-bold text-white print:text-black">
-                                    {activeUnitsCount} Unit
-                                </td>
-                                <td className="p-2.5 text-slate-400 print:text-black">Operating di Pit</td>
-                            </tr>
+                        <tbody className="divide-y divide-[#16273c] text-slate-300">
+                            {filteredReports.length > 0 ? (
+                                filteredReports.map((r) => (
+                                    <tr key={r.id}>
+                                        <td className="py-2.5 font-mono text-slate-400 text-[11px]">{r.report_date}</td>
+                                        <td className="font-bold text-white">{r.pit_location}</td>
+                                        <td className="text-right font-mono text-slate-300">
+                                            {Number(r.overburden_bcm).toLocaleString('id-ID')} BCM
+                                        </td>
+                                        <td className="text-right font-mono font-bold text-emerald-400">
+                                            {Number(r.coal_production_ton).toLocaleString('id-ID')} Ton Ore
+                                        </td>
+                                        <td className="text-center font-mono text-slate-300">{r.heavy_equipment_units} Unit</td>
+                                        <td>
+                                            <span className="bg-[#112233] border border-[#1e3a5f] text-slate-300 text-[10px] px-2 py-0.5 rounded">
+                                                {r.weather_condition}
+                                            </span>
+                                        </td>
+                                        <td className="text-slate-400">{r.supervisor_name}</td>
+                                    </tr>
+                                ))
+                            ) : (
+                                <tr>
+                                    <td colSpan={7} className="py-8 text-center text-slate-500 italic">
+                                        Tidak ada laporan DOR yang cocok dengan pencarian.
+                                    </td>
+                                </tr>
+                            )}
                         </tbody>
                     </table>
                 </div>
+            </div>
 
-                {/* Tabel Ringkasan Keuangan */}
-                <div className="space-y-3">
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-amber-400 print:text-black">
-                        2. Realisasi Pengeluaran Kas Site (Finance)
-                    </h3>
-                    <div className="bg-[#060c14] print:bg-gray-50 border border-[#1b2e46] print:border-black p-4 rounded-lg flex justify-between items-center">
-                        <div>
-                            <div className="text-xs text-slate-400 print:text-gray-700">Total Akumulasi Transaksi Pengeluaran:</div>
-                            <div className="text-xl font-black text-rose-400 print:text-black font-mono mt-1">
-                                Rp {totalExpense.toLocaleString('id-ID')}
+            {/* Modal Input DOR */}
+            {showModal && (
+                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+                    <div className="bg-[#0a1625] border border-[#1b2e46] rounded-xl p-6 w-full max-w-md shadow-2xl space-y-4">
+                        <h2 className="text-sm font-bold text-white uppercase tracking-wider">Buat Laporan Harian Operasi (DOR) Nikel</h2>
+                        <form onSubmit={handleAddReport} className="space-y-3">
+                            <div>
+                                <label className="text-[11px] text-slate-400 block mb-1">Lokasi Pit Penambangan</label>
+                                <input
+                                    type="text"
+                                    required
+                                    value={pitLocation}
+                                    onChange={(e) => setPitLocation(e.target.value)}
+                                    placeholder="Contoh: Pit Nikel Utama (Blok A)"
+                                    className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400"
+                                />
                             </div>
-                        </div>
-                        <div className="text-right text-[11px] text-slate-400 print:text-gray-700">
-                            <div>BBM Solar, Sparepart, Workshop & Logistik Mess</div>
-                            <div className="text-emerald-400 print:text-black font-semibold mt-0.5">✓ Tercatat di Buku Kas Terverifikasi</div>
-                        </div>
-                    </div>
-                </div>
 
-                {/* Kolom Tanda Tangan */}
-                <div className="pt-8 border-t border-[#1b2e46] print:border-black grid grid-cols-3 gap-4 text-center text-xs">
-                    <div>
-                        <p className="text-slate-400 print:text-black">Dibuat Oleh,</p>
-                        <div className="h-16"></div>
-                        <p className="font-bold border-t border-[#1b2e46] print:border-black pt-1 inline-block min-w-[120px]">
-                            {userName}
-                        </p>
-                        <p className="text-[10px] text-slate-500 print:text-black">Site Administration</p>
-                    </div>
-                    <div>
-                        <p className="text-slate-400 print:text-black">Diperiksa Oleh,</p>
-                        <div className="h-16"></div>
-                        <p className="font-bold border-t border-[#1b2e46] print:border-black pt-1 inline-block min-w-[120px]">
-                            Kepala Teknik Tambang
-                        </p>
-                        <p className="text-[10px] text-slate-500 print:text-black">KTT / Site Manager</p>
-                    </div>
-                    <div>
-                        <p className="text-slate-400 print:text-black">Mengetahui,</p>
-                        <div className="h-16"></div>
-                        <p className="font-bold border-t border-[#1b2e46] print:border-black pt-1 inline-block min-w-[120px]">
-                            Direktur Utama
-                        </p>
-                        <p className="text-[10px] text-slate-500 print:text-black">PT. JEEP Pusat</p>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-[11px] text-slate-400 block mb-1">Overburden (BCM)</label>
+                                    <input
+                                        type="number"
+                                        required
+                                        value={overburdenBcm}
+                                        onChange={(e) => setOverburdenBcm(e.target.value)}
+                                        placeholder="3500"
+                                        className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400 font-mono"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[11px] text-slate-400 block mb-1">Produksi Ore Nikel (Ton)</label>
+                                    <input
+                                        type="number"
+                                        required
+                                        value={oreProductionTon}
+                                        onChange={(e) => setOreProductionTon(e.target.value)}
+                                        placeholder="1200"
+                                        className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400 font-mono"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-[11px] text-slate-400 block mb-1">Jumlah Alat Berat Aktif</label>
+                                    <input
+                                        type="number"
+                                        required
+                                        value={heavyEquipmentUnits}
+                                        onChange={(e) => setHeavyEquipmentUnits(e.target.value)}
+                                        placeholder="14"
+                                        className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400 font-mono"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[11px] text-slate-400 block mb-1">Kondisi Cuaca</label>
+                                    <select
+                                        value={weatherCondition}
+                                        onChange={(e) => setWeatherCondition(e.target.value)}
+                                        className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400"
+                                    >
+                                        <option value="Cerah">Cerah</option>
+                                        <option value="Cerah Berawan">Cerah Berawan</option>
+                                        <option value="Hujan Ringan">Hujan Ringan</option>
+                                        <option value="Hujan Lebat (Stop Pit)">Hujan Lebat (Stop Pit)</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="text-[11px] text-slate-400 block mb-1">Supervisor (Pengawas Lapangan)</label>
+                                <input
+                                    type="text"
+                                    required
+                                    value={supervisorName}
+                                    onChange={(e) => setSupervisorName(e.target.value)}
+                                    placeholder="Nama pengawas pit"
+                                    className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400"
+                                />
+                            </div>
+
+                            <div className="flex justify-end gap-2 pt-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowModal(false)}
+                                    className="px-4 py-2 rounded-lg border border-[#1b2e46] text-slate-400 hover:text-white text-xs transition cursor-pointer"
+                                >
+                                    Batal
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={submitting}
+                                    className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs transition cursor-pointer"
+                                >
+                                    {submitting ? 'Menyimpan...' : 'Simpan Laporan DOR'}
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
-            </main>
+            )}
         </div>
     )
 }

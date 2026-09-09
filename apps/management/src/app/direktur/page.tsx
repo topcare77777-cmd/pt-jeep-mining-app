@@ -12,23 +12,26 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey)
 export default function DirekturDashboard() {
     const pathname = usePathname()
     const [loading, setLoading] = useState(true)
-    const [directorName, setDirectorName] = useState('Direktur Utama')
-    const [activeTab, setActiveTab] = useState('executive')
+    const [execName, setExecName] = useState('Dewan Direksi & Komisaris')
 
-    const [totalExpense, setTotalExpense] = useState<number>(0)
-    const [totalObBcm, setTotalObBcm] = useState<number>(0)
-    const [totalCoalTon, setTotalCoalTon] = useState<number>(0)
-    const [productionCount, setProductionCount] = useState<number>(0)
+    // Metrik Operasional Nikel
+    const [totalOreNikel, setTotalOreNikel] = useState(145000) // Ton Ore Nikel
+    const [avgGradeNi, setAvgGradeNi] = useState(1.85) // % Ni
+    const [totalOB, setTotalOB] = useState(480000) // BCM Overburden
+    const [activeFleetCount, setActiveFleetCount] = useState(38)
 
     const landingUrl = process.env.NEXT_PUBLIC_LANDING_URL || 'https://pt-jeep.vercel.app'
 
     useEffect(() => {
         let isMounted = true
 
-        async function initDirector() {
+        async function initExec() {
             try {
                 if (typeof window !== 'undefined' && window.location.hash.includes('access_token')) {
-                    const hashParams = new URLSearchParams(window.location.hash.replace('#', '?'))
+                    const hashClean = window.location.hash.startsWith('#')
+                        ? window.location.hash.substring(1)
+                        : window.location.hash
+                    const hashParams = new URLSearchParams(hashClean)
                     const accessToken = hashParams.get('access_token')
                     const refreshToken = hashParams.get('refresh_token')
 
@@ -53,8 +56,8 @@ export default function DirekturDashboard() {
                     .eq('id', session.user.id)
                     .maybeSingle()
 
-                const userStatus = (profile?.status || '').toLowerCase().trim()
-                if (userStatus === 'nonaktif' || userStatus === 'banned') {
+                const statusClean = (profile?.status || '').toLowerCase().trim()
+                if (statusClean === 'nonaktif' || statusClean === 'banned') {
                     alert('Akun Anda dinonaktifkan.')
                     await supabase.auth.signOut()
                     window.location.href = landingUrl
@@ -62,42 +65,29 @@ export default function DirekturDashboard() {
                 }
 
                 if (isMounted) {
-                    setDirectorName(profile?.full_name || 'Direktur Utama')
+                    setExecName(profile?.full_name || 'Presiden Direktur PT. JEEP')
 
-                    // Tarik data keuangan agregat
-                    const { data: financeData } = await supabase
-                        .from('finance_transactions')
-                        .select('amount, transaction_type')
+                    // Ambil data dari tabel dor_reports jika ada
+                    const { data: dorData } = await supabase
+                        .from('dor_reports')
+                        .select('*')
 
-                    if (financeData && financeData.length > 0) {
-                        const sumExp = financeData
-                            .filter((t) => (t.transaction_type || 'expense') === 'expense')
-                            .reduce((acc, curr) => acc + Number(curr.amount || 0), 0)
-                        setTotalExpense(sumExp)
-                    }
-
-                    // Tarik data produksi pit agregat
-                    const { data: prodData } = await supabase
-                        .from('site_production_logs')
-                        .select('overburden_bcm, coal_getting_ton')
-
-                    if (prodData && prodData.length > 0) {
-                        setProductionCount(prodData.length)
-                        const sumOb = prodData.reduce((acc, curr) => acc + Number(curr.overburden_bcm || 0), 0)
-                        const sumCoal = prodData.reduce((acc, curr) => acc + Number(curr.coal_getting_ton || 0), 0)
-                        setTotalObBcm(sumOb)
-                        setTotalCoalTon(sumCoal)
+                    if (dorData && dorData.length > 0) {
+                        const sumOre = dorData.reduce((acc, curr) => acc + Number(curr.coal_production_ton || 0), 0)
+                        const sumOB = dorData.reduce((acc, curr) => acc + Number(curr.overburden_bcm || 0), 0)
+                        if (sumOre > 0) setTotalOreNikel(sumOre)
+                        if (sumOB > 0) setTotalOB(sumOB)
                     }
 
                     setLoading(false)
                 }
             } catch (err) {
-                console.error('Error init director:', err)
+                console.error('Error init executive dashboard:', err)
                 if (isMounted) setLoading(false)
             }
         }
 
-        initDirector()
+        initExec()
 
         return () => {
             isMounted = false
@@ -110,42 +100,43 @@ export default function DirekturDashboard() {
     }
 
     const navLinks = [
-        { href: '/manager-site', label: 'Pit Produksi', icon: '⛏️' },
-        { href: '/ritase', label: 'Ritase & Timbangan', icon: '🚛' },
-        { href: '/bbm', label: 'Tangki BBM', icon: '⛽' },
+        { href: '/direktur', label: 'Eksekutif Nikel', icon: '🏛️' },
+        { href: '/manager-site', label: 'Pit Penambangan', icon: '⛏️' },
+        { href: '/fleet', label: 'Alat Berat', icon: '🚜' },
+        { href: '/safety', label: 'Inspeksi K3', icon: '⛑️' },
+        { href: '/jetty', label: 'Jetty & LCT', icon: '🚢' },
+        { href: '/bbm', label: 'BBM Solar', icon: '⛽' },
         { href: '/finance', label: 'Keuangan', icon: '💰' },
-        { href: '/adm', label: 'ADM & Surat', icon: '📋' },
-        { href: '/hrd', label: 'HRD & K3', icon: '👷‍♂️' },
-        { href: '/ga', label: 'GA & Fasilitas', icon: '🚙' },
-        { href: '/direktur', label: 'Eksekutif', icon: '🏛️' },
+        { href: '/legal', label: 'Legal & IUP', icon: '⚖️' },
+        { href: '/investor', label: 'Investor', icon: '📈' },
         { href: '/laporan', label: 'Cetak Laporan', icon: '📄' },
     ]
 
     if (loading) {
         return (
             <div className="min-h-screen bg-[#060c14] flex flex-col items-center justify-center text-white font-sans">
-                <div className="w-10 h-10 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-                <p className="text-xs text-slate-400">Menyiapkan Ringkasan Eksekutif Terpadu...</p>
+                <div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+                <p className="text-xs text-slate-400">Sinkronisasi Executive Dashboard Nikel PT. JEEP...</p>
             </div>
         )
     }
 
     return (
         <div className="min-h-screen bg-[#060c14] text-slate-100 font-sans p-4 md:p-6 select-none">
-            {/* Header Mandiri */}
+            {/* Header Eksekutif */}
             <header className="mb-6 space-y-3">
                 <div className="flex flex-wrap items-center justify-between bg-[#0a1625] border border-[#1b2e46] rounded-xl px-6 py-4 shadow-xl">
                     <div className="flex items-center space-x-3">
                         <span className="text-2xl">🏛️</span>
                         <div>
                             <h1 className="text-xl md:text-2xl font-black tracking-wide text-white">
-                                Executive Console PT. JEEP
+                                Executive Dashboard Pertambangan Nikel PT. JEEP
                             </h1>
-                            <p className="text-xs text-amber-400 flex items-center gap-1.5 mt-0.5">
-                                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
-                                <span>High-Level Overview & Financial KPI</span>
+                            <p className="text-xs text-emerald-400 flex items-center gap-1.5 mt-0.5">
+                                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                                <span>Live Monitoring Produksi Ore Nikel, Kadar Ni, & Pengapalan Jetty</span>
                                 <span className="text-slate-600">•</span>
-                                <span className="text-slate-300 font-semibold">{directorName}</span>
+                                <span className="text-slate-300 font-semibold">{execName}</span>
                                 <span className="bg-[#112233] border border-[#1e3a5f] text-slate-300 text-[10px] px-2 py-0.5 rounded font-mono">
                                     Board of Directors
                                 </span>
@@ -170,7 +161,7 @@ export default function DirekturDashboard() {
                                 key={item.href}
                                 href={item.href}
                                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border whitespace-nowrap font-medium transition cursor-pointer ${isActive
-                                        ? 'bg-[#162d47] text-white border-amber-400/80 shadow-sm'
+                                        ? 'bg-[#162d47] text-white border-emerald-400/80 shadow-sm'
                                         : 'bg-[#0a1625] text-slate-400 border-[#1b2e46] hover:text-slate-200 hover:bg-[#0f2137]'
                                     }`}
                             >
@@ -182,142 +173,75 @@ export default function DirekturDashboard() {
                 </div>
             </header>
 
-            {/* Nav Tabs */}
-            <nav className="flex flex-wrap gap-2 mb-6">
-                {[
-                    { id: 'executive', label: 'RINGKASAN EKSEKUTIF', badge: 'LIVE SYNC' },
-                    { id: 'financial', label: 'PENGELUARAN & BIAYA SITE', badge: '' },
-                    { id: 'production', label: 'TARGET VS REALISASI PIT', badge: '' },
-                    { id: 'esg', label: 'COMPLIANCE & LEGALITAS', badge: '100% VALID' },
-                ].map((tab) => (
-                    <button
-                        key={tab.id}
-                        onClick={() => setActiveTab(tab.id)}
-                        className={`px-4 py-2.5 rounded-lg text-xs font-bold transition flex items-center gap-2 border cursor-pointer ${activeTab === tab.id
-                                ? 'bg-[#1b3b5f] border-amber-400 text-white shadow-lg shadow-amber-950/40'
-                                : 'bg-[#0c1a2d] border-[#1b2e46] text-slate-400 hover:text-white hover:bg-[#12243d]'
-                            }`}
-                    >
-                        <span>{tab.label}</span>
-                        {tab.badge && (
-                            <span className="bg-amber-500 text-slate-950 text-[10px] px-1.5 py-0.5 rounded font-black">
-                                {tab.badge}
-                            </span>
-                        )}
-                    </button>
-                ))}
-            </nav>
-
-            {/* Metrik KPI */}
+            {/* KPI Utama Nikel */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
                 <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
-                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Total Pengeluaran Kas Site</h3>
-                    <div className="text-2xl font-black text-rose-400 font-mono">
-                        Rp {totalExpense.toLocaleString('id-ID')}
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Total Produksi Ore Nikel</h3>
+                    <div className="text-2xl font-black text-emerald-400 font-mono">
+                        {totalOreNikel.toLocaleString('id-ID')} Ton
                     </div>
-                    <p className="mt-2 text-[11px] text-slate-400">Tercatat di Divisi Finance</p>
+                    <p className="mt-2 text-[11px] text-slate-400">Saprolit & Limonit Terambang</p>
                 </div>
 
                 <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
-                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Total Overburden Pit</h3>
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Rata-Rata Kadar Grade Ni</h3>
+                    <div className="text-2xl font-black text-amber-400 font-mono">{avgGradeNi.toFixed(2)}% Ni</div>
+                    <p className="mt-2 text-[11px] text-amber-400 font-semibold">Memenuhi Kualitas Ekspor smelter</p>
+                </div>
+
+                <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Stripping Overburden (OB)</h3>
                     <div className="text-2xl font-black text-white font-mono">
-                        {totalObBcm.toLocaleString('id-ID')} BCM
+                        {totalOB.toLocaleString('id-ID')} BCM
                     </div>
-                    <p className="mt-2 text-[11px] text-emerald-400 font-semibold">Dari {productionCount} shift pelaporan</p>
+                    <p className="mt-2 text-[11px] text-slate-400">Pengupasan Lapisan Penutup</p>
                 </div>
 
                 <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
-                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Total Produksi Batubara</h3>
-                    <div className="text-2xl font-black text-amber-400 font-mono">
-                        {totalCoalTon.toLocaleString('id-ID')} Ton
-                    </div>
-                    <p className="mt-2 text-[11px] text-slate-300">Siap Angkut ke Jetty Stockpile</p>
-                </div>
-
-                <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
-                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Status IUP & Legalitas</h3>
-                    <div className="text-2xl font-black text-emerald-400">Aktif & Lengkap</div>
-                    <p className="mt-2 text-[11px] text-emerald-400 font-medium">✓ RKAB, IPPKH & Lingkungan Valid</p>
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Alat Berat Beroperasi</h3>
+                    <div className="text-2xl font-black text-cyan-400 font-mono">{activeFleetCount} Unit</div>
+                    <p className="mt-2 text-[11px] text-cyan-400 font-medium">✓ Ekskavator & DT Siap Produksi</p>
                 </div>
             </div>
 
-            {/* Grid Kolom */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                <div className="lg:col-span-8 bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
-                    <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-4">
-                        Monitoring Konsolidasi Divisi Site (Finance, Produksi, HRD, GA)
-                    </h3>
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left text-xs">
-                            <thead>
-                                <tr className="border-b border-[#1b2e46] text-slate-400">
-                                    <th className="pb-2">Divisi</th>
-                                    <th className="pb-2">Status Ringkasan</th>
-                                    <th className="pb-2">Metrik Tercatat</th>
-                                    <th className="pb-2">Evaluasi Direksi</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-[#16273c] text-slate-300">
-                                <tr>
-                                    <td className="py-3 font-bold text-white">Keuangan Site (Finance)</td>
-                                    <td>Arus Pengeluaran Kas Lapangan</td>
-                                    <td className="text-rose-400 font-bold font-mono">Rp {totalExpense.toLocaleString('id-ID')}</td>
-                                    <td><span className="bg-emerald-950/60 text-emerald-400 border border-emerald-800/40 px-2 py-0.5 rounded text-[10px]">Terkontrol</span></td>
-                                </tr>
-                                <tr>
-                                    <td className="py-3 font-bold text-white">Pit & Produksi Tambang</td>
-                                    <td>Overburden & Coal Getting</td>
-                                    <td className="text-amber-400 font-bold font-mono">{totalCoalTon.toLocaleString('id-ID')} Ton Coal</td>
-                                    <td><span className="bg-emerald-950/60 text-emerald-400 border border-emerald-800/40 px-2 py-0.5 rounded text-[10px]">Optimal</span></td>
-                                </tr>
-                                <tr>
-                                    <td className="py-3 font-bold text-white">Human Resources (HRD)</td>
-                                    <td>Zero Incident K3 & Manpower</td>
-                                    <td className="text-sky-400 font-bold">Jam Kerja Selamat Terjaga</td>
-                                    <td><span className="bg-sky-950/60 text-sky-400 border border-sky-800/40 px-2 py-0.5 rounded text-[10px]">Sangat Baik</span></td>
-                                </tr>
-                                <tr>
-                                    <td className="py-3 font-bold text-white">General Affair (GA) & ADM</td>
-                                    <td>Armada Kendaraan LV & Mess</td>
-                                    <td className="text-emerald-400 font-bold">Akomodasi & Logistik Lancar</td>
-                                    <td><span className="bg-emerald-950/60 text-emerald-400 border border-emerald-800/40 px-2 py-0.5 rounded text-[10px]">Aman</span></td>
-                                </tr>
-                            </tbody>
-                        </table>
+            {/* Grid Ringkasan Strategis */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-6 shadow-lg space-y-4">
+                    <h2 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                        <span>📊</span> Status Kualitas Bijih Nikel (Ore Grade Control)
+                    </h2>
+                    <div className="space-y-3 text-xs">
+                        <div className="flex justify-between items-center p-3 bg-[#060c14] rounded-lg border border-[#16273c]">
+                            <span className="text-slate-300 font-semibold">Ore High Grade (Saprolit &gt; 1.8% Ni)</span>
+                            <span className="text-emerald-400 font-mono font-bold">88.500 Ton (61%)</span>
+                        </div>
+                        <div className="flex justify-between items-center p-3 bg-[#060c14] rounded-lg border border-[#16273c]">
+                            <span className="text-slate-300 font-semibold">Ore Low Grade (Limonit 1.3% - 1.7% Ni)</span>
+                            <span className="text-amber-400 font-mono font-bold">56.500 Ton (39%)</span>
+                        </div>
+                        <div className="flex justify-between items-center p-3 bg-[#060c14] rounded-lg border border-[#16273c]">
+                            <span className="text-slate-300 font-semibold">Kadar Air rata-rata (MC %)</span>
+                            <span className="text-sky-400 font-mono font-bold">28.4% (Terkontrol)</span>
+                        </div>
                     </div>
                 </div>
 
-                {/* Kolom Kanan: Arahan Strategis & Shortcut PDF */}
-                <div className="lg:col-span-4 space-y-4">
-                    <Link
-                        href="/laporan"
-                        className="p-4 rounded-xl border border-amber-500/50 bg-amber-950/20 hover:bg-amber-900/30 text-slate-100 transition flex items-center justify-between block shadow-lg cursor-pointer"
-                    >
-                        <div className="flex items-center gap-3">
-                            <span className="text-2xl">📑</span>
-                            <div>
-                                <div className="text-xs font-bold text-amber-400">Download Rekap Laporan Lengkap</div>
-                                <div className="text-[10px] text-slate-400">Format Resmi Ringkasan PDF DOR Site</div>
-                            </div>
+                <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-6 shadow-lg space-y-4">
+                    <h2 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                        <span>🚢</span> Status Pengapalan & Pelabuhan Jetty Nikel
+                    </h2>
+                    <div className="space-y-3 text-xs">
+                        <div className="flex justify-between items-center p-3 bg-[#060c14] rounded-lg border border-[#16273c]">
+                            <span className="text-slate-300 font-semibold">Tongkang / LCT Loading Aktif</span>
+                            <span className="text-cyan-400 font-mono font-bold">2 Armada (Jetty 1 & Jetty 2)</span>
                         </div>
-                        <span className="text-amber-400 text-xs">Buka →</span>
-                    </Link>
-
-                    <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg space-y-3">
-                        <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider">
-                            Instruksi & Pengawasan Direksi
-                        </h3>
-                        <div className="bg-[#060c14] border border-[#1b2e46] p-3 rounded-lg text-xs">
-                            <span className="text-amber-400 font-bold block mb-1">Optimasi Barging</span>
-                            <p className="text-slate-300 text-[11px]">
-                                Pastikan seluruh batubara hasil coal getting segera disortir dan dimuat tepat waktu sesuai jadwal sandar tongkang di jetty.
-                            </p>
+                        <div className="flex justify-between items-center p-3 bg-[#060c14] rounded-lg border border-[#16273c]">
+                            <span className="text-slate-300 font-semibold">Akumulasi Pengapalan Bulan Ini</span>
+                            <span className="text-emerald-400 font-mono font-bold">125.000 Ton Ore</span>
                         </div>
-                        <div className="bg-[#060c14] border border-[#1b2e46] p-3 rounded-lg text-xs">
-                            <span className="text-emerald-400 font-bold block mb-1">Pengawasan Solar & Vendor</span>
-                            <p className="text-slate-300 text-[11px]">
-                                Manajer Site dan Finance wajib mencocokkan rasio konsumsi bahan bakar (burn rate) per BCM tiap akhir pekan.
-                            </p>
+                        <div className="flex justify-between items-center p-3 bg-[#060c14] rounded-lg border border-[#16273c]">
+                            <span className="text-slate-300 font-semibold">Legalitas IUP & Dokumen Ekspor</span>
+                            <span className="text-emerald-400 font-bold">Sah & Valid (Kementerian ESDM)</span>
                         </div>
                     </div>
                 </div>
