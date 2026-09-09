@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@supabase/supabase-js'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
@@ -55,6 +55,7 @@ const ALL_MODULES = [
 
 export default function AdmDashboard() {
     const pathname = usePathname()
+    const router = useRouter()
     const [loading, setLoading] = useState(true)
     const [userName, setUserName] = useState('Petugas ADM')
     const [userRole, setUserRole] = useState('ADM')
@@ -104,7 +105,7 @@ export default function AdmDashboard() {
 
                 setUserId(session.user.id)
 
-                // 1. Ambil data akun pengguna
+                // 1. Ambil Profil Pengguna
                 const { data: profile } = await supabase
                     .from('profiles')
                     .select('full_name, role, status')
@@ -124,11 +125,12 @@ export default function AdmDashboard() {
                     const division = (profile?.role || 'ADM').trim()
                     setUserRole(division)
 
-                    // 2. Filter modul yang berhak tampil di bilah navbar
+                    // 2. Ambil Izin Divisi dari Supabase
                     const isSuperAdmin = ['admin', 'administrator', 'superadmin'].includes(division.toLowerCase())
 
+                    let grantedKeys: string[] = []
                     if (isSuperAdmin) {
-                        setAllowedModules(ALL_MODULES.map((m) => m.key))
+                        grantedKeys = ALL_MODULES.map((m) => m.key)
                     } else {
                         const { data: allPerms } = await supabase
                             .from('division_permissions')
@@ -148,16 +150,25 @@ export default function AdmDashboard() {
                             })
 
                             if (matched && Array.isArray(matched.allowed_modules)) {
-                                setAllowedModules(matched.allowed_modules)
+                                grantedKeys = matched.allowed_modules
                             } else {
-                                setAllowedModules(['adm'])
+                                grantedKeys = ['adm']
                             }
                         } else {
-                            setAllowedModules(['adm'])
+                            grantedKeys = ['adm']
                         }
                     }
 
-                    // 3. Ambil data dokumen ADM
+                    // Route Guard: Bila user tidak memiliki izin modul 'adm', tendang ke beranda
+                    if (!isSuperAdmin && grantedKeys.length > 0 && !grantedKeys.includes('adm')) {
+                        alert('Divisi Anda tidak memiliki hak akses ke modul Administrasi & Surat.')
+                        router.replace('/')
+                        return
+                    }
+
+                    setAllowedModules(grantedKeys)
+
+                    // 3. Ambil Data Dokumen
                     const { data: docData } = await supabase
                         .from('adm_documents')
                         .select('*')
@@ -180,7 +191,7 @@ export default function AdmDashboard() {
         return () => {
             isMounted = false
         }
-    }, [landingUrl])
+    }, [landingUrl, router])
 
     const handleAddDocument = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -230,7 +241,7 @@ export default function AdmDashboard() {
         (doc.sender || '').toLowerCase().includes(searchQuery.toLowerCase())
     )
 
-    // Hanya tampilkan tombol modul yang telah diberi izin oleh Superadmin
+    // FILTER STRICT: Hanya modul yang diizinkan untuk divisi pengguna yang dirender
     const authorizedNavItems = ALL_MODULES.filter((item) =>
         allowedModules.includes(item.key)
     )
@@ -275,7 +286,7 @@ export default function AdmDashboard() {
                     </button>
                 </div>
 
-                {/* Bilah Navigasi Dinamis: Hanya Merender Tombol Modul yang Diberi Izin */}
+                {/* Bilah Navigasi Dinamis: HANYA MERENDER TOMBOL MODUL YANG MEMILIKI IZIN */}
                 <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
                     {authorizedNavItems.map((item) => {
                         const isActive = pathname === item.href
@@ -324,7 +335,6 @@ export default function AdmDashboard() {
 
             {/* Konten Utama */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                {/* Kolom Kiri: Action Bar */}
                 <aside className="lg:col-span-3 space-y-3">
                     <div
                         onClick={() => setShowModal(true)}
@@ -361,7 +371,6 @@ export default function AdmDashboard() {
                     </div>
                 </aside>
 
-                {/* Kolom Kanan: Tabel Dokumen */}
                 <main className="lg:col-span-9 space-y-6">
                     <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg space-y-4">
                         <div className="flex flex-wrap justify-between items-center gap-3">
