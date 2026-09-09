@@ -9,9 +9,10 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 interface Employee {
     id: string
+    created_at?: string
     nrp: string
-    name: string
-    role: string
+    full_name: string
+    position: string
     shift: string
     status: string
 }
@@ -57,45 +58,38 @@ export default function HrdDashboard() {
 
                 setUserName(profile.full_name || 'Petugas HRD')
 
-                // 3. Ambil data personil dari Supabase
-                const { data: profilesData } = await supabase
-                    .from('profiles')
-                    .select('id, full_name, role, status')
-                    .limit(10)
+                // 3. Tarik data personil dari tabel hrd_employees
+                const { data: hrdData, error } = await supabase
+                    .from('hrd_employees')
+                    .select('*')
+                    .order('created_at', { ascending: false })
 
-                if (profilesData && profilesData.length > 0) {
-                    const mappedEmployees: Employee[] = profilesData.map((p, idx) => ({
-                        id: p.id,
-                        nrp: `NRP-2026-${String(idx + 1).padStart(3, '0')}`,
-                        name: p.full_name || 'Personel Pit',
-                        role: p.role || 'Operator Tambang',
-                        shift: idx % 2 === 0 ? 'Shift 1 (Pagi)' : 'Shift 2 (Malam)',
-                        status: p.status || 'Aktif',
-                    }))
-                    setEmployees(mappedEmployees)
+                if (!error && hrdData && hrdData.length > 0) {
+                    setEmployees(hrdData)
                 } else {
+                    // Data cadangan jika tabel masih kosong
                     setEmployees([
                         {
                             id: '1',
                             nrp: 'NRP-2026-001',
-                            name: 'Bambang Irawan',
-                            role: 'Operator Excavator PC400',
+                            full_name: 'Bambang Irawan',
+                            position: 'Operator Excavator PC400',
                             shift: 'Shift 1 (Pagi)',
                             status: 'Aktif',
                         },
                         {
                             id: '2',
                             nrp: 'NRP-2026-042',
-                            name: 'Rizky Setiawan',
-                            role: 'Driver Dump Truck DT-12',
+                            full_name: 'Rizky Setiawan',
+                            position: 'Driver Dump Truck DT-12',
                             shift: 'Shift 2 (Malam)',
                             status: 'Aktif',
                         },
                         {
                             id: '3',
                             nrp: 'NRP-2026-089',
-                            name: 'Yohanes Mandagi',
-                            role: 'Mekanik Alat Berat',
+                            full_name: 'Yohanes Mandagi',
+                            position: 'Mekanik Alat Berat',
                             shift: 'Off Site',
                             status: 'Roster Cuti',
                         },
@@ -112,25 +106,37 @@ export default function HrdDashboard() {
         initHrd()
     }, [landingUrl])
 
+    // Simpan Personel Baru ke Supabase
     const handleAddEmployee = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!name || !position) return
 
         setSubmitting(true)
-        const newEmp: Employee = {
-            id: Date.now().toString(),
-            nrp: nrp || `NRP-2026-${Date.now().toString().slice(-3)}`,
-            name,
-            role: position,
-            shift,
+        const generatedNrp = nrp || `NRP-2026-${Date.now().toString().slice(-4)}`
+
+        const payload = {
+            nrp: generatedNrp,
+            full_name: name,
+            position: position,
+            shift: shift,
             status: 'Aktif',
         }
 
-        setEmployees([newEmp, ...employees])
-        setShowModal(false)
-        setName('')
-        setPosition('')
-        setNrp('')
+        const { data, error } = await supabase
+            .from('hrd_employees')
+            .insert([payload])
+            .select()
+
+        if (!error && data) {
+            setEmployees([data[0], ...employees])
+            setShowModal(false)
+            setName('')
+            setPosition('')
+            setNrp('')
+        } else {
+            alert('Gagal menyimpan personel: ' + (error?.message || 'Pastikan NRP belum pernah terdaftar.'))
+        }
+
         setSubmitting(false)
     }
 
@@ -215,14 +221,18 @@ export default function HrdDashboard() {
                     </div>
 
                     <div className="p-4 rounded-xl border border-[#16273c] bg-[#0a1625] text-slate-400 space-y-2">
-                        <span className="text-xs font-bold text-white uppercase tracking-wider block">Ringkasan Manpower</span>
+                        <span className="text-xs font-bold text-white uppercase tracking-wider block">Status Database HRD</span>
                         <div className="text-[11px] flex justify-between">
-                            <span>Total Terdata</span>
-                            <span className="text-slate-200">{employees.length} orang</span>
+                            <span>Tabel Supabase</span>
+                            <span className="text-emerald-400 font-semibold">hrd_employees</span>
                         </div>
                         <div className="text-[11px] flex justify-between">
-                            <span>Status Sistem</span>
-                            <span className="text-emerald-400 font-semibold">Tersinkron</span>
+                            <span>Total Karyawan</span>
+                            <span className="text-slate-200 font-bold">{employees.length} orang</span>
+                        </div>
+                        <div className="text-[11px] flex justify-between">
+                            <span>Sinkronisasi Roster</span>
+                            <span className="text-emerald-400 font-semibold">Aktif</span>
                         </div>
                     </div>
                 </aside>
@@ -261,7 +271,7 @@ export default function HrdDashboard() {
                     <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
                         <div className="flex justify-between items-center mb-3">
                             <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider">
-                                Jadwal Shift & Status Operator Pit Tambang
+                                Jadwal Shift & Status Operator Pit Tambang (Real Supabase)
                             </h3>
                             <button
                                 onClick={() => setShowModal(true)}
@@ -285,8 +295,8 @@ export default function HrdDashboard() {
                                     {employees.map((emp) => (
                                         <tr key={emp.id}>
                                             <td className="py-2.5 font-mono text-[11px] text-amber-400">{emp.nrp}</td>
-                                            <td className="font-semibold text-white">{emp.name}</td>
-                                            <td>{emp.role}</td>
+                                            <td className="font-semibold text-white">{emp.full_name}</td>
+                                            <td>{emp.position}</td>
                                             <td>
                                                 <span className="bg-sky-950 text-sky-400 px-2 py-0.5 rounded text-[10px]">
                                                     {emp.shift}
@@ -318,7 +328,7 @@ export default function HrdDashboard() {
                                     type="text"
                                     value={nrp}
                                     onChange={(e) => setNrp(e.target.value)}
-                                    placeholder="Otomatis jika kosong"
+                                    placeholder="Otomatis jika kosong (cth: NRP-2026-099)"
                                     className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400 font-mono"
                                 />
                             </div>
