@@ -1,8 +1,9 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { createClient } from '@supabase/supabase-js'
-import NavigationHeader from '../../components/NavigationHeader'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
@@ -20,6 +21,7 @@ interface FuelLog {
 }
 
 export default function FuelManagementPage() {
+    const pathname = usePathname()
     const [loading, setLoading] = useState(true)
     const [userName, setUserName] = useState('Fuelman Site')
     const [logs, setLogs] = useState<FuelLog[]>([])
@@ -105,7 +107,6 @@ export default function FuelManagementPage() {
         }
     }, [landingUrl])
 
-    // Perhitungan Stok
     const initialStock = 40000
     const totalIn = logs
         .filter((item) => item.transaction_type === 'Penerimaan')
@@ -149,11 +150,27 @@ export default function FuelManagementPage() {
         setSubmitting(false)
     }
 
-    // Filter pencarian live
+    const handleLogout = async () => {
+        await supabase.auth.signOut()
+        window.location.href = landingUrl
+    }
+
     const filteredLogs = logs.filter((item) =>
         item.unit_no.toLowerCase().includes(searchQuery.toLowerCase()) ||
         item.operator_driver.toLowerCase().includes(searchQuery.toLowerCase())
     )
+
+    const navLinks = [
+        { href: '/manager-site', label: 'Pit Produksi', icon: '⛏️' },
+        { href: '/ritase', label: 'Ritase & Timbangan', icon: '🚛' },
+        { href: '/bbm', label: 'Tangki BBM', icon: '⛽' },
+        { href: '/finance', label: 'Keuangan', icon: '💰' },
+        { href: '/adm', label: 'ADM & Surat', icon: '📋' },
+        { href: '/hrd', label: 'HRD & K3', icon: '👷‍♂️' },
+        { href: '/ga', label: 'GA & Fasilitas', icon: '🚙' },
+        { href: '/direktur', label: 'Eksekutif', icon: '🏛️' },
+        { href: '/laporan', label: 'Cetak Laporan', icon: '📄' },
+    ]
 
     if (loading) {
         return (
@@ -166,14 +183,52 @@ export default function FuelManagementPage() {
 
     return (
         <div className="min-h-screen bg-[#060c14] text-slate-100 font-sans p-4 md:p-6 select-none">
-            {/* Global Header */}
-            <NavigationHeader
-                title="Pusat Manajemen BBM Solar & Tangki Site"
-                subtitle="Kontrol Burn Rate, Pengisian Alat Berat, & Penerimaan Tangki"
-                userName={userName}
-                roleBadge="Fuel & Logistics"
-                accentColor="amber"
-            />
+            {/* Header Mandiri */}
+            <header className="mb-6 space-y-3">
+                <div className="flex flex-wrap items-center justify-between bg-[#0a1625] border border-[#1b2e46] rounded-xl px-6 py-4 shadow-xl">
+                    <div>
+                        <h1 className="text-xl md:text-2xl font-black tracking-wide text-white flex items-center gap-2">
+                            Pusat Manajemen BBM Solar & Tangki Site
+                        </h1>
+                        <p className="text-xs text-slate-400 flex items-center gap-2 mt-1">
+                            <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                            <span>Kontrol Burn Rate, Pengisian Alat Berat, & Penerimaan Tangki</span>
+                            <span className="text-slate-600">•</span>
+                            <span className="text-slate-300 font-semibold">{userName}</span>
+                            <span className="bg-[#112233] border border-[#1e3a5f] text-slate-300 text-[10px] px-2 py-0.5 rounded font-mono">
+                                Fuel & Logistics
+                            </span>
+                        </p>
+                    </div>
+
+                    <button
+                        onClick={handleLogout}
+                        className="bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/50 text-rose-300 text-xs px-4 py-2 rounded-lg transition cursor-pointer"
+                    >
+                        Keluar ke Beranda
+                    </button>
+                </div>
+
+                {/* Global Module Switcher */}
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+                    {navLinks.map((item) => {
+                        const isActive = pathname === item.href
+                        return (
+                            <Link
+                                key={item.href}
+                                href={item.href}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border whitespace-nowrap font-medium transition cursor-pointer ${isActive
+                                        ? 'bg-[#162d47] text-white border-amber-400/80 shadow-sm'
+                                        : 'bg-[#0a1625] text-slate-400 border-[#1b2e46] hover:text-slate-200 hover:bg-[#0f2137]'
+                                    }`}
+                            >
+                                <span>{item.icon}</span>
+                                <span>{item.label}</span>
+                            </Link>
+                        )
+                    })}
+                </div>
+            </header>
 
             {/* Metrik Stok Tangki */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
@@ -251,8 +306,8 @@ export default function FuelManagementPage() {
                                         <td>
                                             <span
                                                 className={`px-2 py-0.5 rounded text-[10px] font-bold ${item.transaction_type === 'Penerimaan'
-                                                    ? 'bg-sky-950/80 text-sky-400 border border-sky-800/40'
-                                                    : 'bg-amber-950/80 text-amber-400 border border-amber-800/40'
+                                                        ? 'bg-sky-950/80 text-sky-400 border border-sky-800/40'
+                                                        : 'bg-amber-950/80 text-amber-400 border border-amber-800/40'
                                                     }`}
                                             >
                                                 {item.transaction_type}
