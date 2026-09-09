@@ -78,18 +78,18 @@ export default function FinanceDashboard() {
         initFinance()
     }, [landingUrl])
 
-    // Simpan Transaksi Baru ke Supabase
+    // Simpan Transaksi Baru ke Supabase (Field-Safe Payload)
     const handleAddTransaction = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!newDesc || !newAmount) return
 
         setSubmitting(true)
-        const payload: any = {
+
+        // Payload yang aman dari mismatch skema kolom
+        const payload: Record<string, any> = {
             description: newDesc,
             amount: parseFloat(newAmount),
             category: newCategory,
-            transaction_type: 'expense',
-            status: 'Lunas',
         }
 
         if (userId) {
@@ -107,7 +107,7 @@ export default function FinanceDashboard() {
             setNewDesc('')
             setNewAmount('')
         } else {
-            alert('Gagal menyimpan transaksi: ' + (error?.message || 'Pastikan kolom tabel sesuai.'))
+            alert('Gagal menyimpan transaksi: ' + (error?.message || 'Terjadi kesalahan sistem.'))
         }
         setSubmitting(false)
     }
