@@ -1,132 +1,46 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
-import Link from 'next/link'
 import { createClient } from '@supabase/supabase-js'
+import DynamicNavbar from '@/components/DynamicNavbar'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
-// 30 Modul Tambang Nikel PT. JEEP
-const ALL_MODULES = [
-    { key: 'manager-site', label: 'Pit Produksi', icon: '⛏️', href: '/manager-site' },
-    { key: 'fleet', label: 'Alat Berat', icon: '🚜', href: '/fleet' },
-    { key: 'fleet-maintenance', label: 'Workshop Fleet', icon: '🔧', href: '/fleet-maintenance' },
-    { key: 'sparepart', label: 'Sparepart', icon: '📦', href: '/sparepart' },
-    { key: 'safety', label: 'Inspeksi K3', icon: '⛑️', href: '/safety' },
-    { key: 'ritase', label: 'Ritase', icon: '🚛', href: '/ritase' },
-    { key: 'jetty', label: 'Jetty Port', icon: '🚢', href: '/jetty' },
-    { key: 'environment', label: 'Lingkungan', icon: '🌱', href: '/environment' },
-    { key: 'lingkungan', label: 'Kanal Sedimen', icon: '🏞️', href: '/lingkungan' },
-    { key: 'bbm', label: 'BBM Solar', icon: '⛽', href: '/bbm' },
-    { key: 'finance', label: 'Keuangan', icon: '💰', href: '/finance' },
-    { key: 'adm', label: 'ADM & Surat', icon: '📋', href: '/adm' },
-    { key: 'hrd', label: 'HRD & K3', icon: '👷‍♂️', href: '/hrd' },
-    { key: 'ga', label: 'GA & Fasilitas', icon: '🚙', href: '/ga' },
-    { key: 'mess', label: 'Mess Camp', icon: '🏠', href: '/mess' },
-    { key: 'catering', label: 'Katering', icon: '🍱', href: '/catering' },
-    { key: 'clinic', label: 'Klinik Site', icon: '🏥', href: '/clinic' },
-    { key: 'security', label: 'Security', icon: '🛡️', href: '/security' },
-    { key: 'radio', label: 'Radio Dispatch', icon: '📻', href: '/radio' },
-    { key: 'legal', label: 'Legalitas IUP', icon: '⚖️', href: '/legal' },
-    { key: 'csr', label: 'CSR Masyarakat', icon: '🤝', href: '/csr' },
-    { key: 'vendor', label: 'Vendor', icon: '🏬', href: '/vendor' },
-    { key: 'transport', label: 'Transport Kru', icon: '🚌', href: '/transport' },
-    { key: 'training', label: 'Training K3', icon: '🎓', href: '/training' },
-    { key: 'performance', label: 'Kinerja KPI', icon: '📈', href: '/performance' },
-    { key: 'it-helpdesk', label: 'IT Helpdesk', icon: '💻', href: '/it-helpdesk' },
-    { key: 'helpdesk', label: 'Helpdesk GA', icon: '🛠️', href: '/helpdesk' },
-    { key: 'investor', label: 'Investor', icon: '📊', href: '/investor' },
-    { key: 'direktur', label: 'Eksekutif BOD', icon: '🏛️', href: '/direktur' },
-    { key: 'laporan', label: 'Cetak Laporan', icon: '📄', href: '/laporan' },
-]
-
 export default function AdmDashboardPage() {
     const [loading, setLoading] = useState(true)
     const [userProfile, setUserProfile] = useState<any>(null)
-    const [allowedModules, setAllowedModules] = useState<string[]>([])
     const [activeTab, setActiveTab] = useState<'surat' | 'jalan' | 'po' | 'simp'>('surat')
     const [searchTerm, setSearchTerm] = useState('')
 
     const landingUrl = process.env.NEXT_PUBLIC_LANDING_URL || 'https://pt-jeep.vercel.app'
 
     useEffect(() => {
-        let isMounted = true
-
-        async function loadAuthAndPermissions() {
-            try {
-                const { data: { session } } = await supabase.auth.getSession()
-                if (!session) {
-                    window.location.href = landingUrl
-                    return
-                }
-
-                // Ambil profil
-                const { data: profile } = await supabase
-                    .from('profiles')
-                    .select('full_name, role, status')
-                    .eq('id', session.user.id)
-                    .maybeSingle()
-
-                if (isMounted) {
-                    setUserProfile(profile)
-                    const userDivision = (profile?.role || '').trim()
-
-                    // Jika Superadmin, berikan semua modul
-                    const isSuperAdmin = ['admin', 'administrator', 'superadmin'].includes(userDivision.toLowerCase())
-
-                    if (isSuperAdmin) {
-                        setAllowedModules(ALL_MODULES.map((m) => m.key))
-                    } else {
-                        // Ambil izin dari database
-                        const { data: allPerms } = await supabase
-                            .from('division_permissions')
-                            .select('division_name, allowed_modules')
-
-                        if (allPerms && allPerms.length > 0) {
-                            const cleanDiv = userDivision.toLowerCase()
-
-                            const matched = allPerms.find((p) => {
-                                const target = (p.division_name || '').toLowerCase().trim()
-                                return (
-                                    target === cleanDiv ||
-                                    target.includes(cleanDiv) ||
-                                    cleanDiv.includes(target) ||
-                                    (cleanDiv === 'adm' && target.includes('adm'))
-                                )
-                            })
-
-                            if (matched && Array.isArray(matched.allowed_modules)) {
-                                setAllowedModules(matched.allowed_modules)
-                            } else {
-                                setAllowedModules(['adm'])
-                            }
-                        } else {
-                            setAllowedModules(['adm'])
-                        }
-                    }
-                    setLoading(false)
-                }
-            } catch (err) {
-                console.error('Gagal memuat izin:', err)
-                if (isMounted) setLoading(false)
+        async function loadAuth() {
+            const { data: { session } } = await supabase.auth.getSession()
+            if (!session) {
+                window.location.href = landingUrl
+                return
             }
+
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('full_name, role, status')
+                .eq('id', session.user.id)
+                .maybeSingle()
+
+            setUserProfile(profile)
+            setLoading(false)
         }
 
-        loadAuthAndPermissions()
-        return () => { isMounted = false }
+        loadAuth()
     }, [landingUrl])
 
     const handleLogout = async () => {
         await supabase.auth.signOut()
         window.location.href = landingUrl
     }
-
-    // Filter tombol navigasi: hanya modul yang diizinkan oleh Superadmin
-    const authorizedNavItems = ALL_MODULES.filter((item) =>
-        allowedModules.includes(item.key)
-    )
 
     if (loading) {
         return (
@@ -139,7 +53,7 @@ export default function AdmDashboardPage() {
 
     return (
         <div className="min-h-screen bg-[#070b12] text-slate-100 font-sans p-6 select-none">
-            {/* Header Utama Modul */}
+            {/* Header Atas Modul */}
             <div className="bg-[#0b1320] border border-[#1b2a40] rounded-xl p-5 mb-5 flex flex-wrap items-center justify-between gap-4">
                 <div className="flex items-center gap-3.5">
                     <span className="text-3xl p-2.5 bg-[#070e18] border border-[#16253a] rounded-lg">📋</span>
@@ -167,29 +81,10 @@ export default function AdmDashboardPage() {
                 </button>
             </div>
 
-            {/* Bilah Navigasi: Hanya Merender Modul yang Diizinkan */}
-            <div className="overflow-x-auto pb-2 mb-6">
-                <div className="flex items-center gap-2 min-w-max">
-                    {authorizedNavItems.map((item) => {
-                        const isCurrent = item.key === 'adm'
-                        return (
-                            <Link
-                                key={item.key}
-                                href={item.href}
-                                className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition ${isCurrent
-                                        ? 'bg-[#10253d] border border-cyan-400 text-white shadow-md shadow-cyan-950/50'
-                                        : 'bg-[#0b1320] border border-[#162336] text-slate-400 hover:text-slate-200 hover:border-[#243754]'
-                                    }`}
-                            >
-                                <span>{item.icon}</span>
-                                <span>{item.label}</span>
-                            </Link>
-                        )
-                    })}
-                </div>
-            </div>
+            {/* NAVBAR DINAMIS: HANYA MERENDER MODUL YANG DIBERI IZIN (Misal: ADM & Surat + BBM Solar) */}
+            <DynamicNavbar currentModule="adm" />
 
-            {/* Tab Filter Sub-Kategori ADM */}
+            {/* Tab Kategori Berkas */}
             <div className="flex flex-wrap items-center gap-2.5 mb-6">
                 <button
                     onClick={() => setActiveTab('surat')}
@@ -233,9 +128,8 @@ export default function AdmDashboardPage() {
                 </button>
             </div>
 
-            {/* Konten Area Kerja Administrasi */}
+            {/* Area Kerja Dokumen */}
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                {/* Kolom Kiri: Tombol Aksi Cepat & Info DB */}
                 <div className="space-y-4">
                     <div className="bg-[#0b1320] border border-cyan-500/30 rounded-xl p-4 cursor-pointer hover:border-cyan-400 transition">
                         <div className="flex items-center gap-3">
@@ -270,7 +164,6 @@ export default function AdmDashboardPage() {
                     </div>
                 </div>
 
-                {/* Kolom Kanan: Tabel Dokumen */}
                 <div className="lg:col-span-3 bg-[#0b1320] border border-[#162336] rounded-xl p-5 flex flex-col justify-between">
                     <div>
                         <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
