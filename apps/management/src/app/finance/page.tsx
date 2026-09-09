@@ -1,7 +1,6 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { createClient } from '@supabase/supabase-js'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
@@ -13,31 +12,23 @@ interface Transaction {
     created_at: string
     description: string
     amount: number
-    type: string
+    transaction_type?: string
     category: string
-    status: string
-}
-
-interface Equipment {
-    id: string
-    plate_number?: string
-    model?: string
     status?: string
 }
 
 export default function FinanceDashboard() {
-    const router = useRouter()
     const [loading, setLoading] = useState(true)
     const [userName, setUserName] = useState('User Finance')
+    const [userId, setUserId] = useState<string | null>(null)
     const [activeTab, setActiveTab] = useState('ringkasan')
     const [transactions, setTransactions] = useState<Transaction[]>([])
-    const [equipments, setEquipments] = useState<Equipment[]>([])
 
-    // State Modal Input Transaksi Baru
+    // Modal Input Transaksi Baru
     const [showModal, setShowModal] = useState(false)
     const [newDesc, setNewDesc] = useState('')
     const [newAmount, setNewAmount] = useState('')
-    const [newCategory, setNewCategory] = useState('BBM')
+    const [newCategory, setNewCategory] = useState('BBM & Pelumas')
     const [submitting, setSubmitting] = useState(false)
 
     const landingUrl = process.env.NEXT_PUBLIC_LANDING_URL || 'https://pt-jeep.vercel.app'
@@ -45,14 +36,14 @@ export default function FinanceDashboard() {
     useEffect(() => {
         async function initFinance() {
             try {
-                // 1. Validasi Sesi Pengguna
                 const { data: { session } } = await supabase.auth.getSession()
                 if (!session) {
                     window.location.href = landingUrl
                     return
                 }
 
-                // 2. Validasi Profil & Role
+                setUserId(session.user.id)
+
                 const { data: profile } = await supabase
                     .from('profiles')
                     .select('full_name, role, status')
@@ -67,26 +58,19 @@ export default function FinanceDashboard() {
 
                 setUserName(profile.full_name || 'Finance Officer')
 
-                // 3. Tarik Live Data Transaksi
-                const { data: trxData } = await supabase
+                // Tarik data transaksi riil dari Supabase
+                const { data: trxData, error: trxErr } = await supabase
                     .from('finance_transactions')
                     .select('*')
                     .order('created_at', { ascending: false })
-                    .limit(10)
 
-                if (trxData) setTransactions(trxData)
-
-                // 4. Tarik Live Data Unit / Alat Berat
-                const { data: eqData } = await supabase
-                    .from('dump_trucks')
-                    .select('*')
-                    .limit(10)
-
-                if (eqData) setEquipments(eqData)
+                if (!trxErr && trxData) {
+                    setTransactions(trxData)
+                }
 
                 setLoading(false)
             } catch (err) {
-                console.error('Error loading finance data:', err)
+                console.error('Error init finance:', err)
                 setLoading(false)
             }
         }
@@ -94,23 +78,27 @@ export default function FinanceDashboard() {
         initFinance()
     }, [landingUrl])
 
-    // Fungsi Tambah Transaksi Kas
+    // Simpan Transaksi Baru ke Supabase
     const handleAddTransaction = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!newDesc || !newAmount) return
 
         setSubmitting(true)
+        const payload: any = {
+            description: newDesc,
+            amount: parseFloat(newAmount),
+            category: newCategory,
+            transaction_type: 'expense',
+            status: 'Lunas',
+        }
+
+        if (userId) {
+            payload.user_id = userId
+        }
+
         const { data, error } = await supabase
             .from('finance_transactions')
-            .insert([
-                {
-                    description: newDesc,
-                    amount: parseFloat(newAmount),
-                    category: newCategory,
-                    type: 'expense',
-                    status: 'Lunas',
-                },
-            ])
+            .insert([payload])
             .select()
 
         if (!error && data) {
@@ -119,7 +107,7 @@ export default function FinanceDashboard() {
             setNewDesc('')
             setNewAmount('')
         } else {
-            alert('Gagal menyimpan transaksi: ' + (error?.message || ''))
+            alert('Gagal menyimpan transaksi: ' + (error?.message || 'Pastikan kolom tabel sesuai.'))
         }
         setSubmitting(false)
     }
@@ -157,35 +145,39 @@ export default function FinanceDashboard() {
 
                 <button
                     onClick={handleLogout}
-                    className="bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/50 text-rose-300 text-xs px-4 py-2 rounded-lg transition"
+                    className="bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/50 text-rose-300 text-xs px-4 py-2 rounded-lg transition cursor-pointer"
                 >
                     Keluar ke Beranda
                 </button>
             </header>
 
-            {/* Nav Tabs Atas */}
+            {/* Nav Tabs */}
             <nav className="flex flex-wrap gap-2 mb-6">
                 {[
                     { id: 'ringkasan', label: 'RINGKASAN EKSEKUTIF' },
-                    { id: 'transaksi', label: 'TRANSAKSI SITE' },
-                    { id: 'alat', label: 'ALAT & DUMP TRUCK' },
+                    { id: 'transaksi', label: 'LOG TRANSAKSI REAL-TIME', badge: `${transactions.length} DATA` },
                 ].map((tab) => (
                     <button
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id)}
-                        className={`px-4 py-2.5 rounded-lg text-xs font-bold transition flex items-center gap-2 border ${activeTab === tab.id
+                        className={`px-4 py-2.5 rounded-lg text-xs font-bold transition flex items-center gap-2 border cursor-pointer ${activeTab === tab.id
                                 ? 'bg-[#1b3b5f] border-sky-400 text-white shadow-lg shadow-sky-950/50'
                                 : 'bg-[#0c1a2d] border-[#1b2e46] text-slate-400 hover:text-white hover:bg-[#12243d]'
                             }`}
                     >
-                        {tab.label}
+                        <span>{tab.label}</span>
+                        {tab.badge && (
+                            <span className="bg-amber-500 text-slate-950 text-[10px] px-1.5 py-0.5 rounded font-black">
+                                {tab.badge}
+                            </span>
+                        )}
                     </button>
                 ))}
             </nav>
 
             {/* Konten Utama */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                {/* Kolom Kiri: Menu Aksi Cepat */}
+                {/* Kolom Kiri: Action Bar */}
                 <aside className="lg:col-span-3 space-y-3">
                     <div
                         onClick={() => setShowModal(true)}
@@ -199,25 +191,20 @@ export default function FinanceDashboard() {
                     </div>
 
                     <div className="p-4 rounded-xl border border-[#16273c] bg-[#0a1625] text-slate-400 space-y-2">
-                        <span className="text-xs font-bold text-white uppercase tracking-wider block">Status Koneksi</span>
+                        <span className="text-xs font-bold text-white uppercase tracking-wider block">Status Database</span>
                         <div className="text-[11px] flex justify-between">
-                            <span>Database</span>
+                            <span>Koneksi RLS</span>
                             <span className="text-emerald-400 font-semibold">Tersambung</span>
                         </div>
                         <div className="text-[11px] flex justify-between">
-                            <span>Tabel Transaksi</span>
-                            <span className="text-slate-200">{transactions.length} baris</span>
-                        </div>
-                        <div className="text-[11px] flex justify-between">
-                            <span>Unit Armada</span>
-                            <span className="text-slate-200">{equipments.length} unit</span>
+                            <span>Total Transaksi</span>
+                            <span className="text-slate-200 font-bold">{transactions.length} baris</span>
                         </div>
                     </div>
                 </aside>
 
-                {/* Kolom Kanan: Tampilan Metrik & Tabel Live */}
+                {/* Kolom Kanan: Tabel Log */}
                 <main className="lg:col-span-9 space-y-6">
-                    {/* Tabel Transaksi Real-Time */}
                     <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
                         <div className="flex justify-between items-center mb-4">
                             <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider">
@@ -225,7 +212,7 @@ export default function FinanceDashboard() {
                             </h3>
                             <button
                                 onClick={() => setShowModal(true)}
-                                className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs px-3 py-1.5 rounded-lg transition"
+                                className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs px-3 py-1.5 rounded-lg transition cursor-pointer"
                             >
                                 + Tambah
                             </button>
@@ -246,15 +233,25 @@ export default function FinanceDashboard() {
                                         transactions.map((trx) => (
                                             <tr key={trx.id}>
                                                 <td className="py-2.5 text-white font-medium">{trx.description}</td>
-                                                <td><span className="bg-sky-950/60 border border-sky-800/40 text-sky-400 px-2 py-0.5 rounded text-[10px]">{trx.category || 'Operasional'}</span></td>
-                                                <td className="font-semibold text-amber-400">Rp {Number(trx.amount || 0).toLocaleString('id-ID')}</td>
-                                                <td><span className="text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800/40 text-[10px]">{trx.status || 'Tercatat'}</span></td>
+                                                <td>
+                                                    <span className="bg-sky-950/60 border border-sky-800/40 text-sky-400 px-2 py-0.5 rounded text-[10px]">
+                                                        {trx.category || 'Operasional'}
+                                                    </span>
+                                                </td>
+                                                <td className="font-semibold text-amber-400">
+                                                    Rp {Number(trx.amount || 0).toLocaleString('id-ID')}
+                                                </td>
+                                                <td>
+                                                    <span className="text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800/40 text-[10px]">
+                                                        {trx.status || 'Lunas'}
+                                                    </span>
+                                                </td>
                                             </tr>
                                         ))
                                     ) : (
                                         <tr>
-                                            <td colSpan={4} className="py-6 text-center text-slate-500 italic">
-                                                Belum ada transaksi di tabel finance_transactions. Klik tombol Tambah untuk membuat catatan pertama.
+                                            <td colSpan={4} className="py-8 text-center text-slate-500 italic">
+                                                Belum ada transaksi di database. Klik tombol "+ Tambah" di atas untuk membuat transaksi pertama.
                                             </td>
                                         </tr>
                                     )}
@@ -265,7 +262,7 @@ export default function FinanceDashboard() {
                 </main>
             </div>
 
-            {/* Modal Input Transaksi */}
+            {/* Modal Form Tambah Transaksi */}
             {showModal && (
                 <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
                     <div className="bg-[#0a1625] border border-[#1b2e46] rounded-xl p-6 w-full max-w-md shadow-2xl space-y-4">
@@ -300,10 +297,10 @@ export default function FinanceDashboard() {
                                     onChange={(e) => setNewCategory(e.target.value)}
                                     className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-sky-400"
                                 >
-                                    <option value="BBM">BBM & Pelumas</option>
-                                    <option value="Vendor">Pembayaran Vendor</option>
-                                    <option value="Maintenance">Sparepart & Maintenance</option>
-                                    <option value="Operasional">Operasional Pit</option>
+                                    <option value="BBM & Pelumas">BBM & Pelumas</option>
+                                    <option value="Pembayaran Vendor">Pembayaran Vendor</option>
+                                    <option value="Sparepart & Maintenance">Sparepart & Maintenance</option>
+                                    <option value="Operasional Pit">Operasional Pit</option>
                                 </select>
                             </div>
 
@@ -311,14 +308,14 @@ export default function FinanceDashboard() {
                                 <button
                                     type="button"
                                     onClick={() => setShowModal(false)}
-                                    className="px-4 py-2 rounded-lg border border-[#1b2e46] text-slate-400 hover:text-white text-xs transition"
+                                    className="px-4 py-2 rounded-lg border border-[#1b2e46] text-slate-400 hover:text-white text-xs transition cursor-pointer"
                                 >
                                     Batal
                                 </button>
                                 <button
                                     type="submit"
                                     disabled={submitting}
-                                    className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs transition"
+                                    className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs transition cursor-pointer"
                                 >
                                     {submitting ? 'Menyimpan...' : 'Simpan Transaksi'}
                                 </button>
