@@ -3,103 +3,227 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
-// 12 Kartu Modul Persis Tampilan Beranda Manajemen Operasi Tambang PT. JEEP
+// Daftar lengkap 30 modul aplikasi tambang nikel PT. JEEP sesuai struktur folder src/app
 const OPERATIONAL_MODULE_CARDS = [
     {
         key: 'manager-site',
-        title: 'Pusat Komando Pit',
+        title: 'Pusat Komando Pit Nikel',
         badge: 'Operasional Pit',
-        desc: 'Monitoring ritase batubara, pengupasan overburden, dan laporan shift DOR.',
+        desc: 'Monitoring ritase bijih nikel, pengupasan overburden (OB), dan shift DOR tambang.',
         icon: '⛏️',
     },
     {
         key: 'fleet',
         title: 'Kesiapan Alat Berat',
-        badge: 'Plant & Bengkel',
-        desc: 'Kontrol status unit (OP/ST/BD), jam kerja (HM), serta rasio PA dan MA.',
+        badge: 'Plant & Alat Berat',
+        desc: 'Kontrol unit excavator, dump truck nikel, rasio PA/MA, dan jam kerja (HM).',
         icon: '🚜',
     },
     {
+        key: 'fleet-maintenance',
+        title: 'Workshop & Perbaikan Unit',
+        badge: 'Maintenance',
+        desc: 'Jadwal servis berkala, perbaikan breakdown alat berat, dan backlog mekanik.',
+        icon: '🔧',
+    },
+    {
         key: 'sparepart',
-        title: 'Gudang & Sparepart',
-        badge: 'Logistik Workshop',
-        desc: 'Inventaris suku cadang, reorder point, dan ketersediaan part fast-moving.',
+        title: 'Gudang & Suku Cadang',
+        badge: 'Gudang Workshop',
+        desc: 'Inventaris suku cadang, reorder point sparepart, dan stok komponen kritis.',
         icon: '📦',
     },
     {
         key: 'safety',
         title: 'Inspeksi K3 & HSE',
-        badge: 'K3 Tambang',
-        desc: 'Pencatatan temuan hazard, mitigasi risiko K3, dan jam kerja selamat.',
+        badge: 'K3 Tambang Nikel',
+        desc: 'Pencatatan hazard tambang nikel, investigasi insiden, dan jam kerja selamat.',
         icon: '⛑️',
     },
     {
         key: 'ritase',
         title: 'Ritase & Timbangan',
-        badge: 'Weighbridge',
-        desc: 'Verifikasi tonase bruto, tare, dan netto armada hauling dump truck.',
+        badge: 'Weighbridge Site',
+        desc: 'Verifikasi tonase bruto, tare, dan netto bijih nikel armada hauling.',
         icon: '🚛',
     },
     {
         key: 'jetty',
-        title: 'Jetty & Barging',
-        badge: 'Port Terminal',
-        desc: 'Pemuatan conveyor tongkang batubara, draught survey, dan status SPB.',
+        title: 'Jetty & Tongkang LCT',
+        badge: 'Pelabuhan Jetty',
+        desc: 'Pemuatan ore nikel ke tongkang LCT, draught survey, dan surat persetujuan berlayar.',
         icon: '🚢',
     },
     {
         key: 'environment',
         title: 'Lingkungan & Reklamasi',
         badge: 'Lingkungan Hidup',
-        desc: 'Uji baku mutu settling pond (pH & TSS), penataan lahan, serta revegetasi.',
+        desc: 'Pemantauan settling pond nikel, baku mutu TSS & pH, dan revegetasi pascatambang.',
         icon: '🌱',
+    },
+    {
+        key: 'lingkungan',
+        title: 'Kanal Pengendali Sedimen',
+        badge: 'Sedimen & Air',
+        desc: 'Pengendalian limpasan air tambang dan audit rona lingkungan tambang nikel.',
+        icon: '🏞️',
     },
     {
         key: 'bbm',
         title: 'Tangki & BBM Solar',
         badge: 'Fuel Management',
-        desc: 'Stok solar industri, pencatatan nozzle alat berat, dan burn rate operasional.',
+        desc: 'Stok solar industri, pencatatan nozzle dispenser unit pit, dan burn rate.',
         icon: '⛽',
     },
     {
         key: 'finance',
         title: 'Kas & Finansial Site',
-        badge: 'Finance & Kas',
-        desc: 'Ledger pengeluaran kas kecil, dropping dana pusat, dan biaya lapangan.',
+        badge: 'Finance Site',
+        desc: 'Ledger pengeluaran kas kecil site, dropping dana operasional, dan rekonsiliasi.',
         icon: '💰',
     },
     {
         key: 'adm',
         title: 'Administrasi & Surat',
         badge: 'Site ADM',
-        desc: 'Pengarsipan surat jalan ritase, izin masuk SIMP, dan administrasi berkas.',
+        desc: 'Pengarsipan surat jalan pengangkutan ore nikel, izin masuk SIMP, dan persuratan.',
         icon: '📋',
     },
     {
         key: 'hrd',
-        title: 'HRD & Manpower',
+        title: 'HRD & Ketenagakerjaan',
         badge: 'Human Resources',
-        desc: 'Database pekerja tambang, shift kerja, kebugaran, dan status kru.',
+        desc: 'Database pekerja tambang nikel, rotasi roster kerja, absensi, dan kebugaran.',
         icon: '👷‍♂️',
     },
     {
         key: 'ga',
         title: 'General Affair (GA)',
         badge: 'Fasilitas & Sarana',
-        desc: 'Log armada LV operasional, sarana mess camp, genset, dan logistik makan.',
+        desc: 'Manajemen armada LV operasional, sarana genset site, dan infrastruktur camp.',
         icon: '🚙',
+    },
+    {
+        key: 'mess',
+        title: 'Hunian & Mess Karyawan',
+        badge: 'Camp Accommodation',
+        desc: 'Alokasi tempat tidur mess, pemeliharaan fasilitas kamar, dan kebersihan camp.',
+        icon: '🏠',
+    },
+    {
+        key: 'catering',
+        title: 'Katering & Logistik Pangan',
+        badge: 'Food Service',
+        desc: 'Kontrol menu makanan bergizi kru tambang nikel dan jadwal suplai mess hall.',
+        icon: '🍱',
+    },
+    {
+        key: 'clinic',
+        title: 'Klinik Medis Site',
+        badge: 'Pelayanan Medis',
+        desc: 'Pemeriksaan kesehatan pekerja, surat fit-to-work, dan penanganan darurat.',
+        icon: '🏥',
+    },
+    {
+        key: 'security',
+        title: 'Security & Akses Gerbang',
+        badge: 'Keamanan Site',
+        desc: 'Pemeriksaan ID card gerbang masuk tambang, cek bagasi, dan buku tamu logistik.',
+        icon: '🛡️',
+    },
+    {
+        key: 'radio',
+        title: 'Radio Komunikasi & Dispatch',
+        badge: 'Dispatch Tambang',
+        desc: 'Log komunikasi radio HT/SSB, pemanggilan unit pit, dan koordinasi darurat.',
+        icon: '📻',
+    },
+    {
+        key: 'legal',
+        title: 'Legalitas & Perizinan IUP',
+        badge: 'Hukum & Kepatuhan',
+        desc: 'Kepatuhan IUP-OP nikel, dokumen RKAB ESDM, IPPKH, dan AMDAL operasional.',
+        icon: '⚖️',
+    },
+    {
+        key: 'csr',
+        title: 'CSR & Hubungan Masyarakat',
+        badge: 'Community Relations',
+        desc: 'Program PPM/CSR desa lingkar tambang nikel dan komunikasi warga lokal.',
+        icon: '🤝',
+    },
+    {
+        key: 'vendor',
+        title: 'Vendor & Kontraktor',
+        badge: 'Mitra Usaha',
+        desc: 'Daftar rekanan kontraktor penambangan nikel, subkontraktor, dan evaluasi vendor.',
+        icon: '🏬',
+    },
+    {
+        key: 'transport',
+        title: 'Transportasi & Logistik Kru',
+        badge: 'Mobilisasi Kru',
+        desc: 'Jadwal bus penjemputan kru tambang, mobilisasi bandara, dan izin keluar area.',
+        icon: '🚌',
+    },
+    {
+        key: 'training',
+        title: 'Pelatihan & Sertifikasi',
+        badge: 'Training Center',
+        desc: 'Pelatihan POP/POM, sertifikasi operator alat berat nikel, dan induksi keselamatan.',
+        icon: '🎓',
+    },
+    {
+        key: 'performance',
+        title: 'Evaluasi Kinerja & KPI',
+        badge: 'Performance KPI',
+        desc: 'Pencapaian KPI produksi nikel, evaluasi disiplin kru, dan efisiensi operasional.',
+        icon: '📈',
+    },
+    {
+        key: 'it-helpdesk',
+        title: 'IT Helpdesk & Jaringan VSAT',
+        badge: 'Teknologi Informasi',
+        desc: 'Kendala internet VSAT site tambang nikel, perawatan komputer, dan printer kantor.',
+        icon: '💻',
+    },
+    {
+        key: 'helpdesk',
+        title: 'Helpdesk Sarana GA',
+        badge: 'Bantuan Fasilitas',
+        desc: 'Permintaan perbaikan fasilitas mess, AC kantor, dan saluran air bersih camp.',
+        icon: '🛠️',
+    },
+    {
+        key: 'investor',
+        title: 'Portal Investor Tambang',
+        badge: 'Investor Relations',
+        desc: 'Data keterbukaan perkembangan cadangan nikel dan laporan kinerja finansial.',
+        icon: '📊',
+    },
+    {
+        key: 'direktur',
+        title: 'Eksekutif Direksi (BOD)',
+        badge: 'Executive BOD',
+        desc: 'Executive summary tambang nikel, tren produksi ore, dan ringkasan anggaran.',
+        icon: '🏛️',
+    },
+    {
+        key: 'laporan',
+        title: 'Cetak Laporan Resmi',
+        badge: 'Laporan DOR Nikel',
+        desc: 'Format cetak resmi Daily Operation Report produksi nikel siap unduh PDF.',
+        icon: '📄',
     },
 ]
 
 export default function SuperAdminConsole() {
-    // Tab menu default langsung ke 'permissions' agar kartu modul hak akses langsung tampak
     const [activeMenu, setActiveMenu] = useState<'permissions' | 'users' | 'roles' | 'system' | 'audit'>('permissions')
 
-    // State Manajemen Pengguna
     const [users, setUsers] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
 
-    // State Modal Buat Pengguna
+    // State Pengguna Baru
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [fullName, setFullName] = useState('')
     const [username, setUsername] = useState('')
@@ -108,19 +232,19 @@ export default function SuperAdminConsole() {
     const [role, setRole] = useState('')
     const [isSubmitting, setIsSubmitting] = useState(false)
 
-    // State Modal Edit Pengguna
+    // State Edit Pengguna
     const [isEditUserModalOpen, setIsEditUserModalOpen] = useState(false)
     const [editUserId, setEditUserId] = useState('')
     const [editFullName, setEditFullName] = useState('')
     const [editUsername, setEditUsername] = useState('')
     const [editRole, setEditRole] = useState('')
 
-    // State Divisi & Jabatan
+    // State Divisi
     const [roles, setRoles] = useState<any[]>([
         { id: '1', division: 'Administrator', position: 'Super Administrator', access_level: 'Full' },
-        { id: '2', division: 'Operasional Lapangan', position: 'Operator Pit Tambang', access_level: 'Limited' },
-        { id: '3', division: 'Keuangan & Payroll', position: 'Manajer Keuangan & Gaji', access_level: 'Read-Only' },
-        { id: '4', division: 'HSE & Medical', position: 'Safety & Clinic Officer', access_level: 'Standard' },
+        { id: '2', division: 'Operasional Pit Nikel', position: 'Pit Superintendent', access_level: 'Standard' },
+        { id: '3', division: 'Keuangan & Administrasi', position: 'Finance & ADM Officer', access_level: 'Standard' },
+        { id: '4', division: 'HSE & K3 Tambang', position: 'Safety Coordinator', access_level: 'Standard' },
         { id: '5', division: 'General Affair & Logistik', position: 'GA Supervisor', access_level: 'Standard' },
     ])
     const [rolesLoading, setRolesLoading] = useState(false)
@@ -135,14 +259,14 @@ export default function SuperAdminConsole() {
     const [editPositionName, setEditPositionName] = useState('')
     const [editAccessLevel, setEditAccessLevel] = useState('Standard')
 
-    // State Hak Akses Matriks Modul Terpilih per Divisi
-    const [selectedDivisionForPermission, setSelectedDivisionForPermission] = useState('Operasional Lapangan')
+    // State Izin Modul per Divisi
+    const [selectedDivisionForPermission, setSelectedDivisionForPermission] = useState('Operasional Pit Nikel')
     const [divisionPermissions, setDivisionPermissions] = useState<Record<string, string[]>>({
         Administrator: OPERATIONAL_MODULE_CARDS.map((m) => m.key),
-        'Operasional Lapangan': ['manager-site', 'fleet', 'ritase', 'bbm'],
-        'Keuangan & Payroll': ['finance', 'adm', 'hrd'],
-        'HSE & Medical': ['safety', 'environment'],
-        'General Affair & Logistik': ['adm', 'ga', 'bbm', 'sparepart'],
+        'Operasional Pit Nikel': ['manager-site', 'fleet', 'fleet-maintenance', 'ritase', 'bbm', 'radio'],
+        'Keuangan & Administrasi': ['finance', 'adm', 'hrd', 'legal', 'laporan'],
+        'HSE & K3 Tambang': ['safety', 'clinic', 'environment', 'lingkungan'],
+        'General Affair & Logistik': ['adm', 'ga', 'mess', 'catering', 'transport', 'sparepart', 'bbm'],
     })
     const [savingPermission, setSavingPermission] = useState(false)
 
@@ -159,9 +283,7 @@ export default function SuperAdminConsole() {
             .select('*')
             .order('created_at', { ascending: false })
 
-        if (!error && data) {
-            setUsers(data)
-        }
+        if (!error && data) setUsers(data)
         setLoading(false)
     }
 
@@ -188,7 +310,7 @@ export default function SuperAdminConsole() {
                 setDivisionPermissions((prev) => ({ ...prev, ...mapped }))
             }
         } catch {
-            // Menggunakan fallback data state lokal
+            // Fallback state lokal
         }
     }
 
@@ -196,21 +318,17 @@ export default function SuperAdminConsole() {
         e.preventDefault()
         setIsSubmitting(true)
         try {
-            const { data: authData, error: authError } = await supabase.auth.signUp({
-                email,
-                password,
-            })
+            const { data: authData, error: authError } = await supabase.auth.signUp({ email, password })
             if (authError) throw authError
 
-            const userId = authData.user?.id
-            if (userId) {
+            if (authData.user?.id) {
                 await supabase.from('profiles').insert([
                     {
-                        id: userId,
+                        id: authData.user.id,
                         full_name: fullName,
                         username,
                         email,
-                        role,
+                        role: role || selectedDivisionForPermission,
                         status: 'Aktif',
                     },
                 ])
@@ -222,8 +340,8 @@ export default function SuperAdminConsole() {
             setEmail('')
             setPassword('')
             fetchUsers()
-        } catch (error: any) {
-            alert('Terjadi kesalahan: ' + error.message)
+        } catch (err: any) {
+            alert('Gagal: ' + err.message)
         } finally {
             setIsSubmitting(false)
         }
@@ -248,33 +366,24 @@ export default function SuperAdminConsole() {
             })
             .eq('id', editUserId)
 
-        if (error) {
-            alert('Gagal memperbarui pengguna: ' + error.message)
-        } else {
+        if (!error) {
             alert('Data pengguna berhasil diperbarui!')
             setIsEditUserModalOpen(false)
             fetchUsers()
+        } else {
+            alert('Gagal: ' + error.message)
         }
     }
 
     const handleDeleteUser = async (id: string, emailUser: string) => {
-        if (!confirm(`Yakin ingin menghapus pengguna ${emailUser} dari database?`)) return
+        if (!confirm(`Hapus akun ${emailUser}?`)) return
         const { error } = await supabase.from('profiles').delete().eq('id', id)
-        if (error) {
-            alert('Gagal menghapus pengguna: ' + error.message)
-        } else {
-            alert('Pengguna berhasil dihapus.')
-            fetchUsers()
-        }
+        if (!error) fetchUsers()
     }
 
     const handleToggleStatus = async (id: string, currentStatus: string) => {
         const newStatus = currentStatus === 'Aktif' ? 'Non-Aktif' : 'Aktif'
-        const { error } = await supabase
-            .from('profiles')
-            .update({ status: newStatus })
-            .eq('id', id)
-
+        const { error } = await supabase.from('profiles').update({ status: newStatus }).eq('id', id)
         if (!error) fetchUsers()
     }
 
@@ -285,7 +394,7 @@ export default function SuperAdminConsole() {
         const newRoleItem = {
             id: Date.now().toString(),
             division: divisionName,
-            position: positionName || 'Staff Umum',
+            position: positionName || 'Staff Operasional',
             access_level: accessLevel,
         }
 
@@ -297,17 +406,17 @@ export default function SuperAdminConsole() {
             },
         ])
 
-        if (error) {
-            setRoles([newRoleItem, ...roles])
-            alert('Data Divisi & Jabatan berhasil ditambahkan secara lokal.')
-        } else {
-            alert('Data Divisi & Jabatan berhasil disimpan ke database!')
+        if (!error) {
+            alert('Divisi berhasil disimpan ke database!')
             fetchRoles()
+        } else {
+            setRoles([newRoleItem, ...roles])
+            alert('Divisi ditambahkan secara lokal.')
         }
 
         setDivisionPermissions((prev) => ({
             ...prev,
-            [divisionName]: ['manager-site', 'safety', 'adm'],
+            [divisionName]: ['manager-site', 'ritase', 'adm'],
         }))
 
         setDivisionName('')
@@ -334,7 +443,10 @@ export default function SuperAdminConsole() {
             })
             .eq('id', editRoleId)
 
-        if (error) {
+        if (!error) {
+            alert('Divisi berhasil diperbarui!')
+            fetchRoles()
+        } else {
             setRoles(
                 roles.map((item) =>
                     item.id === editRoleId
@@ -342,29 +454,20 @@ export default function SuperAdminConsole() {
                         : item
                 )
             )
-        } else {
-            alert('Data Divisi berhasil diperbarui!')
-            fetchRoles()
         }
         setIsEditRoleModalOpen(false)
     }
 
     const handleDeleteRole = async (id: string) => {
-        if (!confirm('Yakin ingin menghapus divisi ini?')) return
+        if (!confirm('Hapus divisi ini?')) return
         const { error } = await supabase.from('roles').delete().eq('id', id)
-        if (error) {
-            setRoles(roles.filter((r) => r.id !== id))
-        } else {
-            fetchRoles()
-        }
+        if (!error) fetchRoles()
+        else setRoles(roles.filter((r) => r.id !== id))
     }
 
-    // Handler Checklist Modul per Divisi
     const handleToggleModulePermission = (moduleKey: string) => {
         const currentList = divisionPermissions[selectedDivisionForPermission] || []
-        const exists = currentList.includes(moduleKey)
-
-        const updated = exists
+        const updated = currentList.includes(moduleKey)
             ? currentList.filter((k) => k !== moduleKey)
             : [...currentList, moduleKey]
 
@@ -405,12 +508,12 @@ export default function SuperAdminConsole() {
                 )
 
             if (error) {
-                alert(`Hak akses tersimpan secara lokal untuk divisi: ${selectedDivisionForPermission}`)
+                alert(`Hak akses tersimpan secara lokal untuk: ${selectedDivisionForPermission}`)
             } else {
                 alert(`Hak akses divisi "${selectedDivisionForPermission}" berhasil disimpan ke database!`)
             }
         } catch {
-            alert(`Hak akses tersimpan lokal untuk divisi: ${selectedDivisionForPermission}`)
+            alert(`Hak akses tersimpan lokal untuk: ${selectedDivisionForPermission}`)
         } finally {
             setSavingPermission(false)
         }
@@ -424,18 +527,17 @@ export default function SuperAdminConsole() {
     const currentAllowed = divisionPermissions[selectedDivisionForPermission] || []
 
     return (
-        <div className="flex h-screen bg-[#070b12] text-slate-200 font-sans overflow-hidden selection:bg-amber-500 selection:text-black relative">
+        <div className="flex h-screen bg-[#070b12] text-slate-200 font-sans overflow-hidden select-none">
             {/* Sidebar Navigasi Konsol */}
             <aside className="w-64 bg-[#0c121e] border-r border-[#1a2333] flex flex-col">
                 <div className="p-5 border-b border-[#1a2333]">
-                    <div className="text-[10px] text-amber-400 font-mono tracking-widest mb-1">PT-JEEP // JO SYSTEM</div>
+                    <div className="text-[10px] text-amber-400 font-mono tracking-widest mb-1">PT-JEEP // NICKEL MINING</div>
                     <h1 className="text-base font-black text-white tracking-tight leading-none">Konsol Developer</h1>
                 </div>
 
                 <nav className="flex-1 py-4 px-3 space-y-1.5 overflow-y-auto">
-                    <p className="px-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Akses & Identitas</p>
+                    <p className="px-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Akses & Modul Tambang</p>
 
-                    {/* Menu Baru Hak Akses Modul Divisi */}
                     <button
                         onClick={() => setActiveMenu('permissions')}
                         className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-xs font-bold transition cursor-pointer ${activeMenu === 'permissions'
@@ -447,7 +549,7 @@ export default function SuperAdminConsole() {
                             <span>🔑</span>
                             <span>Hak Akses Modul Divisi</span>
                         </div>
-                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-black/30 font-mono">12 MODUL</span>
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-black/30 font-mono">{OPERATIONAL_MODULE_CARDS.length} MODUL</span>
                     </button>
 
                     <button
@@ -507,16 +609,16 @@ export default function SuperAdminConsole() {
 
             {/* Area Konten Utama */}
             <main className="flex-1 overflow-y-auto bg-[#070b12] p-8">
-                {/* TAB UTAMA: HAK AKSES MODUL DIVISI (12 KARTU PERSIS GAMBAR) */}
+                {/* TAB UTAMA: HAK AKSES MODUL OPERASIONAL TAMBANG NIKEL */}
                 {activeMenu === 'permissions' && (
                     <div className="space-y-6 max-w-7xl mx-auto">
                         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#1a273b] pb-4">
                             <div>
                                 <h2 className="text-2xl font-black text-white flex items-center gap-2.5">
-                                    <span>🔑</span> Hak Akses Pembagian Modul per Divisi
+                                    <span>🔑</span> Hak Akses Modul Operasional Tambang Nikel
                                 </h2>
                                 <p className="text-xs text-slate-400 mt-0.5">
-                                    Pilih divisi untuk mengonfigurasi aplikasi dan menu operasional mana saja yang berhak dibuka oleh karyawan.
+                                    Pilih divisi untuk mengonfigurasi aplikasi mana saja (dari seluruh 30 modul site) yang diizinkan untuk dibuka.
                                 </p>
                             </div>
 
@@ -568,8 +670,8 @@ export default function SuperAdminConsole() {
                             </div>
                         </div>
 
-                        {/* Grid 12 Kartu Modul Persis Tampilan Beranda */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        {/* Grid Lengkap Seluruh Modul Tambang Nikel PT. JEEP */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                             {OPERATIONAL_MODULE_CARDS.map((mod) => {
                                 const isChecked = currentAllowed.includes(mod.key)
                                 return (
@@ -626,7 +728,7 @@ export default function SuperAdminConsole() {
                         <div className="flex justify-between items-end">
                             <div>
                                 <h2 className="text-2xl font-bold text-white mb-1">Manajemen Pengguna</h2>
-                                <p className="text-sm text-slate-500">Data tersimpan secara real-time di database Supabase.</p>
+                                <p className="text-sm text-slate-500">Data akun karyawan tambang nikel PT. JEEP.</p>
                             </div>
                             <button
                                 onClick={() => setIsModalOpen(true)}
@@ -645,7 +747,7 @@ export default function SuperAdminConsole() {
                                         <tr>
                                             <th className="p-4">Pengguna & Username</th>
                                             <th className="p-4">Email</th>
-                                            <th className="p-4">Divisi / Peran</th>
+                                            <th className="p-4">Divisi</th>
                                             <th className="p-4">Status</th>
                                             <th className="p-4 text-right">Aksi</th>
                                         </tr>
@@ -703,7 +805,7 @@ export default function SuperAdminConsole() {
                     <div className="space-y-6 max-w-6xl mx-auto">
                         <div>
                             <h2 className="text-2xl font-bold text-white mb-1">Manajemen Divisi & Jabatan</h2>
-                            <p className="text-sm text-slate-500">Struktur organisasi yang terhubung ke modul Admin, HRD, Keuangan, dan Payroll.</p>
+                            <p className="text-sm text-slate-500">Struktur divisi operasional penambangan nikel PT. JEEP.</p>
                         </div>
 
                         <section className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 shadow-lg">
@@ -715,7 +817,7 @@ export default function SuperAdminConsole() {
                                         type="text"
                                         value={divisionName}
                                         onChange={(e) => setDivisionName(e.target.value)}
-                                        placeholder="Contoh: Divisi Keuangan / HRD"
+                                        placeholder="Contoh: Divisi Hauling Nikel"
                                         className="w-full bg-black border border-zinc-700 rounded p-2.5 text-sm text-white focus:outline-none focus:border-amber-500"
                                         required
                                     />
@@ -726,7 +828,7 @@ export default function SuperAdminConsole() {
                                         type="text"
                                         value={positionName}
                                         onChange={(e) => setPositionName(e.target.value)}
-                                        placeholder="Contoh: Supervisor / Payroll Officer"
+                                        placeholder="Contoh: Foreman Hauling"
                                         className="w-full bg-black border border-zinc-700 rounded p-2.5 text-sm text-white focus:outline-none focus:border-amber-500"
                                     />
                                 </div>
@@ -805,8 +907,8 @@ export default function SuperAdminConsole() {
                                 <div className="text-lg font-bold text-emerald-400 mt-1">Terhubung & Normal</div>
                             </div>
                             <div className="p-4 bg-[#111] border border-[#222] rounded-xl">
-                                <div className="text-xs text-slate-400">Latency Server</div>
-                                <div className="text-lg font-bold text-cyan-400 mt-1">~24 ms</div>
+                                <div className="text-xs text-slate-400">Infrastruktur Server</div>
+                                <div className="text-lg font-bold text-cyan-400 mt-1">Vercel Edge Network Aktif</div>
                             </div>
                         </div>
                     </div>
@@ -817,7 +919,7 @@ export default function SuperAdminConsole() {
                     <div className="max-w-4xl mx-auto space-y-4">
                         <h2 className="text-2xl font-bold text-white mb-2">Log Audit Sistem</h2>
                         <div className="p-6 bg-[#111] border border-[#222] rounded-xl text-xs text-slate-400">
-                            Aktivitas login dan perubahan konfigurasi hak akses modul terekam secara berkala di basis data.
+                            Perubahan matriks akses modul operasional tambang nikel terekam di database.
                         </div>
                     </div>
                 )}
@@ -860,7 +962,7 @@ export default function SuperAdminConsole() {
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 className="w-full bg-[#0a0a0a] border border-[#333] rounded p-2.5 text-white text-sm"
-                                placeholder="Password"
+                                placeholder="Password (Min. 6 Karakter)"
                             />
                             <select
                                 value={role}
@@ -881,11 +983,7 @@ export default function SuperAdminConsole() {
                                 >
                                     Batal
                                 </button>
-                                <button
-                                    type="submit"
-                                    disabled={isSubmitting}
-                                    className="flex-1 bg-amber-500 text-black py-2.5 rounded text-sm font-bold"
-                                >
+                                <button type="submit" disabled={isSubmitting} className="flex-1 bg-amber-500 text-black py-2.5 rounded text-sm font-bold">
                                     Simpan
                                 </button>
                             </div>
