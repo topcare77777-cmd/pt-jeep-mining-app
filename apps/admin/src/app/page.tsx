@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
-// Daftar lengkap 30 modul aplikasi tambang nikel PT. JEEP sesuai struktur folder src/app
+// Daftar lengkap 30 modul aplikasi tambang nikel PT. Jangkar Energi Eka Perkasa
 const OPERATIONAL_MODULE_CARDS = [
     {
         key: 'manager-site',
@@ -217,8 +217,18 @@ const OPERATIONAL_MODULE_CARDS = [
     },
 ]
 
+interface CustomField {
+    id: string
+    module_key: string
+    field_label: string
+    field_name: string
+    field_type: string
+    is_required: boolean
+    placeholder: string
+}
+
 export default function SuperAdminConsole() {
-    const [activeMenu, setActiveMenu] = useState<'permissions' | 'users' | 'roles' | 'system' | 'audit'>('permissions')
+    const [activeMenu, setActiveMenu] = useState<'permissions' | 'form_builder' | 'users' | 'roles' | 'system' | 'audit'>('permissions')
 
     const [users, setUsers] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
@@ -270,11 +280,26 @@ export default function SuperAdminConsole() {
     })
     const [savingPermission, setSavingPermission] = useState(false)
 
+    // State Modul Form Builder Dinamis
+    const [selectedModuleForField, setSelectedModuleForField] = useState('bbm')
+    const [customFields, setCustomFields] = useState<CustomField[]>([])
+    const [isFieldModalOpen, setIsFieldModalOpen] = useState(false)
+    const [newFieldLabel, setNewFieldLabel] = useState('')
+    const [newFieldType, setNewFieldType] = useState('datetime-local')
+    const [newFieldPlaceholder, setNewFieldPlaceholder] = useState('')
+    const [newFieldRequired, setNewFieldRequired] = useState(false)
+    const [savingField, setSavingField] = useState(false)
+
     useEffect(() => {
         fetchUsers()
         fetchRoles()
         fetchPermissions()
+        fetchCustomFields()
     }, [])
+
+    useEffect(() => {
+        fetchCustomFields()
+    }, [selectedModuleForField])
 
     async function fetchUsers() {
         setLoading(true)
@@ -310,7 +335,68 @@ export default function SuperAdminConsole() {
                 setDivisionPermissions((prev) => ({ ...prev, ...mapped }))
             }
         } catch {
-            // Fallback state lokal
+            // Fallback state
+        }
+    }
+
+    async function fetchCustomFields() {
+        try {
+            const { data, error } = await supabase
+                .from('custom_form_fields')
+                .select('*')
+                .eq('module_key', selectedModuleForField)
+                .order('created_at', { ascending: true })
+
+            if (!error && data) {
+                setCustomFields(data)
+            }
+        } catch (err) {
+            console.error(err)
+        }
+    }
+
+    const handleCreateCustomField = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!newFieldLabel) return
+
+        setSavingField(true)
+        const fieldNameGenerated = newFieldLabel.toLowerCase().replace(/[^a-z0-9]/g, '_')
+
+        const payload = {
+            module_key: selectedModuleForField,
+            field_label: newFieldLabel,
+            field_name: fieldNameGenerated,
+            field_type: newFieldType,
+            placeholder: newFieldPlaceholder,
+            is_required: newFieldRequired,
+        }
+
+        const { data, error } = await supabase
+            .from('custom_form_fields')
+            .insert([payload])
+            .select()
+
+        if (!error && data) {
+            setCustomFields([...customFields, data[0]])
+            setIsFieldModalOpen(false)
+            setNewFieldLabel('')
+            setNewFieldPlaceholder('')
+            setNewFieldRequired(false)
+            alert(`Kolom "${newFieldLabel}" berhasil ditambahkan ke modul ${selectedModuleForField}!`)
+        } else {
+            alert('Gagal membuat kolom: ' + (error?.message || 'Periksa tabel custom_form_fields di Supabase.'))
+        }
+        setSavingField(false)
+    }
+
+    const handleDeleteCustomField = async (fieldId: string, label: string) => {
+        if (!confirm(`Hapus kolom input "${label}" dari modul ini?`)) return
+
+        const { error } = await supabase.from('custom_form_fields').delete().eq('id', fieldId)
+        if (!error) {
+            setCustomFields(customFields.filter((f) => f.id !== fieldId))
+        } else {
+            alert('Gagal menghapus: ' + error.message)
         }
     }
 
@@ -496,7 +582,7 @@ export default function SuperAdminConsole() {
         const allowedModules = divisionPermissions[selectedDivisionForPermission] || []
 
         try {
-            const { data, error } = await supabase
+            const { error } = await supabase
                 .from('division_permissions')
                 .upsert(
                     {
@@ -532,7 +618,9 @@ export default function SuperAdminConsole() {
             {/* Sidebar Navigasi Konsol */}
             <aside className="w-64 bg-[#0c121e] border-r border-[#1a2333] flex flex-col">
                 <div className="p-5 border-b border-[#1a2333]">
-                    <div className="text-[10px] text-amber-400 font-mono tracking-widest mb-1">PT-JEEP // NICKEL MINING</div>
+                    <div className="text-[10px] text-amber-400 font-mono tracking-widest mb-1">
+                        PT. JANGKAR ENERGI EKA PERKASA
+                    </div>
                     <h1 className="text-base font-black text-white tracking-tight leading-none">Konsol Developer</h1>
                 </div>
 
@@ -550,7 +638,24 @@ export default function SuperAdminConsole() {
                             <span>🔑</span>
                             <span>Hak Akses Modul Divisi</span>
                         </div>
-                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-black/30 font-mono">{OPERATIONAL_MODULE_CARDS.length} MODUL</span>
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-black/30 font-mono">
+                            {OPERATIONAL_MODULE_CARDS.length} MODUL
+                        </span>
+                    </button>
+
+                    {/* MENU BARU: FORM BUILDER DINAMIS */}
+                    <button
+                        onClick={() => setActiveMenu('form_builder')}
+                        className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-xs font-bold transition cursor-pointer ${activeMenu === 'form_builder'
+                                ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20'
+                                : 'text-slate-400 hover:bg-[#131d2e] hover:text-white'
+                            }`}
+                    >
+                        <div className="flex items-center gap-2.5">
+                            <span>📝</span>
+                            <span>Kustomisasi Form Modul</span>
+                        </div>
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-black/30 font-mono">BUILDER</span>
                     </button>
 
                     <button
@@ -610,7 +715,7 @@ export default function SuperAdminConsole() {
 
             {/* Area Konten Utama */}
             <main className="flex-1 overflow-y-auto bg-[#070b12] p-8">
-                {/* TAB UTAMA: HAK AKSES MODUL OPERASIONAL TAMBANG NIKEL */}
+                {/* TAB: HAK AKSES MODUL */}
                 {activeMenu === 'permissions' && (
                     <div className="space-y-6 max-w-7xl mx-auto">
                         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#1a273b] pb-4">
@@ -632,7 +737,6 @@ export default function SuperAdminConsole() {
                             </button>
                         </div>
 
-                        {/* Pemilihan Divisi Target & Tombol Tindakan Cepat */}
                         <div className="bg-[#0b1320] border border-[#1a273b] rounded-xl p-5 shadow-xl flex flex-wrap items-center justify-between gap-4">
                             <div className="flex items-center gap-3">
                                 <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Pilih Divisi Karyawan:</label>
@@ -671,7 +775,6 @@ export default function SuperAdminConsole() {
                             </div>
                         </div>
 
-                        {/* Grid Lengkap Seluruh Modul Tambang Nikel PT. JEEP */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                             {OPERATIONAL_MODULE_CARDS.map((mod) => {
                                 const isChecked = currentAllowed.includes(mod.key)
@@ -723,13 +826,116 @@ export default function SuperAdminConsole() {
                     </div>
                 )}
 
+                {/* TAB BARU: KUSTOMISASI FORM MODUL (FORM BUILDER) */}
+                {activeMenu === 'form_builder' && (
+                    <div className="space-y-6 max-w-5xl mx-auto">
+                        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#1a273b] pb-4">
+                            <div>
+                                <h2 className="text-2xl font-black text-white flex items-center gap-2.5">
+                                    <span>📝</span> Kustomisasi Input Form Modul Site
+                                </h2>
+                                <p className="text-xs text-slate-400 mt-0.5">
+                                    Tambahkan fasilitas kolom baru (seperti tanggal, waktu, no. dokumen, dll.) ke formulir modul tanpa perlu mengubah kode.
+                                </p>
+                            </div>
+
+                            <button
+                                onClick={() => setIsFieldModalOpen(true)}
+                                className="bg-cyan-500 hover:bg-cyan-600 text-slate-950 font-black px-4 py-2.5 rounded-lg text-xs transition cursor-pointer flex items-center gap-2 shadow-lg shadow-cyan-500/20"
+                            >
+                                <span>+</span> <span>Tambah Kolom Input Baru</span>
+                            </button>
+                        </div>
+
+                        {/* Pemilihan Modul Target */}
+                        <div className="bg-[#0b1320] border border-[#1a273b] rounded-xl p-5 shadow-xl flex items-center gap-4">
+                            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                                Pilih Modul yang Ingin Ditambahkan Form:
+                            </label>
+                            <select
+                                value={selectedModuleForField}
+                                onChange={(e) => setSelectedModuleForField(e.target.value)}
+                                className="bg-[#060a10] border border-cyan-500 text-cyan-300 font-bold text-xs px-4 py-2 rounded-lg focus:outline-none"
+                            >
+                                {OPERATIONAL_MODULE_CARDS.map((m) => (
+                                    <option key={m.key} value={m.key}>
+                                        {m.icon} {m.title} ({m.key})
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {/* Tabel Daftar Kolom Kustom yang Aktif */}
+                        <div className="bg-[#0b1320] border border-[#1a273b] rounded-xl p-5 shadow-xl space-y-4">
+                            <div className="flex items-center justify-between">
+                                <h3 className="text-sm font-bold text-white uppercase tracking-wider">
+                                    Daftar Kolom Tambahan di Modul <span className="text-cyan-400 font-mono font-black">[{selectedModuleForField}]</span>
+                                </h3>
+                                <span className="text-xs text-slate-400 font-mono">
+                                    Total: <strong className="text-white">{customFields.length}</strong> Kolom Kustom
+                                </span>
+                            </div>
+
+                            <div className="border border-[#16273c] rounded-lg overflow-hidden">
+                                <table className="w-full text-left text-xs">
+                                    <thead className="bg-[#060a10] text-slate-400 border-b border-[#16273c]">
+                                        <tr>
+                                            <th className="p-3">Label Kolom</th>
+                                            <th className="p-3">Nama Variabel (ID)</th>
+                                            <th className="p-3">Tipe Input</th>
+                                            <th className="p-3 text-center">Wajib Diisi</th>
+                                            <th className="p-3 text-right">Aksi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-[#16273c] text-slate-300">
+                                        {customFields.length > 0 ? (
+                                            customFields.map((f) => (
+                                                <tr key={f.id} className="hover:bg-[#0c1626] transition">
+                                                    <td className="p-3 font-bold text-white">{f.field_label}</td>
+                                                    <td className="p-3 font-mono text-cyan-300">{f.field_name}</td>
+                                                    <td className="p-3">
+                                                        <span className="bg-[#112233] border border-[#1e3a5f] text-slate-300 text-[10px] px-2 py-0.5 rounded font-mono">
+                                                            {f.field_type}
+                                                        </span>
+                                                    </td>
+                                                    <td className="p-3 text-center">
+                                                        {f.is_required ? (
+                                                            <span className="text-amber-400 font-bold">Wajib</span>
+                                                        ) : (
+                                                            <span className="text-slate-500">Opsional</span>
+                                                        )}
+                                                    </td>
+                                                    <td className="p-3 text-right">
+                                                        <button
+                                                            onClick={() => handleDeleteCustomField(f.id, f.field_label)}
+                                                            className="text-rose-400 hover:text-rose-300 bg-rose-950/40 border border-rose-800/40 text-[10px] px-2.5 py-1 rounded transition cursor-pointer"
+                                                        >
+                                                            Hapus Kolom
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        ) : (
+                                            <tr>
+                                                <td colSpan={5} className="p-8 text-center text-slate-500 italic">
+                                                    Belum ada kolom kustom di modul ini. Klik tombol di atas untuk menambahkan fasilitas tanggal, jam, atau kolom baru lainnya.
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 {/* TAB: MANAJEMEN PENGGUNA */}
                 {activeMenu === 'users' && (
                     <div className="space-y-6 max-w-6xl mx-auto">
                         <div className="flex justify-between items-end">
                             <div>
                                 <h2 className="text-2xl font-bold text-white mb-1">Manajemen Pengguna</h2>
-                                <p className="text-sm text-slate-500">Data akun karyawan tambang nikel PT. JEEP.</p>
+                                <p className="text-sm text-slate-500">Data akun karyawan tambang nikel PT. Jangkar Energi Eka Perkasa.</p>
                             </div>
                             <button
                                 onClick={() => setIsModalOpen(true)}
@@ -806,7 +1012,7 @@ export default function SuperAdminConsole() {
                     <div className="space-y-6 max-w-6xl mx-auto">
                         <div>
                             <h2 className="text-2xl font-bold text-white mb-1">Manajemen Divisi & Jabatan</h2>
-                            <p className="text-sm text-slate-500">Struktur divisi operasional penambangan nikel PT. JEEP.</p>
+                            <p className="text-sm text-slate-500">Struktur divisi operasional penambangan nikel PT. Jangkar Energi Eka Perkasa.</p>
                         </div>
 
                         <section className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 shadow-lg">
@@ -920,11 +1126,92 @@ export default function SuperAdminConsole() {
                     <div className="max-w-4xl mx-auto space-y-4">
                         <h2 className="text-2xl font-bold text-white mb-2">Log Audit Sistem</h2>
                         <div className="p-6 bg-[#111] border border-[#222] rounded-xl text-xs text-slate-400">
-                            Perubahan matriks akses modul operasional tambang nikel terekam di database.
+                            Perubahan matriks akses dan kustomisasi formulir operasional tambang nikel terekam di database.
                         </div>
                     </div>
                 )}
             </main>
+
+            {/* MODAL BUAT KOLOM FORM KUSTOM BARU */}
+            {isFieldModalOpen && (
+                <div className="absolute inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-[#0b1320] border border-cyan-500/50 rounded-xl w-full max-w-md p-6 shadow-2xl space-y-4">
+                        <h3 className="text-base font-bold text-white uppercase tracking-wider">
+                            Tambah Input Form Modul [{selectedModuleForField}]
+                        </h3>
+                        <form onSubmit={handleCreateCustomField} className="space-y-3">
+                            <div>
+                                <label className="text-[11px] text-slate-400 block mb-1">Label Kolom Form</label>
+                                <input
+                                    type="text"
+                                    required
+                                    value={newFieldLabel}
+                                    onChange={(e) => setNewFieldLabel(e.target.value)}
+                                    placeholder="Contoh: Waktu & Tanggal Ritase / No. Segel"
+                                    className="w-full bg-[#060a10] border border-[#1b273b] rounded p-2.5 text-xs text-white focus:outline-none focus:border-cyan-400"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-[11px] text-slate-400 block mb-1">Tipe Input</label>
+                                    <select
+                                        value={newFieldType}
+                                        onChange={(e) => setNewFieldType(e.target.value)}
+                                        className="w-full bg-[#060a10] border border-[#1b273b] rounded p-2.5 text-xs text-white focus:outline-none focus:border-cyan-400 font-bold"
+                                    >
+                                        <option value="datetime-local">Tanggal & Waktu (WITA)</option>
+                                        <option value="date">Tanggal Saja</option>
+                                        <option value="time">Waktu / Pukul Saja</option>
+                                        <option value="text">Teks Bebas</option>
+                                        <option value="number">Angka / Tonase / HM</option>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="text-[11px] text-slate-400 block mb-1">Sifat Input</label>
+                                    <select
+                                        value={newFieldRequired ? 'yes' : 'no'}
+                                        onChange={(e) => setNewFieldRequired(e.target.value === 'yes')}
+                                        className="w-full bg-[#060a10] border border-[#1b273b] rounded p-2.5 text-xs text-white focus:outline-none focus:border-cyan-400"
+                                    >
+                                        <option value="no">Opsional</option>
+                                        <option value="yes">Wajib Diisi (Required)</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="text-[11px] text-slate-400 block mb-1">Petunjuk Placeholder (Opsional)</label>
+                                <input
+                                    type="text"
+                                    value={newFieldPlaceholder}
+                                    onChange={(e) => setNewFieldPlaceholder(e.target.value)}
+                                    placeholder="Contoh: Masukkan tanggal transaksi..."
+                                    className="w-full bg-[#060a10] border border-[#1b273b] rounded p-2.5 text-xs text-white focus:outline-none focus:border-cyan-400"
+                                />
+                            </div>
+
+                            <div className="flex space-x-3 pt-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsFieldModalOpen(false)}
+                                    className="flex-1 bg-[#131d2e] border border-[#1f2f47] text-slate-300 py-2.5 rounded-lg text-xs"
+                                >
+                                    Batal
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={savingField}
+                                    className="flex-1 bg-cyan-500 hover:bg-cyan-600 text-slate-950 font-bold py-2.5 rounded-lg text-xs"
+                                >
+                                    {savingField ? 'Menyimpan...' : 'Tambahkan Kolom'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
 
             {/* MODAL BUAT PENGGUNA */}
             {isModalOpen && (
