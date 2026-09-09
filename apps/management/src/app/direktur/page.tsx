@@ -12,7 +12,6 @@ export default function DirekturDashboard() {
     const [directorName, setDirectorName] = useState('Direktur Utama')
     const [activeTab, setActiveTab] = useState('executive')
 
-    // State Agregasi Data Live Eksekutif
     const [totalExpense, setTotalExpense] = useState<number>(0)
     const [totalObBcm, setTotalObBcm] = useState<number>(0)
     const [totalCoalTon, setTotalCoalTon] = useState<number>(0)
@@ -23,7 +22,6 @@ export default function DirekturDashboard() {
     useEffect(() => {
         async function initDirector() {
             try {
-                // 1. Ambil token dari URL hash jika dialihkan lintas-domain
                 if (typeof window !== 'undefined' && window.location.hash.includes('access_token')) {
                     const hashParams = new URLSearchParams(window.location.hash.replace('#', '?'))
                     const accessToken = hashParams.get('access_token')
@@ -38,14 +36,12 @@ export default function DirekturDashboard() {
                     }
                 }
 
-                // 2. Proteksi Sesi Supabase
                 const { data: { session } } = await supabase.auth.getSession()
                 if (!session) {
                     window.location.href = landingUrl
                     return
                 }
 
-                // 3. Verifikasi Profil
                 const { data: profile } = await supabase
                     .from('profiles')
                     .select('full_name, role, status')
@@ -62,7 +58,6 @@ export default function DirekturDashboard() {
 
                 setDirectorName(profile?.full_name || 'Direktur Utama')
 
-                // 4. Tarik dan Agregasi Pengeluaran Keuangan (Finance)
                 const { data: financeData } = await supabase
                     .from('finance_transactions')
                     .select('amount')
@@ -72,7 +67,6 @@ export default function DirekturDashboard() {
                     setTotalExpense(sumExp)
                 }
 
-                // 5. Tarik dan Agregasi Produksi Site (Overburden & Coal)
                 const { data: prodData } = await supabase
                     .from('site_production_logs')
                     .select('overburden_bcm, coal_getting_ton')
@@ -111,7 +105,6 @@ export default function DirekturDashboard() {
 
     return (
         <div className="min-h-screen bg-[#060c14] text-slate-100 font-sans p-4 md:p-6 select-none">
-            {/* Header Eksekutif */}
             <header className="flex flex-wrap items-center justify-between bg-[#0a1625] border border-[#1b2e46] rounded-xl px-6 py-4 mb-6 shadow-xl">
                 <div className="flex items-center space-x-3">
                     <span className="text-2xl">🏛️</span>
@@ -134,7 +127,6 @@ export default function DirekturDashboard() {
                 </button>
             </header>
 
-            {/* Nav Tabs */}
             <nav className="flex flex-wrap gap-2 mb-6">
                 {[
                     { id: 'executive', label: 'RINGKASAN EKSEKUTIF', badge: 'LIVE SYNC' },
@@ -160,7 +152,6 @@ export default function DirekturDashboard() {
                 ))}
             </nav>
 
-            {/* Kartu Metrik Level Dewan Direksi */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
                 <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
                     <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Total Pengeluaran Site (Live)</h3>
@@ -193,7 +184,6 @@ export default function DirekturDashboard() {
                 </div>
             </div>
 
-            {/* Grid Analisis Laporan Divisi */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 <div className="lg:col-span-8 bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
                     <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-4">
@@ -239,12 +229,26 @@ export default function DirekturDashboard() {
                     </div>
                 </div>
 
-                {/* Kolom Kanan: Arahan Strategis Direktur */}
-                <div className="lg:col-span-4 bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg space-y-4">
-                    <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider">
-                        Instruksi & Pengawasan Direksi
-                    </h3>
-                    <div className="space-y-3">
+                {/* Kolom Kanan: Arahan Strategis Direktur & Shortcut PDF */}
+                <div className="lg:col-span-4 space-y-4">
+                    <a
+                        href="/laporan"
+                        className="p-4 rounded-xl border border-amber-500/50 bg-amber-950/20 hover:bg-amber-900/30 text-slate-100 transition flex items-center justify-between block shadow-lg cursor-pointer"
+                    >
+                        <div className="flex items-center gap-3">
+                            <span className="text-2xl">📑</span>
+                            <div>
+                                <div className="text-xs font-bold text-amber-400">Download Rekap Laporan Lengkap</div>
+                                <div className="text-[10px] text-slate-400">Format Resmi Ringkasan PDF DOR Site</div>
+                            </div>
+                        </div>
+                        <span className="text-amber-400 text-xs">Buka →</span>
+                    </a>
+
+                    <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg space-y-3">
+                        <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+                            Instruksi & Pengawasan Direksi
+                        </h3>
                         <div className="bg-[#060c14] border border-[#1b2e46] p-3 rounded-lg text-xs">
                             <span className="text-amber-400 font-bold block mb-1">Optimasi Barging</span>
                             <p className="text-slate-300 text-[11px]">

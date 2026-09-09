@@ -42,7 +42,6 @@ export default function ManagerSiteDashboard() {
 
         async function processAuth() {
             try {
-                // 1. Tangkap token lintas-domain dari hash (#access_token=...) atau query string (?access_token=...)
                 if (typeof window !== 'undefined') {
                     let accessToken = ''
                     let refreshToken = ''
@@ -69,11 +68,9 @@ export default function ManagerSiteDashboard() {
                     }
                 }
 
-                // 2. Ambil sesi Supabase aktif
                 const { data: { session } } = await supabase.auth.getSession()
 
                 if (!session) {
-                    // Berikan toleransi listener jika sesi sedang proses persistensi
                     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
                         if (currentSession && isMounted) {
                             await loadUserData(currentSession)
@@ -97,14 +94,12 @@ export default function ManagerSiteDashboard() {
 
         async function loadUserData(session: any) {
             try {
-                // 3. Ambil data profil pengguna secara aman
                 const { data: profile } = await supabase
                     .from('profiles')
                     .select('full_name, role, status')
                     .eq('id', session.user.id)
                     .maybeSingle()
 
-                // Jangan tendang jika profil sedang dibuat/kosong; hanya blokir jika eksplisit Nonaktif
                 const statusClean = (profile?.status || '').toLowerCase().trim()
                 if (statusClean === 'nonaktif' || statusClean === 'banned' || statusClean === 'suspended') {
                     alert('Akun Anda dinonaktifkan oleh Administrator.')
@@ -120,7 +115,6 @@ export default function ManagerSiteDashboard() {
                     'Kepala Teknik Tambang / Site Manager'
                 )
 
-                // 4. Ambil data tabel site_production_logs
                 const { data: logsData, error } = await supabase
                     .from('site_production_logs')
                     .select('*')
@@ -166,7 +160,6 @@ export default function ManagerSiteDashboard() {
         }
     }, [landingUrl])
 
-    // Simpan Laporan Produksi Harian Site
     const handleAddProductionLog = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!obBcm || !coalTon) return
@@ -292,6 +285,18 @@ export default function ManagerSiteDashboard() {
                         </div>
                     </a>
 
+                    {/* Tombol Pintas ke Rekapitulasi & Cetak PDF */}
+                    <a
+                        href="/laporan"
+                        className="p-4 rounded-xl border border-[#1b2e46] bg-[#0c1a2d] hover:bg-[#12243d] hover:border-emerald-500/50 text-slate-200 transition flex items-center gap-3 block"
+                    >
+                        <span className="text-xl">📄</span>
+                        <div>
+                            <div className="text-xs font-bold text-emerald-400">Cetak Rekapitulasi Laporan</div>
+                            <div className="text-[10px] text-slate-400">Format Resmi DOR (PDF / A4)</div>
+                        </div>
+                    </a>
+
                     <div className="p-4 rounded-xl border border-[#16273c] bg-[#0a1625] text-slate-400 space-y-2">
                         <span className="text-xs font-bold text-white uppercase tracking-wider block">Database Operasional</span>
                         <div className="text-[11px] flex justify-between">
@@ -307,7 +312,6 @@ export default function ManagerSiteDashboard() {
 
                 {/* Kolom Kanan: Panel Tabel */}
                 <main className="lg:col-span-9 space-y-6">
-                    {/* Row Atas: Kartu Metrik Operasional */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
                             <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Overburden (OB) Terakhir</h3>
@@ -334,7 +338,6 @@ export default function ManagerSiteDashboard() {
                         </div>
                     </div>
 
-                    {/* Tabel Log Produksi Pit */}
                     <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
                         <div className="flex justify-between items-center mb-3">
                             <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider">
