@@ -237,6 +237,18 @@ export default function ManagerSiteDashboard() {
                         </div>
                     </div>
 
+                    {/* Tombol Pintas ke Modul Ritase */}
+                    <a
+                        href="/ritase"
+                        className="p-4 rounded-xl border border-[#1b2e46] bg-[#0c1a2d] hover:bg-[#12243d] hover:border-amber-500/50 text-slate-200 transition flex items-center gap-3 block"
+                    >
+                        <span className="text-xl">🚛</span>
+                        <div>
+                            <div className="text-xs font-bold text-amber-400">Log Ritase & Timbangan</div>
+                            <div className="text-[10px] text-slate-400">Pencatatan Dump Truck Hauling</div>
+                        </div>
+                    </a>
+
                     <div className="p-4 rounded-xl border border-[#16273c] bg-[#0a1625] text-slate-400 space-y-2">
                         <span className="text-xs font-bold text-white uppercase tracking-wider block">Database Operasional</span>
                         <div className="text-[11px] flex justify-between">
