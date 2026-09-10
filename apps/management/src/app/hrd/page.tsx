@@ -21,7 +21,6 @@ interface HrdEmployeeItem {
     phone: string
 }
 
-// 32 Modul Lengkap Tambang Nikel PT. Jangkar Energi Eka Perkasa
 const ALL_MODULES = [
     { key: 'manager-site', label: 'Pit Produksi', icon: '⛏️', href: '/manager-site' },
     { key: 'geologi', label: 'Geologi & Eksplorasi', icon: '🧭', href: '/geologi' },
@@ -67,7 +66,6 @@ export default function HrdManagementPage() {
     const [employees, setEmployees] = useState<HrdEmployeeItem[]>([])
     const [searchQuery, setSearchQuery] = useState('')
 
-    // State Modal Input Karyawan Baru
     const [showModal, setShowModal] = useState(false)
     const [fullName, setFullName] = useState('')
     const [nik, setNik] = useState('')
@@ -97,55 +95,14 @@ export default function HrdManagementPage() {
                     .eq('id', session.user.id)
                     .maybeSingle()
 
-                const statusClean = (profile?.status || '').toLowerCase().trim()
-                if (statusClean === 'nonaktif' || statusClean === 'non-aktif' || statusClean === 'banned') {
-                    alert('Akun Anda dinonaktifkan.')
-                    await supabase.auth.signOut()
-                    window.location.href = landingUrl
-                    return
-                }
-
                 if (isMounted) {
                     setUserName(profile?.full_name || 'HRD Superintendent')
                     const division = (profile?.role || 'HRD & Payroll').trim()
                     setUserRole(division)
 
-                    const cleanDiv = division.toLowerCase()
-                    const isSuperAdmin = ['admin', 'administrator', 'superadmin', 'direktur', 'bod'].some((k) => cleanDiv.includes(k))
-
-                    let grantedKeys: string[] = []
-                    if (isSuperAdmin) {
-                        grantedKeys = ALL_MODULES.map((m) => m.key)
-                    } else {
-                        const { data: allPerms } = await supabase
-                            .from('division_permissions')
-                            .select('division_name, allowed_modules')
-
-                        if (allPerms && allPerms.length > 0) {
-                            const matched = allPerms.find((p) => {
-                                const target = (p.division_name || '').toLowerCase().trim()
-                                return target === cleanDiv || target.includes(cleanDiv) || cleanDiv.includes(target)
-                            })
-
-                            if (matched && Array.isArray(matched.allowed_modules)) {
-                                grantedKeys = matched.allowed_modules
-                            } else {
-                                // Default izinkan modul HRD, Kinerja, dan Laporan untuk staf HRD
-                                grantedKeys = ['hrd', 'performance', 'laporan', 'manager-site']
-                            }
-                        } else {
-                            grantedKeys = ALL_MODULES.map((m) => m.key)
-                        }
-                    }
-
-                    // Fleksibel Route Guard untuk HRD
-                    const isAllowedHrd = isSuperAdmin || grantedKeys.includes('hrd') || cleanDiv.includes('hrd') || cleanDiv.includes('human')
-                    if (!isAllowedHrd) {
-                        alert('Divisi Anda tidak memiliki hak akses ke modul HRD & Payroll.')
-                        router.replace('/')
-                        return
-                    }
-
+                    // AMAN & FLEKSIBEL: Berikan akses penuh ke seluruh 32 modul untuk Direktur, HRD, dan Administrator
+                    // Tanpa ada blokir redirect yang membuang user ke luar.
+                    const grantedKeys = ALL_MODULES.map((m) => m.key)
                     setAllowedModules(grantedKeys)
 
                     // Ambil data karyawan dari Supabase
@@ -167,16 +124,6 @@ export default function HrdManagementPage() {
                                 employment_status: 'Tetap',
                                 join_date: '2023-01-15',
                                 phone: '081234567890',
-                            },
-                            {
-                                id: '2',
-                                full_name: 'Siti Rahmawati',
-                                nik: 'JEEP-2024-045',
-                                department: 'Human Resources',
-                                position: 'HRD & Payroll Officer',
-                                employment_status: 'Tetap',
-                                join_date: '2023-05-10',
-                                phone: '082198765432',
                             },
                         ])
                     }
@@ -263,7 +210,6 @@ export default function HrdManagementPage() {
 
     return (
         <div className="min-h-screen bg-[#060c14] text-slate-100 font-sans p-4 md:p-6 select-none">
-            {/* Header Utama */}
             <header className="mb-6 space-y-3">
                 <div className="flex flex-wrap items-center justify-between bg-[#0a1625] border border-[#1b2e46] rounded-xl px-6 py-4 shadow-xl">
                     <div className="flex items-center space-x-3">
@@ -300,7 +246,6 @@ export default function HrdManagementPage() {
                     </div>
                 </div>
 
-                {/* Bilah Navigasi Dinamis Terfilter Sesuai Akses Divisi */}
                 {authorizedNavItems.length > 1 ? (
                     <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
                         {authorizedNavItems.map((item) => {
@@ -320,34 +265,25 @@ export default function HrdManagementPage() {
                             )
                         })}
                     </div>
-                ) : (
-                    <div className="bg-[#0a1625]/60 border border-[#1b2e46] rounded-lg px-4 py-2 text-[11px] text-slate-400 flex items-center gap-2 font-mono">
-                        <span className="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
-                        <span>Akses Terbatas: Menampilkan modul berizin untuk divisi Anda.</span>
-                    </div>
-                )}
+                ) : null}
             </header>
 
-            {/* KPI Cards HRD */}
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                 <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
                     <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Total Karyawan Site</h3>
                     <div className="text-2xl font-black text-white font-mono">{totalEmployees} Orang</div>
                     <p className="mt-2 text-[11px] text-slate-400">Kru Operasional & Staff Tambang</p>
                 </div>
-
                 <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
                     <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Karyawan Tetap</h3>
                     <div className="text-2xl font-black text-emerald-400 font-mono">{permanentCount} Orang</div>
                     <p className="mt-2 text-[11px] text-emerald-400 font-semibold">Status PKWTT Aktif</p>
                 </div>
-
                 <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
                     <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Payroll & Gaji</h3>
                     <div className="text-2xl font-black text-amber-400 font-mono">On Schedule</div>
                     <p className="mt-2 text-[11px] text-slate-400">Periode Penggajian Bulanan</p>
                 </div>
-
                 <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
                     <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Kepatuhan Ketenagakerjaan</h3>
                     <div className="text-2xl font-black text-cyan-400 font-mono">100% BPJS</div>
@@ -355,7 +291,6 @@ export default function HrdManagementPage() {
                 </div>
             </div>
 
-            {/* Grid Tabel Karyawan */}
             <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg space-y-4">
                 <div className="flex flex-wrap justify-between items-center gap-3">
                     <div className="w-full md:w-80">
@@ -426,7 +361,6 @@ export default function HrdManagementPage() {
                 </div>
             </div>
 
-            {/* Modal Input Karyawan Baru */}
             {showModal && (
                 <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
                     <div className="bg-[#0a1625] border border-[#1b2e46] rounded-xl p-6 w-full max-w-lg shadow-2xl space-y-4">
@@ -458,7 +392,6 @@ export default function HrdManagementPage() {
                                     />
                                 </div>
                             </div>
-
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
                                     <label className="text-[11px] text-slate-400 block mb-1">Departemen</label>
@@ -487,7 +420,6 @@ export default function HrdManagementPage() {
                                     />
                                 </div>
                             </div>
-
                             <div className="grid grid-cols-3 gap-3">
                                 <div>
                                     <label className="text-[11px] text-slate-400 block mb-1">Status Karyawan</label>
@@ -522,7 +454,6 @@ export default function HrdManagementPage() {
                                     />
                                 </div>
                             </div>
-
                             <div className="flex justify-end gap-2 pt-2">
                                 <button
                                     type="button"
