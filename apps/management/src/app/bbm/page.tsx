@@ -20,15 +20,17 @@ interface FuelItem {
   hour_meter: number
   operator_driver: string
   fuel_man: string
+  synced?: boolean
 }
 
 // 30 Modul Lengkap Tambang Nikel PT. Jangkar Energi Eka Perkasa
 const ALL_MODULES = [
   { key: 'manager-site', label: 'Pit Produksi', icon: '⛏️', href: '/manager-site' },
+  { key: 'geologi', label: 'Geologi & Eksplorasi', icon: '🧭', href: '/geologi' },
   { key: 'fleet', label: 'Alat Berat', icon: '🚜', href: '/fleet' },
   { key: 'fleet-maintenance', label: 'Workshop Fleet', icon: '🔧', href: '/fleet-maintenance' },
-  { key: 'sparepart', label: 'Sparepart', icon: '📦', href: '/sparepart' },
-  { key: 'safety', label: 'Inspeksi K3', icon: '⛑️', href: '/safety' },
+  { key: 'sparepart', label: 'Sparepart Gudang', icon: '📦', href: '/sparepart' },
+  { key: 'safety', label: 'Inspeksi K3 (HSE)', icon: '⛑️', href: '/safety' },
   { key: 'ritase', label: 'Ritase', icon: '🚛', href: '/ritase' },
   { key: 'jetty', label: 'Jetty Port', icon: '🚢', href: '/jetty' },
   { key: 'environment', label: 'Lingkungan', icon: '🌱', href: '/environment' },
@@ -36,13 +38,14 @@ const ALL_MODULES = [
   { key: 'bbm', label: 'BBM Solar', icon: '⛽', href: '/bbm' },
   { key: 'finance', label: 'Keuangan', icon: '💰', href: '/finance' },
   { key: 'adm', label: 'ADM & Surat', icon: '📋', href: '/adm' },
-  { key: 'hrd', label: 'HRD & K3', icon: '👷‍♂️', href: '/hrd' },
+  { key: 'hrd', label: 'HRD & Payroll', icon: '👷‍♂️', href: '/hrd' },
   { key: 'ga', label: 'GA & Fasilitas', icon: '🚙', href: '/ga' },
+  { key: 'assets', label: 'Aset Tambang', icon: '🏷️', href: '/assets' },
   { key: 'mess', label: 'Mess Camp', icon: '🏠', href: '/mess' },
   { key: 'catering', label: 'Katering', icon: '🍱', href: '/catering' },
   { key: 'clinic', label: 'Klinik Site', icon: '🏥', href: '/clinic' },
   { key: 'security', label: 'Security Gate', icon: '🛡️', href: '/security' },
-  { key: 'radio', label: 'Radio Dispatch', icon: '📻', href: '/radio' },
+  { key: 'radio', label: 'Radio Komunikasi', icon: '📻', href: '/radio' },
   { key: 'legal', label: 'Legalitas IUP', icon: '⚖️', href: '/legal' },
   { key: 'csr', label: 'CSR Masyarakat', icon: '🤝', href: '/csr' },
   { key: 'vendor', label: 'Vendor', icon: '🏬', href: '/vendor' },
@@ -65,6 +68,7 @@ export default function FuelManagementPage() {
   const [allowedModules, setAllowedModules] = useState<string[]>([])
   const [fuelLogs, setFuelLogs] = useState<FuelItem[]>([])
   const [searchQuery, setSearchQuery] = useState('')
+  const [isOnline, setIsOnline] = useState(true)
 
   // State Modal Input Transaksi BBM Baru
   const [showModal, setShowModal] = useState(false)
@@ -82,6 +86,14 @@ export default function FuelManagementPage() {
 
   useEffect(() => {
     let isMounted = true
+
+    // Pemantau Status Jaringan
+    setIsOnline(navigator.onLine)
+    const handleOnline = () => setIsOnline(true)
+    const handleOffline = () => setIsOnline(false)
+
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
 
     async function initFuel() {
       try {
@@ -127,7 +139,6 @@ export default function FuelManagementPage() {
           const division = (profile?.role || 'Fuel Management').trim()
           setUserRole(division)
 
-          // Filter navigasi modul berdasarkan matriks hak akses divisi
           const isSuperAdmin = ['admin', 'administrator', 'superadmin'].includes(division.toLowerCase())
 
           let grantedKeys: string[] = []
@@ -146,7 +157,8 @@ export default function FuelManagementPage() {
                   target === cleanDiv ||
                   target.includes(cleanDiv) ||
                   cleanDiv.includes(target) ||
-                  (cleanDiv === 'bbm' && target.includes('bbm'))
+                  (cleanDiv.includes('bbm') && target.includes('bbm')) ||
+                  (cleanDiv.includes('fuel') && target.includes('fuel'))
                 )
               })
 
@@ -160,7 +172,6 @@ export default function FuelManagementPage() {
             }
           }
 
-          // Route Guard: Bila user tidak memiliki izin modul BBM
           if (!isSuperAdmin && grantedKeys.length > 0 && !grantedKeys.includes('bbm')) {
             alert('Divisi Anda tidak memiliki hak akses ke modul BBM Solar.')
             router.replace('/')
@@ -169,28 +180,31 @@ export default function FuelManagementPage() {
 
           setAllowedModules(grantedKeys)
 
+          // Ambil data lokal offline yang belum tersinkron
+          const localOfflineQueue: FuelItem[] = JSON.parse(localStorage.getItem('offline_fuel_queue') || '[]')
+
           // Ambil riwayat log BBM dari Supabase
           const { data, error } = await supabase
             .from('fuel_logs')
             .select('*')
             .order('created_at', { ascending: false })
 
+          let serverLogs: FuelItem[] = []
           if (!error && data && data.length > 0) {
-            setFuelLogs(
-              data.map((item: any) => ({
-                id: item.id,
-                transaction_datetime: item.transaction_datetime || item.transaction_date || item.created_at,
-                fuel_type: item.fuel_type || 'Solar B35 Industri',
-                transaction_type: item.transaction_type,
-                unit_code: item.unit_code,
-                liters: Number(item.liters || 0),
-                hour_meter: Number(item.hour_meter || 0),
-                operator_driver: item.operator_driver,
-                fuel_man: item.fuel_man,
-              }))
-            )
+            serverLogs = data.map((item: any) => ({
+              id: item.id,
+              transaction_datetime: item.transaction_datetime || item.transaction_date || item.created_at,
+              fuel_type: item.fuel_type || 'Solar B35 Industri',
+              transaction_type: item.transaction_type,
+              unit_code: item.unit_code,
+              liters: Number(item.liters || 0),
+              hour_meter: Number(item.hour_meter || 0),
+              operator_driver: item.operator_driver,
+              fuel_man: item.fuel_man,
+              synced: true,
+            }))
           } else {
-            setFuelLogs([
+            serverLogs = [
               {
                 id: '1',
                 transaction_datetime: '2026-09-09T08:30:00',
@@ -201,20 +215,13 @@ export default function FuelManagementPage() {
                 hour_meter: 0,
                 operator_driver: 'Supplier PT Solar Pasifik Nusantara',
                 fuel_man: 'Hendra (Fuel Man)',
+                synced: true,
               },
-              {
-                id: '2',
-                transaction_datetime: '2026-09-09T10:15:00',
-                fuel_type: 'Solar B35 Industri',
-                transaction_type: 'Pengisian',
-                unit_code: 'EX-05 (Excavator PC200)',
-                liters: 450,
-                hour_meter: 4120.0,
-                operator_driver: 'Joko (Operator Pit Nikel)',
-                fuel_man: 'Hendra (Fuel Man)',
-              },
-            ])
+            ]
           }
+
+          // Gabungkan data lokal offline di urutan teratas dengan data server
+          setFuelLogs([...localOfflineQueue, ...serverLogs])
           setLoading(false)
         }
       } catch (err) {
@@ -227,11 +234,51 @@ export default function FuelManagementPage() {
 
     return () => {
       isMounted = false
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
     }
   }, [landingUrl, router])
 
+  // Sinkronisasi otomatis saat kembali online
+  useEffect(() => {
+    async function syncOfflineQueue() {
+      if (!isOnline) return
+      const offlineQueue: FuelItem[] = JSON.parse(localStorage.getItem('offline_fuel_queue') || '[]')
+      if (offlineQueue.length === 0) return
+
+      const remainingQueue: FuelItem[] = []
+      for (const item of offlineQueue) {
+        try {
+          const { error } = await supabase.from('fuel_logs').insert([{
+            transaction_datetime: item.transaction_datetime,
+            transaction_date: item.transaction_datetime ? item.transaction_datetime.split('T')[0] : new Date().toISOString().split('T')[0],
+            fuel_type: item.fuel_type,
+            transaction_type: item.transaction_type,
+            unit_code: item.unit_code,
+            liters: item.liters,
+            hour_meter: item.hour_meter,
+            operator_driver: item.operator_driver,
+            fuel_man: item.fuel_man,
+          }])
+          if (error) {
+            remainingQueue.push(item)
+          }
+        } catch {
+          remainingQueue.push(item)
+        }
+      }
+
+      localStorage.setItem('offline_fuel_queue', JSON.stringify(remainingQueue))
+      if (offlineQueue.length > remainingQueue.length) {
+        // Refresh data setelah sinkronisasi berhasil
+        window.location.reload()
+      }
+    }
+
+    syncOfflineQueue()
+  }, [isOnline])
+
   const handleOpenModal = () => {
-    // Inisialisasi waktu saat ini dalam format YYYY-MM-DDTHH:mm
     const now = new Date()
     const offset = now.getTimezoneOffset()
     const localNow = new Date(now.getTime() - offset * 60 * 1000)
@@ -243,42 +290,82 @@ export default function FuelManagementPage() {
     e.preventDefault()
     if (!unitCode || !liters) return
 
+    const numericLiters = parseFloat(liters) || 0
+    if (numericLiters <= 0) {
+      alert('Validasi Gagal: Volume liter BBM harus lebih besar dari 0.')
+      return
+    }
+
     setSubmitting(true)
 
-    const payload = {
+    const payload: FuelItem = {
+      id: 'local_' + Date.now(),
       transaction_datetime: transactionDatetime || new Date().toISOString(),
-      transaction_date: transactionDatetime ? transactionDatetime.split('T')[0] : new Date().toISOString().split('T')[0],
       fuel_type: fuelType,
       transaction_type: transactionType,
       unit_code: unitCode.toUpperCase(),
-      liters: parseFloat(liters) || 0,
+      liters: numericLiters,
       hour_meter: parseFloat(hourMeter) || 0,
       operator_driver: operatorDriver || 'Operator Pit Nikel',
       fuel_man: fuelMan || userName,
+      synced: false,
     }
 
-    const { data, error } = await supabase
-      .from('fuel_logs')
-      .insert([payload])
-      .select()
+    if (!navigator.onLine) {
+      // Mode Offline: Simpan ke localStorage
+      const existingQueue: FuelItem[] = JSON.parse(localStorage.getItem('offline_fuel_queue') || '[]')
+      localStorage.setItem('offline_fuel_queue', JSON.stringify([payload, ...existingQueue]))
 
-    if (!error && data) {
-      setFuelLogs([data[0], ...fuelLogs])
+      setFuelLogs([payload, ...fuelLogs])
       setShowModal(false)
-      setUnitCode('DT-015')
-      setLiters('350')
-    } else {
-      // Fallback state lokal
-      setFuelLogs([
-        {
-          id: Date.now().toString(),
-          ...payload,
-        },
-        ...fuelLogs,
-      ])
+      setSubmitting(false)
+      alert('Jaringan terputus. Data disimpan di memori lokal dan akan disinkronkan otomatis saat online.')
+      return
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('fuel_logs')
+        .insert([{
+          transaction_datetime: payload.transaction_datetime,
+          transaction_date: payload.transaction_datetime.split('T')[0],
+          fuel_type: payload.fuel_type,
+          transaction_type: payload.transaction_type,
+          unit_code: payload.unit_code,
+          liters: payload.liters,
+          hour_meter: payload.hour_meter,
+          operator_driver: payload.operator_driver,
+          fuel_man: payload.fuel_man,
+        }])
+        .select()
+
+      if (!error && data) {
+        setFuelLogs([
+          {
+            id: data[0].id,
+            transaction_datetime: data[0].transaction_datetime || data[0].transaction_date || data[0].created_at,
+            fuel_type: data[0].fuel_type || 'Solar B35 Industri',
+            transaction_type: data[0].transaction_type,
+            unit_code: data[0].unit_code,
+            liters: Number(data[0].liters || 0),
+            hour_meter: Number(data[0].hour_meter || 0),
+            operator_driver: data[0].operator_driver,
+            fuel_man: data[0].fuel_man,
+            synced: true,
+          },
+          ...fuelLogs,
+        ])
+        setShowModal(false)
+      } else {
+        throw error
+      }
+    } catch {
+      // Fallback jika server gagal merespons
+      const existingQueue: FuelItem[] = JSON.parse(localStorage.getItem('offline_fuel_queue') || '[]')
+      localStorage.setItem('offline_fuel_queue', JSON.stringify([payload, ...existingQueue]))
+      setFuelLogs([payload, ...fuelLogs])
       setShowModal(false)
-      setUnitCode('DT-015')
-      setLiters('350')
+      alert('Gagal mengirim ke server. Data diamankan ke memori lokal browser.')
     }
 
     setSubmitting(false)
@@ -306,22 +393,21 @@ export default function FuelManagementPage() {
   }
 
   const totalIncoming = fuelLogs
-    .filter((f) => f.transaction_type === 'Penerimaan')
+    .filter((f) => (f?.transaction_type || '') === 'Penerimaan')
     .reduce((acc, curr) => acc + Number(curr.liters || 0), 0)
 
   const totalOutgoing = fuelLogs
-    .filter((f) => f.transaction_type === 'Pengisian')
+    .filter((f) => (f?.transaction_type || '') === 'Pengisian')
     .reduce((acc, curr) => acc + Number(curr.liters || 0), 0)
 
   const filteredLogs = fuelLogs.filter((item) =>
-    item.unit_code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    item.transaction_type.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (item.fuel_type || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-    item.operator_driver.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    item.fuel_man.toLowerCase().includes(searchQuery.toLowerCase())
+    (item?.unit_code || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (item?.transaction_type || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (item?.fuel_type || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (item?.operator_driver || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (item?.fuel_man || '').toLowerCase().includes(searchQuery.toLowerCase())
   )
 
-  // Hanya tombol navigasi berizin yang dirender
   const authorizedNavItems = ALL_MODULES.filter((item) =>
     allowedModules.includes(item.key)
   )
@@ -339,7 +425,6 @@ export default function FuelManagementPage() {
 
   return (
     <div className="min-h-screen bg-[#060c14] text-slate-100 font-sans p-4 md:p-6 select-none">
-      {/* Header Utama */}
       <header className="mb-6 space-y-3">
         <div className="flex flex-wrap items-center justify-between bg-[#0a1625] border border-[#1b2e46] rounded-xl px-6 py-4 shadow-xl">
           <div className="flex items-center space-x-3">
@@ -349,8 +434,8 @@ export default function FuelManagementPage() {
                 Manajemen BBM Solar Industri PT. Jangkar Energi Eka Perkasa
               </h1>
               <p className="text-xs text-amber-400 flex items-center gap-1.5 mt-0.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                <span>Kontrol Stok Tangki Utama Pit Nikel, Pengisian Alat Berat, & Efisiensi Burn Rate</span>
+                <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`}></span>
+                <span>{isOnline ? 'Online - Sistem Sinkronisasi Aktif' : 'Offline Mode - Data Disimpan di Perangkat'}</span>
                 <span className="text-slate-600">•</span>
                 <span className="text-slate-300 font-semibold">{userName}</span>
                 <span className="bg-[#112233] border border-[#1e3a5f] text-cyan-300 text-[10px] px-2 py-0.5 rounded font-mono font-bold">
@@ -360,36 +445,49 @@ export default function FuelManagementPage() {
             </div>
           </div>
 
-          <button
-            onClick={handleLogout}
-            className="bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/50 text-rose-300 text-xs px-4 py-2 rounded-lg transition cursor-pointer"
-          >
-            Keluar ke Beranda
-          </button>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/"
+              className="bg-[#102033] hover:bg-[#162b45] border border-[#1e3757] text-slate-300 text-xs px-3 py-2 rounded-lg transition"
+            >
+              ← Beranda Portal
+            </Link>
+            <button
+              onClick={handleLogout}
+              className="bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/50 text-rose-300 text-xs px-4 py-2 rounded-lg transition cursor-pointer"
+            >
+              Keluar
+            </button>
+          </div>
         </div>
 
-        {/* Bilah Navigasi Terfilter Sesuai Hak Akses Divisi */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
-          {authorizedNavItems.map((item) => {
-            const isActive = pathname === item.href
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border whitespace-nowrap font-medium transition cursor-pointer ${isActive
-                    ? 'bg-[#162d47] text-white border-amber-400/80 shadow-sm'
-                    : 'bg-[#0a1625] text-slate-400 border-[#1b2e46] hover:text-slate-200 hover:bg-[#0f2137]'
-                  }`}
-              >
-                <span>{item.icon}</span>
-                <span>{item.label}</span>
-              </Link>
-            )
-          })}
-        </div>
+        {authorizedNavItems.length > 1 ? (
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+            {authorizedNavItems.map((item) => {
+              const isActive = pathname === item.href
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border whitespace-nowrap font-medium transition cursor-pointer ${isActive
+                      ? 'bg-[#162d47] text-white border-amber-400/80 shadow-sm'
+                      : 'bg-[#0a1625] text-slate-400 border-[#1b2e46] hover:text-slate-200 hover:bg-[#0f2137]'
+                    }`}
+                >
+                  <span>{item.icon}</span>
+                  <span>{item.label}</span>
+                </Link>
+              )
+            })}
+          </div>
+        ) : (
+          <div className="bg-[#0a1625]/60 border border-[#1b2e46] rounded-lg px-4 py-2 text-[11px] text-slate-400 flex items-center gap-2 font-mono">
+            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
+            <span>Akses Terbatas: Menampilkan modul berizin untuk divisi Anda.</span>
+          </div>
+        )}
       </header>
 
-      {/* KPI BBM Tambang Nikel */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
           <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Total Penerimaan BBM</h3>
@@ -398,7 +496,6 @@ export default function FuelManagementPage() {
           </div>
           <p className="mt-2 text-[11px] text-slate-400">Suplai Dari Vendor Resmi Site</p>
         </div>
-
         <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
           <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Total Pengisian ke Unit</h3>
           <div className="text-2xl font-black text-amber-400 font-mono">
@@ -406,7 +503,6 @@ export default function FuelManagementPage() {
           </div>
           <p className="mt-2 text-[11px] text-slate-400">Konsumsi Alat Berat & Hauler Nikel</p>
         </div>
-
         <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
           <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Estimasi Stok Tangki Utama</h3>
           <div className="text-2xl font-black text-cyan-400 font-mono">
@@ -414,15 +510,15 @@ export default function FuelManagementPage() {
           </div>
           <p className="mt-2 text-[11px] text-cyan-400 font-semibold">Tersedia di Fuel Station Site</p>
         </div>
-
         <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
-          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Rekonsiliasi Fuel Pit</h3>
-          <div className="text-2xl font-black text-emerald-400 font-mono">Akurat 100%</div>
-          <p className="mt-2 text-[11px] text-emerald-400 font-medium">✓ Burn Rate Sesuai Jam Kerja HM</p>
+          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Status Jaringan</h3>
+          <div className={`text-2xl font-black font-mono ${isOnline ? 'text-emerald-400' : 'text-rose-400'}`}>
+            {isOnline ? 'ONLINE' : 'OFFLINE MODE'}
+          </div>
+          <p className="mt-2 text-[11px] text-slate-400">Sinkronisasi Otomatis Aktif</p>
         </div>
       </div>
 
-      {/* Grid Tabel Transaksi BBM */}
       <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg space-y-4">
         <div className="flex flex-wrap justify-between items-center gap-3">
           <div className="w-full md:w-80">
@@ -446,6 +542,7 @@ export default function FuelManagementPage() {
           <table className="w-full text-left text-xs">
             <thead>
               <tr className="border-b border-[#1b2e46] text-slate-400">
+                <th className="pb-2.5">Status Sync</th>
                 <th className="pb-2.5">Tanggal & Pukul</th>
                 <th className="pb-2.5">Jenis BBM</th>
                 <th className="pb-2.5 text-center">Transaksi</th>
@@ -462,6 +559,17 @@ export default function FuelManagementPage() {
                   const isIncoming = f.transaction_type === 'Penerimaan'
                   return (
                     <tr key={f.id} className="hover:bg-[#0c1a2d]/50 transition">
+                      <td className="py-3">
+                        {f.synced === false ? (
+                          <span className="bg-amber-950/80 border border-amber-800 text-amber-400 text-[10px] px-1.5 py-0.5 rounded font-mono">
+                            Pending (Offline)
+                          </span>
+                        ) : (
+                          <span className="bg-emerald-950/80 border border-emerald-800 text-emerald-400 text-[10px] px-1.5 py-0.5 rounded font-mono">
+                            Synced
+                          </span>
+                        )}
+                      </td>
                       <td className="py-3 font-mono text-slate-300 text-[11px] whitespace-nowrap">
                         {formatDateTimeDisplay(f.transaction_datetime)}
                       </td>
@@ -472,9 +580,9 @@ export default function FuelManagementPage() {
                       </td>
                       <td className="text-center">
                         <span
-                          className={`px-2.5 py-1 rounded text-[10px] font-bold inline-block ${isIncoming
-                              ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-800/40'
-                              : 'bg-amber-950/80 text-amber-400 border border-amber-800/40'
+                          className={`px-2.5 py-1 rounded text-[10px] font-bold inline-block border ${isIncoming
+                              ? 'bg-emerald-950/80 text-emerald-400 border-emerald-800/40'
+                              : 'bg-amber-950/80 text-amber-400 border-amber-800/40'
                             }`}
                         >
                           {f.transaction_type.toUpperCase()}
@@ -498,7 +606,7 @@ export default function FuelManagementPage() {
                 })
               ) : (
                 <tr>
-                  <td colSpan={8} className="py-8 text-center text-slate-500 italic">
+                  <td colSpan={9} className="py-8 text-center text-slate-500 italic">
                     Tidak ada data transaksi BBM yang cocok dengan pencarian.
                   </td>
                 </tr>
@@ -508,7 +616,6 @@ export default function FuelManagementPage() {
         </div>
       </div>
 
-      {/* Modal Input Transaksi BBM */}
       {showModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-[#0a1625] border border-[#1b2e46] rounded-xl p-6 w-full max-w-lg shadow-2xl space-y-4">

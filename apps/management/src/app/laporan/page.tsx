@@ -180,7 +180,7 @@ export default function LaporanPage() {
                                 report_date: '2026-09-09',
                                 pit_location: 'Pit Nikel Utama (Blok A)',
                                 overburden_bcm: 3800,
-                                coal_production_ton: 1250, // Ore Nikel Ton
+                                coal_production_ton: 1250,
                                 heavy_equipment_units: 14,
                                 weather_condition: 'Cerah',
                                 supervisor_name: 'Slamet Riyadi',
@@ -190,7 +190,7 @@ export default function LaporanPage() {
                                 report_date: '2026-09-08',
                                 pit_location: 'Pit Ekspansi (Blok B)',
                                 overburden_bcm: 4200,
-                                coal_production_ton: 1400, // Ore Nikel Ton
+                                coal_production_ton: 1400,
                                 heavy_equipment_units: 16,
                                 weather_condition: 'Hujan Ringan',
                                 supervisor_name: 'Dedi Saputra',
@@ -254,6 +254,37 @@ export default function LaporanPage() {
         setSubmitting(false)
     }
 
+    const handleExportExcel = () => {
+        try {
+            let csvContent = 'data:text/csv;charset=utf-8,'
+                + 'Tanggal,Lokasi Pit,Overburden (BCM),Produksi Ore Nikel (Ton),Alat Aktif,Cuaca,Supervisor\n'
+
+            filteredReports.forEach((r) => {
+                const row = [
+                    `"${r.report_date || ''}"`,
+                    `"${r.pit_location || ''}"`,
+                    r.overburden_bcm || 0,
+                    r.coal_production_ton || 0,
+                    r.heavy_equipment_units || 0,
+                    `"${r.weather_condition || ''}"`,
+                    `"${r.supervisor_name || ''}"`
+                ].join(',')
+                csvContent += row + '\n'
+            })
+
+            const encodedUri = encodeURI(csvContent)
+            const link = document.createElement('a')
+            link.setAttribute('href', encodedUri)
+            link.setAttribute('download', `Laporan_DOR_PT_JEEP_${new Date().toISOString().split('T')[0]}.csv`)
+            document.body.appendChild(link)
+            link.click()
+            document.body.removeChild(link)
+        } catch (err) {
+            console.error('Gagal export excel:', err)
+            alert('Terjadi kesalahan saat mengunduh berkas Excel.')
+        }
+    }
+
     const handleLogout = async () => {
         await supabase.auth.signOut()
         window.location.href = landingUrl
@@ -283,7 +314,7 @@ export default function LaporanPage() {
 
     return (
         <div className="min-h-screen bg-[#060c14] text-slate-100 font-sans p-4 md:p-6 select-none">
-            <header className="mb-6 space-y-3">
+            <header className="mb-6 space-y-3 print:hidden">
                 <div className="flex flex-wrap items-center justify-between bg-[#0a1625] border border-[#1b2e46] rounded-xl px-6 py-4 shadow-xl">
                     <div className="flex items-center space-x-3">
                         <span className="text-2xl">📄</span>
@@ -328,8 +359,8 @@ export default function LaporanPage() {
                                     key={item.href}
                                     href={item.href}
                                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border whitespace-nowrap font-medium transition cursor-pointer ${isActive
-                                            ? 'bg-[#162d47] text-white border-amber-400/80 shadow-sm'
-                                            : 'bg-[#0a1625] text-slate-400 border-[#1b2e46] hover:text-slate-200 hover:bg-[#0f2137]'
+                                        ? 'bg-[#162d47] text-white border-amber-400/80 shadow-sm'
+                                        : 'bg-[#0a1625] text-slate-400 border-[#1b2e46] hover:text-slate-200 hover:bg-[#0f2137]'
                                         }`}
                                 >
                                     <span>{item.icon}</span>
@@ -346,30 +377,37 @@ export default function LaporanPage() {
                 )}
             </header>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
-                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Total Akumulasi Ore Nikel</h3>
-                    <div className="text-2xl font-black text-emerald-400 font-mono">
+            {/* Header Cetak Khusus PDF */}
+            <div className="hidden print:block mb-6 text-black border-b-2 border-black pb-4">
+                <h2 className="text-xl font-bold uppercase">PT. JANGKAR ENEGI EKA PERKASA</h2>
+                <p className="text-xs">Laporan Harian Operasi Penambangan Nikel (DOR)</p>
+                <p className="text-[10px] text-slate-600">Dicetak oleh: {userName} pada {new Date().toLocaleDateString('id-ID')}</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6 print:grid-cols-3">
+                <div className="bg-[#0a1625] print:bg-white print:border-black border border-[#16273c] rounded-xl p-5 shadow-lg">
+                    <h3 className="text-xs font-bold text-slate-400 print:text-black uppercase tracking-wider mb-2">Total Akumulasi Ore Nikel</h3>
+                    <div className="text-2xl font-black text-emerald-400 print:text-black font-mono">
                         {totalOre.toLocaleString('id-ID')} Ton
                     </div>
-                    <p className="mt-2 text-[11px] text-slate-400">Bijih Nikel Siap Kirim</p>
+                    <p className="mt-2 text-[11px] text-slate-400 print:text-black">Bijih Nikel Siap Kirim</p>
                 </div>
-                <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
-                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Total Stripping Overburden</h3>
-                    <div className="text-2xl font-black text-white font-mono">
+                <div className="bg-[#0a1625] print:bg-white print:border-black border border-[#16273c] rounded-xl p-5 shadow-lg">
+                    <h3 className="text-xs font-bold text-slate-400 print:text-black uppercase tracking-wider mb-2">Total Stripping Overburden</h3>
+                    <div className="text-2xl font-black text-white print:text-black font-mono">
                         {totalOB.toLocaleString('id-ID')} BCM
                     </div>
-                    <p className="mt-2 text-[11px] text-slate-400">Lapisan Tanah Penutup</p>
+                    <p className="mt-2 text-[11px] text-slate-400 print:text-black">Lapisan Tanah Penutup</p>
                 </div>
-                <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
-                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Total Laporan Tercatat</h3>
-                    <div className="text-2xl font-black text-amber-400 font-mono">{reports.length} Laporan</div>
-                    <p className="mt-2 text-[11px] text-slate-400">Arsip DOR Site Tervalidasi</p>
+                <div className="bg-[#0a1625] print:bg-white print:border-black border border-[#16273c] rounded-xl p-5 shadow-lg">
+                    <h3 className="text-xs font-bold text-slate-400 print:text-black uppercase tracking-wider mb-2">Total Laporan Tercatat</h3>
+                    <div className="text-2xl font-black text-amber-400 print:text-black font-mono">{reports.length} Laporan</div>
+                    <p className="mt-2 text-[11px] text-slate-400 print:text-black">Arsip DOR Site Tervalidasi</p>
                 </div>
             </div>
 
-            <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg space-y-4">
-                <div className="flex flex-wrap justify-between items-center gap-3">
+            <div className="bg-[#0a1625] print:bg-white print:border-black border border-[#16273c] rounded-xl p-5 shadow-lg space-y-4">
+                <div className="flex flex-wrap justify-between items-center gap-3 print:hidden">
                     <div className="w-full md:w-72">
                         <input
                             type="text"
@@ -381,10 +419,16 @@ export default function LaporanPage() {
                     </div>
                     <div className="flex gap-2">
                         <button
-                            onClick={() => window.print()}
-                            className="bg-[#1b2e46] hover:bg-[#253f5e] text-white font-bold text-xs px-4 py-2 rounded-lg transition cursor-pointer"
+                            onClick={handleExportExcel}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2 rounded-lg transition cursor-pointer flex items-center gap-1.5"
                         >
-                            🖨️ Cetak Laporan (PDF)
+                            <span>📥</span> <span>Ekspor ke Excel</span>
+                        </button>
+                        <button
+                            onClick={() => window.print()}
+                            className="bg-[#1b2e46] hover:bg-[#253f5e] text-white font-bold text-xs px-4 py-2 rounded-lg transition cursor-pointer flex items-center gap-1.5"
+                        >
+                            <span>🖨️</span> <span>Cetak / Ekspor PDF</span>
                         </button>
                         <button
                             onClick={() => setShowModal(true)}
@@ -396,9 +440,9 @@ export default function LaporanPage() {
                 </div>
 
                 <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs">
+                    <table className="w-full text-left text-xs print:text-black">
                         <thead>
-                            <tr className="border-b border-[#1b2e46] text-slate-400">
+                            <tr className="border-b border-[#1b2e46] print:border-black text-slate-400 print:text-black">
                                 <th className="pb-2">Tanggal</th>
                                 <th className="pb-2">Lokasi Pit Penambangan</th>
                                 <th className="pb-2 text-right">Overburden (OB)</th>
@@ -408,25 +452,25 @@ export default function LaporanPage() {
                                 <th className="pb-2">Supervisor (Pengawas)</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-[#16273c] text-slate-300">
+                        <tbody className="divide-y divide-[#16273c] print:divide-black text-slate-300 print:text-black">
                             {filteredReports.length > 0 ? (
                                 filteredReports.map((r) => (
-                                    <tr key={r.id} className="hover:bg-[#0c1a2d]/50 transition">
-                                        <td className="py-2.5 font-mono text-slate-400 text-[11px]">{r.report_date}</td>
-                                        <td className="font-bold text-white">{r.pit_location}</td>
-                                        <td className="text-right font-mono text-slate-300">
+                                    <tr key={r.id} className="hover:bg-[#0c1a2d]/50 print:hover:bg-transparent transition">
+                                        <td className="py-2.5 font-mono print:font-sans text-slate-400 print:text-black text-[11px]">{r.report_date}</td>
+                                        <td className="font-bold text-white print:text-black">{r.pit_location}</td>
+                                        <td className="text-right font-mono print:font-sans text-slate-300 print:text-black">
                                             {Number(r.overburden_bcm).toLocaleString('id-ID')} BCM
                                         </td>
-                                        <td className="text-right font-mono font-bold text-emerald-400">
+                                        <td className="text-right font-mono print:font-sans font-bold text-emerald-400 print:text-black">
                                             {Number(r.coal_production_ton).toLocaleString('id-ID')} Ton Ore
                                         </td>
-                                        <td className="text-center font-mono text-slate-300">{r.heavy_equipment_units} Unit</td>
+                                        <td className="text-center font-mono print:font-sans text-slate-300 print:text-black">{r.heavy_equipment_units} Unit</td>
                                         <td>
-                                            <span className="bg-[#112233] border border-[#1e3a5f] text-slate-300 text-[10px] px-2 py-0.5 rounded">
+                                            <span className="bg-[#112233] print:bg-transparent border border-[#1e3a5f] print:border-black text-slate-300 print:text-black text-[10px] px-2 py-0.5 rounded">
                                                 {r.weather_condition}
                                             </span>
                                         </td>
-                                        <td className="text-slate-400">{r.supervisor_name}</td>
+                                        <td className="text-slate-400 print:text-black">{r.supervisor_name}</td>
                                     </tr>
                                 ))
                             ) : (
@@ -439,10 +483,26 @@ export default function LaporanPage() {
                         </tbody>
                     </table>
                 </div>
+
+                {/* Tanda Tangan Khusus Cetak PDF */}
+                <div className="hidden print:flex justify-between pt-16 text-black text-xs">
+                    <div className="text-center">
+                        <p>Dibuat Oleh,</p>
+                        <div className="h-16"></div>
+                        <p className="font-bold underline">{userName}</p>
+                        <p>Production Supervisor</p>
+                    </div>
+                    <div className="text-center">
+                        <p>Disetujui Oleh,</p>
+                        <div className="h-16"></div>
+                        <p className="font-bold underline">Ir. Kepala Teknik Tambang</p>
+                        <p>KTT PT. Jangkar Energi Eka Perkasa</p>
+                    </div>
+                </div>
             </div>
 
             {showModal && (
-                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50 print:hidden">
                     <div className="bg-[#0a1625] border border-[#1b2e46] rounded-xl p-6 w-full max-w-md shadow-2xl space-y-4">
                         <h2 className="text-sm font-bold text-white uppercase tracking-wider">Buat Laporan Harian Operasi (DOR) Nikel</h2>
                         <form onSubmit={handleAddReport} className="space-y-3">

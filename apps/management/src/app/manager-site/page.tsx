@@ -187,16 +187,6 @@ export default function ManagerSiteDashboard() {
                                 active_units: 24,
                                 weather_condition: 'Cerah Berawan',
                             },
-                            {
-                                id: '2',
-                                date: '2026-09-08',
-                                shift: 'Shift 2 (Malam)',
-                                overburden_bcm: 4200,
-                                coal_getting_ton: 1650,
-                                fuel_consumed_liter: 5890,
-                                active_units: 22,
-                                weather_condition: 'Hujan Ringan',
-                            },
                         ])
                     }
                     setLoading(false)
@@ -209,8 +199,29 @@ export default function ManagerSiteDashboard() {
 
         initManager()
 
+        // Mengaktifkan Supabase Realtime Channel untuk tabel site_production_logs
+        const channel = supabase
+            .channel('realtime-site-production')
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'site_production_logs' },
+                (payload) => {
+                    if (payload.eventType === 'INSERT') {
+                        setProductionLogs((prev) => [payload.new as ProductionLog, ...prev])
+                    } else if (payload.eventType === 'UPDATE') {
+                        setProductionLogs((prev) =>
+                            prev.map((item) => (item.id === payload.new.id ? (payload.new as ProductionLog) : item))
+                        )
+                    } else if (payload.eventType === 'DELETE') {
+                        setProductionLogs((prev) => prev.filter((item) => item.id !== payload.old.id))
+                    }
+                }
+            )
+            .subscribe()
+
         return () => {
             isMounted = false
+            supabase.removeChannel(channel)
         }
     }, [landingUrl, router])
 
@@ -218,13 +229,33 @@ export default function ManagerSiteDashboard() {
         e.preventDefault()
         if (!obBcm || !coalTon) return
 
+        const numericOb = parseFloat(obBcm) || 0
+        const numericCoal = parseFloat(coalTon) || 0
+        const numericFuel = parseFloat(fuelLiter) || 0
+
+        // Sanity Check / Validasi Batas Wajar Input Tambang
+        if (numericOb < 0 || numericCoal < 0 || numericFuel < 0) {
+            alert('Validasi Gagal: Nilai produksi, Overburden, atau BBM tidak boleh bernilai negatif.')
+            return
+        }
+
+        if (numericCoal > 50000) {
+            alert('Peringatan Validasi: Volume Ore per entri harian melebihi batas wajar 50.000 Ton. Periksa kembali input Anda.')
+            return
+        }
+
+        if (numericOb > 200000) {
+            alert('Peringatan Validasi: Volume Overburden (BCM) melebihi batas wajar 200.000 BCM per entri.')
+            return
+        }
+
         setSubmitting(true)
 
         const payload = {
             shift,
-            overburden_bcm: parseFloat(obBcm),
-            coal_getting_ton: parseFloat(coalTon),
-            fuel_consumed_liter: parseFloat(fuelLiter) || 0,
+            overburden_bcm: numericOb,
+            coal_getting_ton: numericCoal,
+            fuel_consumed_liter: numericFuel,
             active_units: parseInt(activeUnits) || 0,
             weather_condition: weather,
         }
@@ -235,12 +266,12 @@ export default function ManagerSiteDashboard() {
             .select()
 
         if (!error && data) {
-            setProductionLogs([data[0], ...productionLogs])
             setShowModal(false)
             setObBcm('')
             setCoalTon('')
             setFuelLiter('')
         } else {
+            // Fallback state lokal jika offline atau error koneksi
             setProductionLogs([
                 {
                     id: Date.now().toString(),
@@ -294,10 +325,10 @@ export default function ManagerSiteDashboard() {
                             </h1>
                             <p className="text-xs text-emerald-400 flex items-center gap-1.5 mt-0.5">
                                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                                <span>Kontrol Pit, Hauling, K3, & Fleet Management</span>
+                                <span>Kontrol Pit, Hauling, K3, & Fleet Management (Realtime Active)</span>
                                 <span className="text-slate-600">•</span>
                                 <span className="text-slate-300 font-semibold">{managerName}</span>
-                                <span className="bg-[#112233] border border-[#1e3a5f] text-slate-300 text-[10px] px-2 py-0.5 rounded font-mono">
+                                <span className="bg-[#112233] border border-[#1e3a5f] text-slate-300 text-[10px] px-2 py-0.5 rounded font-mono font-bold">
                                     {userRole}
                                 </span>
                             </p>
