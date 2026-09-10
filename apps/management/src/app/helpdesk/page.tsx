@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@supabase/supabase-js'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
@@ -22,10 +22,48 @@ interface HelpdeskTicket {
     assigned_to: string
 }
 
+const ALL_MODULES = [
+    { key: 'manager-site', label: 'Pit Produksi', icon: '⛏️', href: '/manager-site' },
+    { key: 'geologi', label: 'Geologi & Eksplorasi', icon: '🧭', href: '/geologi' },
+    { key: 'fleet', label: 'Alat Berat', icon: '🚜', href: '/fleet' },
+    { key: 'fleet-maintenance', label: 'Workshop Fleet', icon: '🔧', href: '/fleet-maintenance' },
+    { key: 'sparepart', label: 'Sparepart Gudang', icon: '📦', href: '/sparepart' },
+    { key: 'safety', label: 'Inspeksi K3 (HSE)', icon: '⛑️', href: '/safety' },
+    { key: 'ritase', label: 'Ritase', icon: '🚛', href: '/ritase' },
+    { key: 'jetty', label: 'Jetty Port', icon: '🚢', href: '/jetty' },
+    { key: 'environment', label: 'Lingkungan', icon: '🌱', href: '/environment' },
+    { key: 'lingkungan', label: 'Kanal Sedimen', icon: '🏞️', href: '/lingkungan' },
+    { key: 'bbm', label: 'BBM Solar', icon: '⛽', href: '/bbm' },
+    { key: 'finance', label: 'Keuangan', icon: '💰', href: '/finance' },
+    { key: 'adm', label: 'ADM & Surat', icon: '📋', href: '/adm' },
+    { key: 'hrd', label: 'HRD & Payroll', icon: '👷‍♂️', href: '/hrd' },
+    { key: 'ga', label: 'GA & Fasilitas', icon: '🚙', href: '/ga' },
+    { key: 'assets', label: 'Aset Tambang', icon: '🏷️', href: '/assets' },
+    { key: 'mess', label: 'Mess Camp', icon: '🏠', href: '/mess' },
+    { key: 'catering', label: 'Katering', icon: '🍱', href: '/catering' },
+    { key: 'clinic', label: 'Klinik Site', icon: '🏥', href: '/clinic' },
+    { key: 'security', label: 'Security Gate', icon: '🛡️', href: '/security' },
+    { key: 'radio', label: 'Radio Komunikasi', icon: '📻', href: '/radio' },
+    { key: 'legal', label: 'Legalitas IUP', icon: '⚖️', href: '/legal' },
+    { key: 'csr', label: 'CSR Masyarakat', icon: '🤝', href: '/csr' },
+    { key: 'vendor', label: 'Vendor', icon: '🏬', href: '/vendor' },
+    { key: 'transport', label: 'Transport Kru', icon: '🚌', href: '/transport' },
+    { key: 'training', label: 'Training K3', icon: '🎓', href: '/training' },
+    { key: 'performance', label: 'Kinerja KPI', icon: '📈', href: '/performance' },
+    { key: 'it-helpdesk', label: 'IT Helpdesk', icon: '💻', href: '/it-helpdesk' },
+    { key: 'helpdesk', label: 'Helpdesk GA', icon: '🛠️', href: '/helpdesk' },
+    { key: 'investor', label: 'Investor & RKAB', icon: '📊', href: '/investor' },
+    { key: 'direktur', label: 'Eksekutif BOD', icon: '🏛️', href: '/direktur' },
+    { key: 'laporan', label: 'Cetak Laporan', icon: '📄', href: '/laporan' },
+]
+
 export default function HelpdeskPage() {
     const pathname = usePathname()
+    const router = useRouter()
     const [loading, setLoading] = useState(true)
     const [userName, setUserName] = useState('GA & Facility Officer')
+    const [userRole, setUserRole] = useState('General Affair')
+    const [allowedModules, setAllowedModules] = useState<string[]>([])
     const [tickets, setTickets] = useState<HelpdeskTicket[]>([])
     const [searchQuery, setSearchQuery] = useState('')
 
@@ -71,7 +109,7 @@ export default function HelpdeskPage() {
 
                 const { data: profile } = await supabase
                     .from('profiles')
-                    .select('full_name, status')
+                    .select('full_name, role, status')
                     .eq('id', session.user.id)
                     .maybeSingle()
 
@@ -85,6 +123,49 @@ export default function HelpdeskPage() {
 
                 if (isMounted) {
                     setUserName(profile?.full_name || 'GA Support Lead')
+                    const division = (profile?.role || 'General Affair').trim()
+                    setUserRole(division)
+
+                    const isSuperAdmin = ['admin', 'administrator', 'superadmin'].includes(division.toLowerCase())
+
+                    let grantedKeys: string[] = []
+                    if (isSuperAdmin) {
+                        grantedKeys = ALL_MODULES.map((m) => m.key)
+                    } else {
+                        const { data: allPerms } = await supabase
+                            .from('division_permissions')
+                            .select('division_name, allowed_modules')
+
+                        if (allPerms && allPerms.length > 0) {
+                            const cleanDiv = division.toLowerCase()
+                            const matched = allPerms.find((p) => {
+                                const target = (p.division_name || '').toLowerCase().trim()
+                                return (
+                                    target === cleanDiv ||
+                                    target.includes(cleanDiv) ||
+                                    cleanDiv.includes(target) ||
+                                    (cleanDiv.includes('helpdesk') && target.includes('helpdesk')) ||
+                                    (cleanDiv.includes('ga') && target.includes('ga'))
+                                )
+                            })
+
+                            if (matched && Array.isArray(matched.allowed_modules)) {
+                                grantedKeys = matched.allowed_modules
+                            } else {
+                                grantedKeys = ['helpdesk']
+                            }
+                        } else {
+                            grantedKeys = ['helpdesk']
+                        }
+                    }
+
+                    if (!isSuperAdmin && grantedKeys.length > 0 && !grantedKeys.includes('helpdesk')) {
+                        alert('Divisi Anda tidak memiliki hak akses ke modul Helpdesk GA.')
+                        router.replace('/')
+                        return
+                    }
+
+                    setAllowedModules(grantedKeys)
 
                     const { data, error } = await supabase
                         .from('ga_helpdesk_tickets')
@@ -134,7 +215,7 @@ export default function HelpdeskPage() {
         return () => {
             isMounted = false
         }
-    }, [landingUrl])
+    }, [landingUrl, router])
 
     const handleAddTicket = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -165,7 +246,6 @@ export default function HelpdeskPage() {
             setSubject('')
             setDescription('')
         } else {
-            // Fallback state lokal jika tabel belum dibuat di Supabase
             setTickets([
                 {
                     id: Math.random().toString(),
@@ -192,22 +272,15 @@ export default function HelpdeskPage() {
     const resolvedTickets = tickets.filter((t) => t.status === 'Resolved').length
 
     const filteredTickets = tickets.filter((item) =>
-        item.ticket_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.department.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.category.toLowerCase().includes(searchQuery.toLowerCase())
+        (item?.ticket_number || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (item?.department || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (item?.subject || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (item?.category || '').toLowerCase().includes(searchQuery.toLowerCase())
     )
 
-    const navLinks = [
-        { href: '/helpdesk', label: 'Helpdesk GA', icon: '🛠️' },
-        { href: '/manager-site', label: 'Pit Produksi', icon: '⛏️' },
-        { href: '/fleet', label: 'Alat Berat', icon: '🚜' },
-        { href: '/safety', label: 'Inspeksi K3', icon: '⛑️' },
-        { href: '/bbm', label: 'BBM Solar', icon: '⛽' },
-        { href: '/finance', label: 'Keuangan', icon: '💰' },
-        { href: '/direktur', label: 'Eksekutif', icon: '🏛️' },
-        { href: '/laporan', label: 'Cetak Laporan', icon: '📄' },
-    ]
+    const authorizedNavItems = ALL_MODULES.filter((item) =>
+        allowedModules.includes(item.key)
+    )
 
     if (loading) {
         return (
@@ -220,7 +293,6 @@ export default function HelpdeskPage() {
 
     return (
         <div className="min-h-screen bg-[#060c14] text-slate-100 font-sans p-4 md:p-6 select-none">
-            {/* Header */}
             <header className="mb-6 space-y-3">
                 <div className="flex flex-wrap items-center justify-between bg-[#0a1625] border border-[#1b2e46] rounded-xl px-6 py-4 shadow-xl">
                     <div className="flex items-center space-x-3">
@@ -234,50 +306,62 @@ export default function HelpdeskPage() {
                                 <span>Permintaan Fasilitas Mess, Keluhan Sarana Kantor, & Perbaikan Infrastruktur Camp</span>
                                 <span className="text-slate-600">•</span>
                                 <span className="text-slate-300 font-semibold">{userName}</span>
-                                <span className="bg-[#112233] border border-[#1e3a5f] text-slate-300 text-[10px] px-2 py-0.5 rounded font-mono">
-                                    General Affair Dept
+                                <span className="bg-[#112233] border border-[#1e3a5f] text-slate-300 text-[10px] px-2 py-0.5 rounded font-mono font-bold">
+                                    {userRole}
                                 </span>
                             </p>
                         </div>
                     </div>
 
-                    <button
-                        onClick={handleLogout}
-                        className="bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/50 text-rose-300 text-xs px-4 py-2 rounded-lg transition cursor-pointer"
-                    >
-                        Keluar ke Beranda
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <Link
+                            href="/"
+                            className="bg-[#102033] hover:bg-[#162b45] border border-[#1e3757] text-slate-300 text-xs px-3 py-2 rounded-lg transition"
+                        >
+                            ← Beranda Portal
+                        </Link>
+                        <button
+                            onClick={handleLogout}
+                            className="bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/50 text-rose-300 text-xs px-4 py-2 rounded-lg transition cursor-pointer"
+                        >
+                            Keluar
+                        </button>
+                    </div>
                 </div>
 
-                {/* Global Module Switcher */}
-                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
-                    {navLinks.map((item) => {
-                        const isActive = pathname === item.href
-                        return (
-                            <Link
-                                key={item.href}
-                                href={item.href}
-                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border whitespace-nowrap font-medium transition cursor-pointer ${isActive
-                                    ? 'bg-[#162d47] text-white border-amber-400/80 shadow-sm'
-                                    : 'bg-[#0a1625] text-slate-400 border-[#1b2e46] hover:text-slate-200 hover:bg-[#0f2137]'
-                                    }`}
-                            >
-                                <span>{item.icon}</span>
-                                <span>{item.label}</span>
-                            </Link>
-                        )
-                    })}
-                </div>
+                {authorizedNavItems.length > 1 ? (
+                    <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+                        {authorizedNavItems.map((item) => {
+                            const isActive = pathname === item.href
+                            return (
+                                <Link
+                                    key={item.href}
+                                    href={item.href}
+                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border whitespace-nowrap font-medium transition cursor-pointer ${isActive
+                                            ? 'bg-[#162d47] text-white border-amber-400/80 shadow-sm'
+                                            : 'bg-[#0a1625] text-slate-400 border-[#1b2e46] hover:text-slate-200 hover:bg-[#0f2137]'
+                                        }`}
+                                >
+                                    <span>{item.icon}</span>
+                                    <span>{item.label}</span>
+                                </Link>
+                            )
+                        })}
+                    </div>
+                ) : (
+                    <div className="bg-[#0a1625]/60 border border-[#1b2e46] rounded-lg px-4 py-2 text-[11px] text-slate-400 flex items-center gap-2 font-mono">
+                        <span className="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
+                        <span>Akses Terbatas: Menampilkan modul berizin untuk divisi Anda.</span>
+                    </div>
+                )}
             </header>
 
-            {/* KPI Helpdesk */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
                 <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
                     <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Total Permintaan Masuk</h3>
                     <div className="text-2xl font-black text-white font-mono">{totalTickets} Tiket</div>
                     <p className="mt-2 text-[11px] text-slate-400">Pengajuan Fasilitas Lapangan</p>
                 </div>
-
                 <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
                     <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Tiket Aktif / Dikerjakan</h3>
                     <div className={`text-2xl font-black font-mono ${activeTickets > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
@@ -285,13 +369,11 @@ export default function HelpdeskPage() {
                     </div>
                     <p className="mt-2 text-[11px] text-slate-400">Sedang Ditangani Teknisi GA</p>
                 </div>
-
                 <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
                     <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Selesai (Resolved)</h3>
                     <div className="text-2xl font-black text-emerald-400 font-mono">{resolvedTickets} Tiket</div>
                     <p className="mt-2 text-[11px] text-emerald-400 font-semibold">Tuntas Tervalidasi User</p>
                 </div>
-
                 <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
                     <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">SLA Penyelesaian</h3>
                     <div className="text-2xl font-black text-cyan-400 font-mono">&lt; 24 Jam</div>
@@ -299,7 +381,6 @@ export default function HelpdeskPage() {
                 </div>
             </div>
 
-            {/* Grid Tabel Helpdesk */}
             <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg space-y-4">
                 <div className="flex flex-wrap justify-between items-center gap-3">
                     <div className="w-full md:w-72">
@@ -338,7 +419,7 @@ export default function HelpdeskPage() {
                                     const isResolved = t.status === 'Resolved'
                                     const isHigh = t.priority === 'Tinggi' || t.priority === 'Darurat'
                                     return (
-                                        <tr key={t.id}>
+                                        <tr key={t.id} className="hover:bg-[#0c1a2d]/50 transition">
                                             <td className="py-2.5 font-bold font-mono text-amber-400">{t.ticket_number}</td>
                                             <td className="font-semibold text-white">{t.department}</td>
                                             <td>
@@ -348,9 +429,9 @@ export default function HelpdeskPage() {
                                             </td>
                                             <td className="text-center font-bold">
                                                 <span
-                                                    className={`px-2 py-0.5 rounded text-[10px] ${isHigh
-                                                        ? 'bg-rose-950/80 text-rose-400 border border-rose-800/40'
-                                                        : 'bg-amber-950/80 text-amber-400 border border-amber-800/40'
+                                                    className={`px-2 py-0.5 rounded text-[10px] border ${isHigh
+                                                            ? 'bg-rose-950/80 text-rose-400 border border-rose-800/40'
+                                                            : 'bg-amber-950/80 text-amber-400 border border-amber-800/40'
                                                         }`}
                                                 >
                                                     {t.priority.toUpperCase()}
@@ -362,9 +443,9 @@ export default function HelpdeskPage() {
                                             </td>
                                             <td className="text-center">
                                                 <span
-                                                    className={`px-2 py-0.5 rounded text-[10px] font-bold ${isResolved
-                                                        ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-800/40'
-                                                        : 'bg-amber-950/80 text-amber-400 border border-amber-800/40'
+                                                    className={`px-2 py-0.5 rounded text-[10px] font-bold border ${isResolved
+                                                            ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-800/40'
+                                                            : 'bg-amber-950/80 text-amber-400 border border-amber-800/40'
                                                         }`}
                                                 >
                                                     {t.status.toUpperCase()}
@@ -386,7 +467,6 @@ export default function HelpdeskPage() {
                 </div>
             </div>
 
-            {/* Modal Input Tiket GA */}
             {showModal && (
                 <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
                     <div className="bg-[#0a1625] border border-[#1b2e46] rounded-xl p-6 w-full max-w-md shadow-2xl space-y-4">

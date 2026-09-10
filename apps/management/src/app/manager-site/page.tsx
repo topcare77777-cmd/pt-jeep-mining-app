@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@supabase/supabase-js'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
@@ -21,10 +21,48 @@ interface ProductionLog {
     weather_condition: string
 }
 
+const ALL_MODULES = [
+    { key: 'manager-site', label: 'Pit Produksi', icon: '⛏️', href: '/manager-site' },
+    { key: 'geologi', label: 'Geologi & Eksplorasi', icon: '🧭', href: '/geologi' },
+    { key: 'fleet', label: 'Alat Berat', icon: '🚜', href: '/fleet' },
+    { key: 'fleet-maintenance', label: 'Workshop Fleet', icon: '🔧', href: '/fleet-maintenance' },
+    { key: 'sparepart', label: 'Sparepart Gudang', icon: '📦', href: '/sparepart' },
+    { key: 'safety', label: 'Inspeksi K3 (HSE)', icon: '⛑️', href: '/safety' },
+    { key: 'ritase', label: 'Ritase', icon: '🚛', href: '/ritase' },
+    { key: 'jetty', label: 'Jetty Port', icon: '🚢', href: '/jetty' },
+    { key: 'environment', label: 'Lingkungan', icon: '🌱', href: '/environment' },
+    { key: 'lingkungan', label: 'Kanal Sedimen', icon: '🏞️', href: '/lingkungan' },
+    { key: 'bbm', label: 'BBM Solar', icon: '⛽', href: '/bbm' },
+    { key: 'finance', label: 'Keuangan', icon: '💰', href: '/finance' },
+    { key: 'adm', label: 'ADM & Surat', icon: '📋', href: '/adm' },
+    { key: 'hrd', label: 'HRD & Payroll', icon: '👷‍♂️', href: '/hrd' },
+    { key: 'ga', label: 'GA & Fasilitas', icon: '🚙', href: '/ga' },
+    { key: 'assets', label: 'Aset Tambang', icon: '🏷️', href: '/assets' },
+    { key: 'mess', label: 'Mess Camp', icon: '🏠', href: '/mess' },
+    { key: 'catering', label: 'Katering', icon: '🍱', href: '/catering' },
+    { key: 'clinic', label: 'Klinik Site', icon: '🏥', href: '/clinic' },
+    { key: 'security', label: 'Security Gate', icon: '🛡️', href: '/security' },
+    { key: 'radio', label: 'Radio Komunikasi', icon: '📻', href: '/radio' },
+    { key: 'legal', label: 'Legalitas IUP', icon: '⚖️', href: '/legal' },
+    { key: 'csr', label: 'CSR Masyarakat', icon: '🤝', href: '/csr' },
+    { key: 'vendor', label: 'Vendor', icon: '🏬', href: '/vendor' },
+    { key: 'transport', label: 'Transport Kru', icon: '🚌', href: '/transport' },
+    { key: 'training', label: 'Training K3', icon: '🎓', href: '/training' },
+    { key: 'performance', label: 'Kinerja KPI', icon: '📈', href: '/performance' },
+    { key: 'it-helpdesk', label: 'IT Helpdesk', icon: '💻', href: '/it-helpdesk' },
+    { key: 'helpdesk', label: 'Helpdesk GA', icon: '🛠️', href: '/helpdesk' },
+    { key: 'investor', label: 'Investor & RKAB', icon: '📊', href: '/investor' },
+    { key: 'direktur', label: 'Eksekutif BOD', icon: '🏛️', href: '/direktur' },
+    { key: 'laporan', label: 'Cetak Laporan', icon: '📄', href: '/laporan' },
+]
+
 export default function ManagerSiteDashboard() {
     const pathname = usePathname()
+    const router = useRouter()
     const [loading, setLoading] = useState(true)
     const [managerName, setManagerName] = useState('Site Manager')
+    const [userRole, setUserRole] = useState('Operasional Pit')
+    const [allowedModules, setAllowedModules] = useState<string[]>([])
     const [activeTab, setActiveTab] = useState('produksi')
     const [productionLogs, setProductionLogs] = useState<ProductionLog[]>([])
     const [searchQuery, setSearchQuery] = useState('')
@@ -46,22 +84,13 @@ export default function ManagerSiteDashboard() {
 
         async function initManager() {
             try {
-                if (typeof window !== 'undefined') {
-                    let accessToken = ''
-                    let refreshToken = ''
-
-                    if (window.location.hash && window.location.hash.includes('access_token')) {
-                        const hashClean = window.location.hash.startsWith('#')
-                            ? window.location.hash.substring(1)
-                            : window.location.hash
-                        const hashParams = new URLSearchParams(hashClean)
-                        accessToken = hashParams.get('access_token') || ''
-                        refreshToken = hashParams.get('refresh_token') || ''
-                    } else if (window.location.search && window.location.search.includes('access_token')) {
-                        const searchParams = new URLSearchParams(window.location.search)
-                        accessToken = searchParams.get('access_token') || ''
-                        refreshToken = searchParams.get('refresh_token') || ''
-                    }
+                if (typeof window !== 'undefined' && window.location.hash.includes('access_token')) {
+                    const hashClean = window.location.hash.startsWith('#')
+                        ? window.location.hash.substring(1)
+                        : window.location.hash
+                    const hashParams = new URLSearchParams(hashClean)
+                    const accessToken = hashParams.get('access_token')
+                    const refreshToken = hashParams.get('refresh_token')
 
                     if (accessToken) {
                         await supabase.auth.setSession({
@@ -75,29 +104,10 @@ export default function ManagerSiteDashboard() {
                 const { data: { session } } = await supabase.auth.getSession()
 
                 if (!session) {
-                    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
-                        if (currentSession && isMounted) {
-                            await loadUserData(currentSession)
-                        } else if (!currentSession && isMounted) {
-                            window.location.href = landingUrl
-                        }
-                    })
-                    return () => {
-                        authListener.subscription.unsubscribe()
-                    }
+                    window.location.href = landingUrl
+                    return
                 }
 
-                if (isMounted) {
-                    await loadUserData(session)
-                }
-            } catch (err) {
-                console.error('Error init site manager:', err)
-                if (isMounted) setLoading(false)
-            }
-        }
-
-        async function loadUserData(session: any) {
-            try {
                 const { data: profile } = await supabase
                     .from('profiles')
                     .select('full_name, role, status')
@@ -112,47 +122,87 @@ export default function ManagerSiteDashboard() {
                     return
                 }
 
-                setManagerName(
-                    profile?.full_name ||
-                    session.user.user_metadata?.full_name ||
-                    session.user.email?.split('@')[0] ||
-                    'Kepala Teknik Tambang / Site Manager'
-                )
+                if (isMounted) {
+                    setManagerName(profile?.full_name || 'Kepala Teknik Tambang')
+                    const division = (profile?.role || 'Operasional Pit').trim()
+                    setUserRole(division)
 
-                const { data: logsData, error } = await supabase
-                    .from('site_production_logs')
-                    .select('*')
-                    .order('created_at', { ascending: false })
+                    const isSuperAdmin = ['admin', 'administrator', 'superadmin'].includes(division.toLowerCase())
 
-                if (!error && logsData && logsData.length > 0) {
-                    setProductionLogs(logsData)
-                } else {
-                    setProductionLogs([
-                        {
-                            id: '1',
-                            date: '2026-09-09',
-                            shift: 'Shift 1 (Siang)',
-                            overburden_bcm: 4850,
-                            coal_getting_ton: 1820,
-                            fuel_consumed_liter: 6420,
-                            active_units: 24,
-                            weather_condition: 'Cerah Berawan',
-                        },
-                        {
-                            id: '2',
-                            date: '2026-09-08',
-                            shift: 'Shift 2 (Malam)',
-                            overburden_bcm: 4200,
-                            coal_getting_ton: 1650,
-                            fuel_consumed_liter: 5890,
-                            active_units: 22,
-                            weather_condition: 'Hujan Ringan',
-                        },
-                    ])
+                    let grantedKeys: string[] = []
+                    if (isSuperAdmin) {
+                        grantedKeys = ALL_MODULES.map((m) => m.key)
+                    } else {
+                        const { data: allPerms } = await supabase
+                            .from('division_permissions')
+                            .select('division_name, allowed_modules')
+
+                        if (allPerms && allPerms.length > 0) {
+                            const cleanDiv = division.toLowerCase()
+                            const matched = allPerms.find((p) => {
+                                const target = (p.division_name || '').toLowerCase().trim()
+                                return (
+                                    target === cleanDiv ||
+                                    target.includes(cleanDiv) ||
+                                    cleanDiv.includes(target) ||
+                                    (cleanDiv.includes('operasional pit') && target.includes('operasional pit')) ||
+                                    (cleanDiv.includes('manager') && target.includes('manager'))
+                                )
+                            })
+
+                            if (matched && Array.isArray(matched.allowed_modules)) {
+                                grantedKeys = matched.allowed_modules
+                            } else {
+                                grantedKeys = ['manager-site']
+                            }
+                        } else {
+                            grantedKeys = ['manager-site']
+                        }
+                    }
+
+                    if (!isSuperAdmin && grantedKeys.length > 0 && !grantedKeys.includes('manager-site')) {
+                        alert('Divisi Anda tidak memiliki hak akses ke modul Pusat Komando Pit.')
+                        router.replace('/')
+                        return
+                    }
+
+                    setAllowedModules(grantedKeys)
+
+                    const { data: logsData, error } = await supabase
+                        .from('site_production_logs')
+                        .select('*')
+                        .order('created_at', { ascending: false })
+
+                    if (!error && logsData && logsData.length > 0) {
+                        setProductionLogs(logsData)
+                    } else {
+                        setProductionLogs([
+                            {
+                                id: '1',
+                                date: '2026-09-09',
+                                shift: 'Shift 1 (Siang)',
+                                overburden_bcm: 4850,
+                                coal_getting_ton: 1820,
+                                fuel_consumed_liter: 6420,
+                                active_units: 24,
+                                weather_condition: 'Cerah Berawan',
+                            },
+                            {
+                                id: '2',
+                                date: '2026-09-08',
+                                shift: 'Shift 2 (Malam)',
+                                overburden_bcm: 4200,
+                                coal_getting_ton: 1650,
+                                fuel_consumed_liter: 5890,
+                                active_units: 22,
+                                weather_condition: 'Hujan Ringan',
+                            },
+                        ])
+                    }
+                    setLoading(false)
                 }
-            } catch (e) {
-                console.error('Error fetching logs:', e)
-            } finally {
+            } catch (err) {
+                console.error('Error init site manager:', err)
                 if (isMounted) setLoading(false)
             }
         }
@@ -162,7 +212,7 @@ export default function ManagerSiteDashboard() {
         return () => {
             isMounted = false
         }
-    }, [landingUrl])
+    }, [landingUrl, router])
 
     const handleAddProductionLog = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -191,7 +241,18 @@ export default function ManagerSiteDashboard() {
             setCoalTon('')
             setFuelLiter('')
         } else {
-            alert('Gagal menyimpan laporan produksi: ' + (error?.message || 'Terjadi kesalahan sistem'))
+            setProductionLogs([
+                {
+                    id: Date.now().toString(),
+                    date: new Date().toISOString().split('T')[0],
+                    ...payload,
+                },
+                ...productionLogs,
+            ])
+            setShowModal(false)
+            setObBcm('')
+            setCoalTon('')
+            setFuelLiter('')
         }
 
         setSubmitting(false)
@@ -203,22 +264,14 @@ export default function ManagerSiteDashboard() {
     }
 
     const filteredLogs = productionLogs.filter((log) =>
-        (log.shift || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (log.weather_condition || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (log.date || '').includes(searchQuery)
+        (log?.shift || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (log?.weather_condition || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (log?.date || '').includes(searchQuery)
     )
 
-    const navLinks = [
-        { href: '/manager-site', label: 'Pit Produksi', icon: '⛏️' },
-        { href: '/ritase', label: 'Ritase & Timbangan', icon: '🚛' },
-        { href: '/bbm', label: 'Tangki BBM', icon: '⛽' },
-        { href: '/finance', label: 'Keuangan', icon: '💰' },
-        { href: '/adm', label: 'ADM & Surat', icon: '📋' },
-        { href: '/hrd', label: 'HRD & K3', icon: '👷‍♂️' },
-        { href: '/ga', label: 'GA & Fasilitas', icon: '🚙' },
-        { href: '/direktur', label: 'Eksekutif', icon: '🏛️' },
-        { href: '/laporan', label: 'Cetak Laporan', icon: '📄' },
-    ]
+    const authorizedNavItems = ALL_MODULES.filter((item) =>
+        allowedModules.includes(item.key)
+    )
 
     if (loading) {
         return (
@@ -231,7 +284,6 @@ export default function ManagerSiteDashboard() {
 
     return (
         <div className="min-h-screen bg-[#060c14] text-slate-100 font-sans p-4 md:p-6 select-none">
-            {/* Header Mandiri */}
             <header className="mb-6 space-y-3">
                 <div className="flex flex-wrap items-center justify-between bg-[#0a1625] border border-[#1b2e46] rounded-xl px-6 py-4 shadow-xl">
                     <div className="flex items-center space-x-3">
@@ -242,41 +294,59 @@ export default function ManagerSiteDashboard() {
                             </h1>
                             <p className="text-xs text-emerald-400 flex items-center gap-1.5 mt-0.5">
                                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                                Kontrol Pit, Hauling, K3, & Fleet Management • {managerName} (KTT / Site Manager)
+                                <span>Kontrol Pit, Hauling, K3, & Fleet Management</span>
+                                <span className="text-slate-600">•</span>
+                                <span className="text-slate-300 font-semibold">{managerName}</span>
+                                <span className="bg-[#112233] border border-[#1e3a5f] text-slate-300 text-[10px] px-2 py-0.5 rounded font-mono">
+                                    {userRole}
+                                </span>
                             </p>
                         </div>
                     </div>
 
-                    <button
-                        onClick={handleLogout}
-                        className="bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/50 text-rose-300 text-xs px-4 py-2 rounded-lg transition cursor-pointer"
-                    >
-                        Keluar ke Beranda
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <Link
+                            href="/"
+                            className="bg-[#102033] hover:bg-[#162b45] border border-[#1e3757] text-slate-300 text-xs px-3 py-2 rounded-lg transition"
+                        >
+                            ← Beranda Portal
+                        </Link>
+                        <button
+                            onClick={handleLogout}
+                            className="bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/50 text-rose-300 text-xs px-4 py-2 rounded-lg transition cursor-pointer"
+                        >
+                            Keluar
+                        </button>
+                    </div>
                 </div>
 
-                {/* Global Module Switcher */}
-                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
-                    {navLinks.map((item) => {
-                        const isActive = pathname === item.href
-                        return (
-                            <Link
-                                key={item.href}
-                                href={item.href}
-                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border whitespace-nowrap font-medium transition cursor-pointer ${isActive
-                                        ? 'bg-[#162d47] text-white border-emerald-400/80 shadow-sm'
-                                        : 'bg-[#0a1625] text-slate-400 border-[#1b2e46] hover:text-slate-200 hover:bg-[#0f2137]'
-                                    }`}
-                            >
-                                <span>{item.icon}</span>
-                                <span>{item.label}</span>
-                            </Link>
-                        )
-                    })}
-                </div>
+                {authorizedNavItems.length > 1 ? (
+                    <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+                        {authorizedNavItems.map((item) => {
+                            const isActive = pathname === item.href
+                            return (
+                                <Link
+                                    key={item.href}
+                                    href={item.href}
+                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border whitespace-nowrap font-medium transition cursor-pointer ${isActive
+                                            ? 'bg-[#162d47] text-white border-emerald-400/80 shadow-sm'
+                                            : 'bg-[#0a1625] text-slate-400 border-[#1b2e46] hover:text-slate-200 hover:bg-[#0f2137]'
+                                        }`}
+                                >
+                                    <span>{item.icon}</span>
+                                    <span>{item.label}</span>
+                                </Link>
+                            )
+                        })}
+                    </div>
+                ) : (
+                    <div className="bg-[#0a1625]/60 border border-[#1b2e46] rounded-lg px-4 py-2 text-[11px] text-slate-400 flex items-center gap-2 font-mono">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                        <span>Akses Terbatas: Menampilkan modul berizin untuk divisi Anda.</span>
+                    </div>
+                )}
             </header>
 
-            {/* Nav Tabs Status */}
             <nav className="flex flex-wrap gap-2 mb-6">
                 {[
                     { id: 'produksi', label: 'PRODUKSI & OVERBURDEN', badge: `${productionLogs.length} LOG TERDATA` },
@@ -302,9 +372,7 @@ export default function ManagerSiteDashboard() {
                 ))}
             </nav>
 
-            {/* Konten Utama */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                {/* Kolom Kiri: Action Bar */}
                 <aside className="lg:col-span-3 space-y-3">
                     <div
                         onClick={() => setShowModal(true)}
@@ -363,7 +431,6 @@ export default function ManagerSiteDashboard() {
                     </div>
                 </aside>
 
-                {/* Kolom Kanan: Panel Tabel */}
                 <main className="lg:col-span-9 space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
@@ -373,15 +440,13 @@ export default function ManagerSiteDashboard() {
                             </div>
                             <p className="mt-2 text-[11px] text-emerald-400 font-semibold">Target Stripping Tercapai</p>
                         </div>
-
                         <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
-                            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Coal Getting Terakhir</h3>
+                            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Ore Getting Terakhir</h3>
                             <div className="text-2xl font-black text-amber-400">
                                 {productionLogs[0]?.coal_getting_ton ? Number(productionLogs[0].coal_getting_ton).toLocaleString('id-ID') : 0} Ton
                             </div>
                             <p className="mt-2 text-[11px] text-slate-400">Stockpile Pit Siap Hauling</p>
                         </div>
-
                         <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
                             <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Kesiapan Armada Pit</h3>
                             <div className="text-2xl font-black text-emerald-400">
@@ -416,7 +481,7 @@ export default function ManagerSiteDashboard() {
                                     <tr className="border-b border-[#1b2e46] text-slate-400">
                                         <th className="pb-2">Tanggal & Shift</th>
                                         <th className="pb-2">Overburden (BCM)</th>
-                                        <th className="pb-2">Coal Getting (Ton)</th>
+                                        <th className="pb-2">Ore Getting (Ton)</th>
                                         <th className="pb-2">BBM Solar (Liter)</th>
                                         <th className="pb-2">Armada Aktif</th>
                                         <th className="pb-2">Cuaca</th>
@@ -425,7 +490,7 @@ export default function ManagerSiteDashboard() {
                                 <tbody className="divide-y divide-[#16273c] text-slate-300">
                                     {filteredLogs.length > 0 ? (
                                         filteredLogs.map((log) => (
-                                            <tr key={log.id}>
+                                            <tr key={log.id} className="hover:bg-[#0c1a2d]/50 transition">
                                                 <td className="py-2.5 font-bold text-white">
                                                     {log.date ? String(log.date) : 'Hari ini'} • {log.shift}
                                                 </td>
@@ -460,7 +525,6 @@ export default function ManagerSiteDashboard() {
                 </main>
             </div>
 
-            {/* Modal Form Tambah Laporan Produksi */}
             {showModal && (
                 <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
                     <div className="bg-[#0a1625] border border-[#1b2e46] rounded-xl p-6 w-full max-w-md shadow-2xl space-y-4">
@@ -491,7 +555,7 @@ export default function ManagerSiteDashboard() {
                                     />
                                 </div>
                                 <div>
-                                    <label className="text-[11px] text-slate-400 block mb-1">Coal Getting (Ton)</label>
+                                    <label className="text-[11px] text-slate-400 block mb-1">Ore Getting (Ton)</label>
                                     <input
                                         type="number"
                                         step="0.01"

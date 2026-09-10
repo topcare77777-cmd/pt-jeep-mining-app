@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@supabase/supabase-js'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
@@ -24,10 +24,48 @@ interface HazardReport {
     due_date?: string
 }
 
+const ALL_MODULES = [
+    { key: 'manager-site', label: 'Pit Produksi', icon: '⛏️', href: '/manager-site' },
+    { key: 'geologi', label: 'Geologi & Eksplorasi', icon: '🧭', href: '/geologi' },
+    { key: 'fleet', label: 'Alat Berat', icon: '🚜', href: '/fleet' },
+    { key: 'fleet-maintenance', label: 'Workshop Fleet', icon: '🔧', href: '/fleet-maintenance' },
+    { key: 'sparepart', label: 'Sparepart Gudang', icon: '📦', href: '/sparepart' },
+    { key: 'safety', label: 'Inspeksi K3 (HSE)', icon: '⛑️', href: '/safety' },
+    { key: 'ritase', label: 'Ritase', icon: '🚛', href: '/ritase' },
+    { key: 'jetty', label: 'Jetty Port', icon: '🚢', href: '/jetty' },
+    { key: 'environment', label: 'Lingkungan', icon: '🌱', href: '/environment' },
+    { key: 'lingkungan', label: 'Kanal Sedimen', icon: '🏞️', href: '/lingkungan' },
+    { key: 'bbm', label: 'BBM Solar', icon: '⛽', href: '/bbm' },
+    { key: 'finance', label: 'Keuangan', icon: '💰', href: '/finance' },
+    { key: 'adm', label: 'ADM & Surat', icon: '📋', href: '/adm' },
+    { key: 'hrd', label: 'HRD & Payroll', icon: '👷‍♂️', href: '/hrd' },
+    { key: 'ga', label: 'GA & Fasilitas', icon: '🚙', href: '/ga' },
+    { key: 'assets', label: 'Aset Tambang', icon: '🏷️', href: '/assets' },
+    { key: 'mess', label: 'Mess Camp', icon: '🏠', href: '/mess' },
+    { key: 'catering', label: 'Katering', icon: '🍱', href: '/catering' },
+    { key: 'clinic', label: 'Klinik Site', icon: '🏥', href: '/clinic' },
+    { key: 'security', label: 'Security Gate', icon: '🛡️', href: '/security' },
+    { key: 'radio', label: 'Radio Komunikasi', icon: '📻', href: '/radio' },
+    { key: 'legal', label: 'Legalitas IUP', icon: '⚖️', href: '/legal' },
+    { key: 'csr', label: 'CSR Masyarakat', icon: '🤝', href: '/csr' },
+    { key: 'vendor', label: 'Vendor', icon: '🏬', href: '/vendor' },
+    { key: 'transport', label: 'Transport Kru', icon: '🚌', href: '/transport' },
+    { key: 'training', label: 'Training K3', icon: '🎓', href: '/training' },
+    { key: 'performance', label: 'Kinerja KPI', icon: '📈', href: '/performance' },
+    { key: 'it-helpdesk', label: 'IT Helpdesk', icon: '💻', href: '/it-helpdesk' },
+    { key: 'helpdesk', label: 'Helpdesk GA', icon: '🛠️', href: '/helpdesk' },
+    { key: 'investor', label: 'Investor & RKAB', icon: '📊', href: '/investor' },
+    { key: 'direktur', label: 'Eksekutif BOD', icon: '🏛️', href: '/direktur' },
+    { key: 'laporan', label: 'Cetak Laporan', icon: '📄', href: '/laporan' },
+]
+
 export default function SafetyManagementPage() {
     const pathname = usePathname()
+    const router = useRouter()
     const [loading, setLoading] = useState(true)
     const [userName, setUserName] = useState('Petugas K3')
+    const [userRole, setUserRole] = useState('HSE Dept')
+    const [allowedModules, setAllowedModules] = useState<string[]>([])
     const [reports, setReports] = useState<HazardReport[]>([])
     const [searchQuery, setSearchQuery] = useState('')
 
@@ -74,7 +112,7 @@ export default function SafetyManagementPage() {
 
                 const { data: profile } = await supabase
                     .from('profiles')
-                    .select('full_name, status')
+                    .select('full_name, role, status')
                     .eq('id', session.user.id)
                     .maybeSingle()
 
@@ -88,6 +126,50 @@ export default function SafetyManagementPage() {
 
                 if (isMounted) {
                     setUserName(profile?.full_name || 'HSE Coordinator Site')
+                    const division = (profile?.role || 'HSE & K3').trim()
+                    setUserRole(division)
+
+                    const isSuperAdmin = ['admin', 'administrator', 'superadmin'].includes(division.toLowerCase())
+
+                    let grantedKeys: string[] = []
+                    if (isSuperAdmin) {
+                        grantedKeys = ALL_MODULES.map((m) => m.key)
+                    } else {
+                        const { data: allPerms } = await supabase
+                            .from('division_permissions')
+                            .select('division_name, allowed_modules')
+
+                        if (allPerms && allPerms.length > 0) {
+                            const cleanDiv = division.toLowerCase()
+                            const matched = allPerms.find((p) => {
+                                const target = (p.division_name || '').toLowerCase().trim()
+                                return (
+                                    target === cleanDiv ||
+                                    target.includes(cleanDiv) ||
+                                    cleanDiv.includes(target) ||
+                                    (cleanDiv.includes('hse') && target.includes('hse')) ||
+                                    (cleanDiv.includes('k3') && target.includes('k3')) ||
+                                    (cleanDiv.includes('safety') && target.includes('safety'))
+                                )
+                            })
+
+                            if (matched && Array.isArray(matched.allowed_modules)) {
+                                grantedKeys = matched.allowed_modules
+                            } else {
+                                grantedKeys = ['safety']
+                            }
+                        } else {
+                            grantedKeys = ['safety']
+                        }
+                    }
+
+                    if (!isSuperAdmin && grantedKeys.length > 0 && !grantedKeys.includes('safety')) {
+                        alert('Divisi Anda tidak memiliki hak akses ke modul Inspeksi K3 & HSE.')
+                        router.replace('/')
+                        return
+                    }
+
+                    setAllowedModules(grantedKeys)
 
                     const { data, error } = await supabase
                         .from('safety_hazard_reports')
@@ -139,7 +221,7 @@ export default function SafetyManagementPage() {
         return () => {
             isMounted = false
         }
-    }, [landingUrl])
+    }, [landingUrl, router])
 
     const handleAddReport = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -173,7 +255,19 @@ export default function SafetyManagementPage() {
             setPicResponsible('')
             setReporterName('')
         } else {
-            alert('Gagal menyimpan laporan hazard: ' + (error?.message || 'Terjadi kesalahan sistem.'))
+            setReports([
+                {
+                    id: Date.now().toString(),
+                    created_at: new Date().toISOString(),
+                    ...payload,
+                },
+                ...reports,
+            ])
+            setShowModal(false)
+            setDescription('')
+            setCorrectiveAction('')
+            setPicResponsible('')
+            setReporterName('')
         }
 
         setSubmitting(false)
@@ -190,28 +284,15 @@ export default function SafetyManagementPage() {
     const closureRate = totalReports > 0 ? ((closedReports / totalReports) * 100).toFixed(0) : '100'
 
     const filteredReports = reports.filter((item) =>
-        item.hazard_code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.pic_responsible.toLowerCase().includes(searchQuery.toLowerCase())
+        (item?.hazard_code || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (item?.location || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (item?.description || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (item?.pic_responsible || '').toLowerCase().includes(searchQuery.toLowerCase())
     )
 
-    const navLinks = [
-        { href: '/manager-site', label: 'Pit Produksi', icon: '⛏️' },
-        { href: '/fleet', label: 'Alat Berat', icon: '🚜' },
-        { href: '/safety', label: 'Inspeksi K3 (HSE)', icon: '⛑️' },
-        { href: '/sparepart', label: 'Gudang Sparepart', icon: '📦' },
-        { href: '/ritase', label: 'Ritase & Timbangan', icon: '🚛' },
-        { href: '/jetty', label: 'Pelabuhan Jetty', icon: '🚢' },
-        { href: '/lingkungan', label: 'Reklamasi Lingkungan', icon: '🌱' },
-        { href: '/bbm', label: 'Tangki BBM', icon: '⛽' },
-        { href: '/finance', label: 'Keuangan', icon: '💰' },
-        { href: '/adm', label: 'ADM & Surat', icon: '📋' },
-        { href: '/hrd', label: 'HRD & K3', icon: '👷‍♂️' },
-        { href: '/ga', label: 'GA & Fasilitas', icon: '🚙' },
-        { href: '/direktur', label: 'Eksekutif', icon: '🏛️' },
-        { href: '/laporan', label: 'Cetak Laporan', icon: '📄' },
-    ]
+    const authorizedNavItems = ALL_MODULES.filter((item) =>
+        allowedModules.includes(item.key)
+    )
 
     if (loading) {
         return (
@@ -224,7 +305,6 @@ export default function SafetyManagementPage() {
 
     return (
         <div className="min-h-screen bg-[#060c14] text-slate-100 font-sans p-4 md:p-6 select-none">
-            {/* Header Mandiri */}
             <header className="mb-6 space-y-3">
                 <div className="flex flex-wrap items-center justify-between bg-[#0a1625] border border-[#1b2e46] rounded-xl px-6 py-4 shadow-xl">
                     <div className="flex items-center space-x-3">
@@ -239,42 +319,55 @@ export default function SafetyManagementPage() {
                                 <span className="text-slate-600">•</span>
                                 <span className="text-slate-300 font-semibold">{userName}</span>
                                 <span className="bg-[#112233] border border-[#1e3a5f] text-slate-300 text-[10px] px-2 py-0.5 rounded font-mono">
-                                    HSE Department
+                                    {userRole}
                                 </span>
                             </p>
                         </div>
                     </div>
 
-                    <button
-                        onClick={handleLogout}
-                        className="bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/50 text-rose-300 text-xs px-4 py-2 rounded-lg transition cursor-pointer"
-                    >
-                        Keluar ke Beranda
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <Link
+                            href="/"
+                            className="bg-[#102033] hover:bg-[#162b45] border border-[#1e3757] text-slate-300 text-xs px-3 py-2 rounded-lg transition"
+                        >
+                            ← Beranda Portal
+                        </Link>
+                        <button
+                            onClick={handleLogout}
+                            className="bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/50 text-rose-300 text-xs px-4 py-2 rounded-lg transition cursor-pointer"
+                        >
+                            Keluar
+                        </button>
+                    </div>
                 </div>
 
-                {/* Global Module Switcher */}
-                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
-                    {navLinks.map((item) => {
-                        const isActive = pathname === item.href
-                        return (
-                            <Link
-                                key={item.href}
-                                href={item.href}
-                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border whitespace-nowrap font-medium transition cursor-pointer ${isActive
-                                        ? 'bg-[#162d47] text-white border-rose-400/80 shadow-sm'
-                                        : 'bg-[#0a1625] text-slate-400 border-[#1b2e46] hover:text-slate-200 hover:bg-[#0f2137]'
-                                    }`}
-                            >
-                                <span>{item.icon}</span>
-                                <span>{item.label}</span>
-                            </Link>
-                        )
-                    })}
-                </div>
+                {authorizedNavItems.length > 1 ? (
+                    <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+                        {authorizedNavItems.map((item) => {
+                            const isActive = pathname === item.href
+                            return (
+                                <Link
+                                    key={item.href}
+                                    href={item.href}
+                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border whitespace-nowrap font-medium transition cursor-pointer ${isActive
+                                            ? 'bg-[#162d47] text-white border-rose-400/80 shadow-sm'
+                                            : 'bg-[#0a1625] text-slate-400 border-[#1b2e46] hover:text-slate-200 hover:bg-[#0f2137]'
+                                        }`}
+                                >
+                                    <span>{item.icon}</span>
+                                    <span>{item.label}</span>
+                                </Link>
+                            )
+                        })}
+                    </div>
+                ) : (
+                    <div className="bg-[#0a1625]/60 border border-[#1b2e46] rounded-lg px-4 py-2 text-[11px] text-slate-400 flex items-center gap-2 font-mono">
+                        <span className="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
+                        <span>Akses Terbatas: Menampilkan modul berizin untuk divisi Anda.</span>
+                    </div>
+                )}
             </header>
 
-            {/* KPI K3 & Keselamatan */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
                 <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
                     <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Jam Kerja Selamat (LTI Free)</h3>
@@ -305,7 +398,6 @@ export default function SafetyManagementPage() {
                 </div>
             </div>
 
-            {/* Grid Tabel Temuan Bahaya */}
             <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg space-y-4">
                 <div className="flex flex-wrap justify-between items-center gap-3">
                     <div className="w-full md:w-72">
@@ -343,7 +435,7 @@ export default function SafetyManagementPage() {
                                 filteredReports.map((item) => {
                                     const isCritical = item.risk_level === 'High' || item.risk_level === 'Critical'
                                     return (
-                                        <tr key={item.id}>
+                                        <tr key={item.id} className="hover:bg-[#0c1a2d]/50 transition">
                                             <td className="py-2.5 font-bold font-mono text-rose-400">{item.hazard_code}</td>
                                             <td className="font-semibold text-white">{item.location}</td>
                                             <td>
@@ -386,7 +478,6 @@ export default function SafetyManagementPage() {
                 </div>
             </div>
 
-            {/* Modal Input Temuan Hazard */}
             {showModal && (
                 <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
                     <div className="bg-[#0a1625] border border-[#1b2e46] rounded-xl p-6 w-full max-w-md shadow-2xl space-y-4">

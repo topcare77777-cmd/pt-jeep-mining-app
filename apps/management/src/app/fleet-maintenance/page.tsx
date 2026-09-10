@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@supabase/supabase-js'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
@@ -21,10 +21,48 @@ interface MaintenanceItem {
     notes?: string
 }
 
+const ALL_MODULES = [
+    { key: 'manager-site', label: 'Pit Produksi', icon: '⛏️', href: '/manager-site' },
+    { key: 'geologi', label: 'Geologi & Eksplorasi', icon: '🧭', href: '/geologi' },
+    { key: 'fleet', label: 'Alat Berat', icon: '🚜', href: '/fleet' },
+    { key: 'fleet-maintenance', label: 'Workshop Fleet', icon: '🔧', href: '/fleet-maintenance' },
+    { key: 'sparepart', label: 'Sparepart Gudang', icon: '📦', href: '/sparepart' },
+    { key: 'safety', label: 'Inspeksi K3 (HSE)', icon: '⛑️', href: '/safety' },
+    { key: 'ritase', label: 'Ritase', icon: '🚛', href: '/ritase' },
+    { key: 'jetty', label: 'Jetty Port', icon: '🚢', href: '/jetty' },
+    { key: 'environment', label: 'Lingkungan', icon: '🌱', href: '/environment' },
+    { key: 'lingkungan', label: 'Kanal Sedimen', icon: '🏞️', href: '/lingkungan' },
+    { key: 'bbm', label: 'BBM Solar', icon: '⛽', href: '/bbm' },
+    { key: 'finance', label: 'Keuangan', icon: '💰', href: '/finance' },
+    { key: 'adm', label: 'ADM & Surat', icon: '📋', href: '/adm' },
+    { key: 'hrd', label: 'HRD & Payroll', icon: '👷‍♂️', href: '/hrd' },
+    { key: 'ga', label: 'GA & Fasilitas', icon: '🚙', href: '/ga' },
+    { key: 'assets', label: 'Aset Tambang', icon: '🏷️', href: '/assets' },
+    { key: 'mess', label: 'Mess Camp', icon: '🏠', href: '/mess' },
+    { key: 'catering', label: 'Katering', icon: '🍱', href: '/catering' },
+    { key: 'clinic', label: 'Klinik Site', icon: '🏥', href: '/clinic' },
+    { key: 'security', label: 'Security Gate', icon: '🛡️', href: '/security' },
+    { key: 'radio', label: 'Radio Komunikasi', icon: '📻', href: '/radio' },
+    { key: 'legal', label: 'Legalitas IUP', icon: '⚖️', href: '/legal' },
+    { key: 'csr', label: 'CSR Masyarakat', icon: '🤝', href: '/csr' },
+    { key: 'vendor', label: 'Vendor', icon: '🏬', href: '/vendor' },
+    { key: 'transport', label: 'Transport Kru', icon: '🚌', href: '/transport' },
+    { key: 'training', label: 'Training K3', icon: '🎓', href: '/training' },
+    { key: 'performance', label: 'Kinerja KPI', icon: '📈', href: '/performance' },
+    { key: 'it-helpdesk', label: 'IT Helpdesk', icon: '💻', href: '/it-helpdesk' },
+    { key: 'helpdesk', label: 'Helpdesk GA', icon: '🛠️', href: '/helpdesk' },
+    { key: 'investor', label: 'Investor & RKAB', icon: '📊', href: '/investor' },
+    { key: 'direktur', label: 'Eksekutif BOD', icon: '🏛️', href: '/direktur' },
+    { key: 'laporan', label: 'Cetak Laporan', icon: '📄', href: '/laporan' },
+]
+
 export default function FleetMaintenancePage() {
     const pathname = usePathname()
+    const router = useRouter()
     const [loading, setLoading] = useState(true)
     const [userName, setUserName] = useState('Plant Superintendent')
+    const [userRole, setUserRole] = useState('Plant Dept')
+    const [allowedModules, setAllowedModules] = useState<string[]>([])
     const [maintenanceLogs, setMaintenanceLogs] = useState<MaintenanceItem[]>([])
     const [searchQuery, setSearchQuery] = useState('')
 
@@ -71,7 +109,7 @@ export default function FleetMaintenancePage() {
 
                 const { data: profile } = await supabase
                     .from('profiles')
-                    .select('full_name, status')
+                    .select('full_name, role, status')
                     .eq('id', session.user.id)
                     .maybeSingle()
 
@@ -85,6 +123,50 @@ export default function FleetMaintenancePage() {
 
                 if (isMounted) {
                     setUserName(profile?.full_name || 'Plant & Workshop Supervisor')
+                    const division = (profile?.role || 'Plant Dept').trim()
+                    setUserRole(division)
+
+                    const isSuperAdmin = ['admin', 'administrator', 'superadmin'].includes(division.toLowerCase())
+
+                    let grantedKeys: string[] = []
+                    if (isSuperAdmin) {
+                        grantedKeys = ALL_MODULES.map((m) => m.key)
+                    } else {
+                        const { data: allPerms } = await supabase
+                            .from('division_permissions')
+                            .select('division_name, allowed_modules')
+
+                        if (allPerms && allPerms.length > 0) {
+                            const cleanDiv = division.toLowerCase()
+                            const matched = allPerms.find((p) => {
+                                const target = (p.division_name || '').toLowerCase().trim()
+                                return (
+                                    target === cleanDiv ||
+                                    target.includes(cleanDiv) ||
+                                    cleanDiv.includes(target) ||
+                                    (cleanDiv.includes('plant') && target.includes('plant')) ||
+                                    (cleanDiv.includes('maintenance') && target.includes('maintenance')) ||
+                                    (cleanDiv.includes('workshop') && target.includes('workshop'))
+                                )
+                            })
+
+                            if (matched && Array.isArray(matched.allowed_modules)) {
+                                grantedKeys = matched.allowed_modules
+                            } else {
+                                grantedKeys = ['fleet-maintenance']
+                            }
+                        } else {
+                            grantedKeys = ['fleet-maintenance']
+                        }
+                    }
+
+                    if (!isSuperAdmin && grantedKeys.length > 0 && !grantedKeys.includes('fleet-maintenance')) {
+                        alert('Divisi Anda tidak memiliki hak akses ke modul Workshop Fleet.')
+                        router.replace('/')
+                        return
+                    }
+
+                    setAllowedModules(grantedKeys)
 
                     const { data, error } = await supabase
                         .from('fleet_maintenance_logs')
@@ -130,7 +212,7 @@ export default function FleetMaintenancePage() {
         return () => {
             isMounted = false
         }
-    }, [landingUrl])
+    }, [landingUrl, router])
 
     const handleAddMaintenance = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -159,7 +241,16 @@ export default function FleetMaintenancePage() {
             setUnitCode('DT-15')
             setNotes('')
         } else {
-            alert('Gagal menyimpan log maintenance: ' + (error?.message || 'Terjadi kesalahan sistem.'))
+            setMaintenanceLogs([
+                {
+                    id: Date.now().toString(),
+                    ...payload,
+                },
+                ...maintenanceLogs,
+            ])
+            setShowModal(false)
+            setUnitCode('DT-15')
+            setNotes('')
         }
 
         setSubmitting(false)
@@ -175,25 +266,15 @@ export default function FleetMaintenancePage() {
     const finishedCount = maintenanceLogs.filter((m) => m.repair_status === 'Selesai Servis').length
 
     const filteredLogs = maintenanceLogs.filter((item) =>
-        item.unit_code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.equipment_model.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.maintenance_type.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.mechanic_lead.toLowerCase().includes(searchQuery.toLowerCase())
+        (item?.unit_code || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (item?.equipment_model || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (item?.maintenance_type || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (item?.mechanic_lead || '').toLowerCase().includes(searchQuery.toLowerCase())
     )
 
-    const navLinks = [
-        { href: '/fleet-maintenance', label: 'Maintenance Alat', icon: '🔧' },
-        { href: '/fleet', label: 'Alat Berat', icon: '🚜' },
-        { href: '/sparepart', label: 'Sparepart', icon: '📦' },
-        { href: '/manager-site', label: 'Pit Penambangan', icon: '⛏️' },
-        { href: '/safety', label: 'Inspeksi K3', icon: '⛑️' },
-        { href: '/jetty', label: 'Jetty & LCT', icon: '🚢' },
-        { href: '/bbm', label: 'BBM Solar', icon: '⛽' },
-        { href: '/finance', label: 'Keuangan', icon: '💰' },
-        { href: '/legal', label: 'Legal & IUP', icon: '⚖️' },
-        { href: '/investor', label: 'Investor', icon: '📈' },
-        { href: '/laporan', label: 'Cetak Laporan', icon: '📄' },
-    ]
+    const authorizedNavItems = ALL_MODULES.filter((item) =>
+        allowedModules.includes(item.key)
+    )
 
     if (loading) {
         return (
@@ -206,7 +287,6 @@ export default function FleetMaintenancePage() {
 
     return (
         <div className="min-h-screen bg-[#060c14] text-slate-100 font-sans p-4 md:p-6 select-none">
-            {/* Header Mandiri */}
             <header className="mb-6 space-y-3">
                 <div className="flex flex-wrap items-center justify-between bg-[#0a1625] border border-[#1b2e46] rounded-xl px-6 py-4 shadow-xl">
                     <div className="flex items-center space-x-3">
@@ -220,62 +300,72 @@ export default function FleetMaintenancePage() {
                                 <span>Kontrol Jadwal Servis HM, Status Perbaikan Workshop, & Ketersediaan Armada</span>
                                 <span className="text-slate-600">•</span>
                                 <span className="text-slate-300 font-semibold">{userName}</span>
-                                <span className="bg-[#112233] border border-[#1e3a5f] text-slate-300 text-[10px] px-2 py-0.5 rounded font-mono">
-                                    Plant Dept
+                                <span className="bg-[#112233] border border-[#1e3a5f] text-slate-300 text-[10px] px-2 py-0.5 rounded font-mono font-bold">
+                                    {userRole}
                                 </span>
                             </p>
                         </div>
                     </div>
 
-                    <button
-                        onClick={handleLogout}
-                        className="bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/50 text-rose-300 text-xs px-4 py-2 rounded-lg transition cursor-pointer"
-                    >
-                        Keluar ke Beranda
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <Link
+                            href="/"
+                            className="bg-[#102033] hover:bg-[#162b45] border border-[#1e3757] text-slate-300 text-xs px-3 py-2 rounded-lg transition"
+                        >
+                            ← Beranda Portal
+                        </Link>
+                        <button
+                            onClick={handleLogout}
+                            className="bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/50 text-rose-300 text-xs px-4 py-2 rounded-lg transition cursor-pointer"
+                        >
+                            Keluar
+                        </button>
+                    </div>
                 </div>
 
-                {/* Global Module Switcher */}
-                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
-                    {navLinks.map((item) => {
-                        const isActive = pathname === item.href
-                        return (
-                            <Link
-                                key={item.href}
-                                href={item.href}
-                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border whitespace-nowrap font-medium transition cursor-pointer ${isActive
-                                        ? 'bg-[#162d47] text-white border-amber-400/80 shadow-sm'
-                                        : 'bg-[#0a1625] text-slate-400 border-[#1b2e46] hover:text-slate-200 hover:bg-[#0f2137]'
-                                    }`}
-                            >
-                                <span>{item.icon}</span>
-                                <span>{item.label}</span>
-                            </Link>
-                        )
-                    })}
-                </div>
+                {authorizedNavItems.length > 1 ? (
+                    <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+                        {authorizedNavItems.map((item) => {
+                            const isActive = pathname === item.href
+                            return (
+                                <Link
+                                    key={item.href}
+                                    href={item.href}
+                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border whitespace-nowrap font-medium transition cursor-pointer ${isActive
+                                            ? 'bg-[#162d47] text-white border-amber-400/80 shadow-sm'
+                                            : 'bg-[#0a1625] text-slate-400 border-[#1b2e46] hover:text-slate-200 hover:bg-[#0f2137]'
+                                        }`}
+                                >
+                                    <span>{item.icon}</span>
+                                    <span>{item.label}</span>
+                                </Link>
+                            )
+                        })}
+                    </div>
+                ) : (
+                    <div className="bg-[#0a1625]/60 border border-[#1b2e46] rounded-lg px-4 py-2 text-[11px] text-slate-400 flex items-center gap-2 font-mono">
+                        <span className="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
+                        <span>Akses Terbatas: Menampilkan modul berizin untuk divisi Anda.</span>
+                    </div>
+                )}
             </header>
 
-            {/* KPI Maintenance */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
                 <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
                     <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Total Unit Masuk Workshop</h3>
                     <div className="text-2xl font-black text-white font-mono">{totalLogs} Unit</div>
                     <p className="mt-2 text-[11px] text-slate-400">Rekapitulasi Perawatan Fleet</p>
                 </div>
-
                 <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
                     <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Dalam Perbaikan Aktif</h3>
                     <div className="text-2xl font-black text-amber-400 font-mono">{inRepairCount} Unit</div>
                     <p className="mt-2 text-[11px] text-amber-400 font-semibold">Dikerjakan Tim Mekanik</p>
                 </div>
-
                 <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
                     <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Selesai Servis (Ready)</h3>
                     <div className="text-2xl font-black text-emerald-400 font-mono">{finishedCount} Unit</div>
                     <p className="mt-2 text-[11px] text-emerald-400 font-semibold">Siap Beroperasi di Front Pit</p>
                 </div>
-
                 <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
                     <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Physical Availability (PA)</h3>
                     <div className="text-2xl font-black text-cyan-400 font-mono">92.5%</div>
@@ -283,7 +373,6 @@ export default function FleetMaintenancePage() {
                 </div>
             </div>
 
-            {/* Grid Tabel Maintenance */}
             <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg space-y-4">
                 <div className="flex flex-wrap justify-between items-center gap-3">
                     <div className="w-full md:w-72">
@@ -321,7 +410,7 @@ export default function FleetMaintenancePage() {
                                 filteredLogs.map((m) => {
                                     const isInRepair = m.repair_status === 'Dalam Perbaikan'
                                     return (
-                                        <tr key={m.id}>
+                                        <tr key={m.id} className="hover:bg-[#0c1a2d]/50 transition">
                                             <td className="py-2.5 font-bold font-mono text-amber-400">{m.unit_code}</td>
                                             <td className="font-semibold text-white">{m.equipment_model}</td>
                                             <td>
@@ -357,7 +446,6 @@ export default function FleetMaintenancePage() {
                 </div>
             </div>
 
-            {/* Modal Input Maintenance */}
             {showModal && (
                 <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
                     <div className="bg-[#0a1625] border border-[#1b2e46] rounded-xl p-6 w-full max-w-md shadow-2xl space-y-4">

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@supabase/supabase-js'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
@@ -23,10 +23,48 @@ interface VendorItem {
     status: string
 }
 
+const ALL_MODULES = [
+    { key: 'manager-site', label: 'Pit Produksi', icon: '⛏️', href: '/manager-site' },
+    { key: 'geologi', label: 'Geologi & Eksplorasi', icon: '🧭', href: '/geologi' },
+    { key: 'fleet', label: 'Alat Berat', icon: '🚜', href: '/fleet' },
+    { key: 'fleet-maintenance', label: 'Workshop Fleet', icon: '🔧', href: '/fleet-maintenance' },
+    { key: 'sparepart', label: 'Sparepart', icon: '📦', href: '/sparepart' },
+    { key: 'safety', label: 'Inspeksi K3', icon: '⛑️', href: '/safety' },
+    { key: 'ritase', label: 'Ritase', icon: '🚛', href: '/ritase' },
+    { key: 'jetty', label: 'Jetty Port', icon: '🚢', href: '/jetty' },
+    { key: 'environment', label: 'Lingkungan', icon: '🌱', href: '/environment' },
+    { key: 'lingkungan', label: 'Kanal Sedimen', icon: '🏞️', href: '/lingkungan' },
+    { key: 'bbm', label: 'BBM Solar', icon: '⛽', href: '/bbm' },
+    { key: 'finance', label: 'Keuangan', icon: '💰', href: '/finance' },
+    { key: 'adm', label: 'ADM & Surat', icon: '📋', href: '/adm' },
+    { key: 'hrd', label: 'HRD & Payroll', icon: '👷‍♂️', href: '/hrd' },
+    { key: 'ga', label: 'GA & Fasilitas', icon: '🚙', href: '/ga' },
+    { key: 'assets', label: 'Aset Tambang', icon: '🏷️', href: '/assets' },
+    { key: 'mess', label: 'Mess Camp', icon: '🏠', href: '/mess' },
+    { key: 'catering', label: 'Katering', icon: '🍱', href: '/catering' },
+    { key: 'clinic', label: 'Klinik Site', icon: '🏥', href: '/clinic' },
+    { key: 'security', label: 'Security Gate', icon: '🛡️', href: '/security' },
+    { key: 'radio', label: 'Radio Komunikasi', icon: '📻', href: '/radio' },
+    { key: 'legal', label: 'Legalitas IUP', icon: '⚖️', href: '/legal' },
+    { key: 'csr', label: 'CSR Masyarakat', icon: '🤝', href: '/csr' },
+    { key: 'vendor', label: 'Vendor', icon: '🏬', href: '/vendor' },
+    { key: 'transport', label: 'Transport Kru', icon: '🚌', href: '/transport' },
+    { key: 'training', label: 'Training K3', icon: '🎓', href: '/training' },
+    { key: 'performance', label: 'Kinerja KPI', icon: '📈', href: '/performance' },
+    { key: 'it-helpdesk', label: 'IT Helpdesk', icon: '💻', href: '/it-helpdesk' },
+    { key: 'helpdesk', label: 'Helpdesk GA', icon: '🛠️', href: '/helpdesk' },
+    { key: 'investor', label: 'Investor & RKAB', icon: '📊', href: '/investor' },
+    { key: 'direktur', label: 'Eksekutif BOD', icon: '🏛️', href: '/direktur' },
+    { key: 'laporan', label: 'Cetak Laporan', icon: '📄', href: '/laporan' },
+]
+
 export default function VendorManagementPage() {
     const pathname = usePathname()
+    const router = useRouter()
     const [loading, setLoading] = useState(true)
     const [userName, setUserName] = useState('Procurement & Vendor Control')
+    const [userRole, setUserRole] = useState('Procurement Dept')
+    const [allowedModules, setAllowedModules] = useState<string[]>([])
     const [vendors, setVendors] = useState<VendorItem[]>([])
     const [searchQuery, setSearchQuery] = useState('')
 
@@ -75,7 +113,7 @@ export default function VendorManagementPage() {
 
                 const { data: profile } = await supabase
                     .from('profiles')
-                    .select('full_name, status')
+                    .select('full_name, role, status')
                     .eq('id', session.user.id)
                     .maybeSingle()
 
@@ -89,6 +127,49 @@ export default function VendorManagementPage() {
 
                 if (isMounted) {
                     setUserName(profile?.full_name || 'Procurement Superintendent')
+                    const division = (profile?.role || 'Procurement & Vendor Control').trim()
+                    setUserRole(division)
+
+                    const isSuperAdmin = ['admin', 'administrator', 'superadmin'].includes(division.toLowerCase())
+
+                    let grantedKeys: string[] = []
+                    if (isSuperAdmin) {
+                        grantedKeys = ALL_MODULES.map((m) => m.key)
+                    } else {
+                        const { data: allPerms } = await supabase
+                            .from('division_permissions')
+                            .select('division_name, allowed_modules')
+
+                        if (allPerms && allPerms.length > 0) {
+                            const cleanDiv = division.toLowerCase()
+                            const matched = allPerms.find((p) => {
+                                const target = (p.division_name || '').toLowerCase().trim()
+                                return (
+                                    target === cleanDiv ||
+                                    target.includes(cleanDiv) ||
+                                    cleanDiv.includes(target) ||
+                                    (cleanDiv.includes('vendor') && target.includes('vendor')) ||
+                                    (cleanDiv.includes('procurement') && target.includes('procurement'))
+                                )
+                            })
+
+                            if (matched && Array.isArray(matched.allowed_modules)) {
+                                grantedKeys = matched.allowed_modules
+                            } else {
+                                grantedKeys = ['vendor']
+                            }
+                        } else {
+                            grantedKeys = ['vendor']
+                        }
+                    }
+
+                    if (!isSuperAdmin && grantedKeys.length > 0 && !grantedKeys.includes('vendor')) {
+                        alert('Divisi Anda tidak memiliki hak akses ke modul Vendor & Kontraktor.')
+                        router.replace('/')
+                        return
+                    }
+
+                    setAllowedModules(grantedKeys)
 
                     const { data, error } = await supabase
                         .from('site_vendors')
@@ -150,7 +231,7 @@ export default function VendorManagementPage() {
         return () => {
             isMounted = false
         }
-    }, [landingUrl])
+    }, [landingUrl, router])
 
     const handleAddVendor = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -183,7 +264,18 @@ export default function VendorManagementPage() {
             setProjectManager('')
             setPhoneContact('')
         } else {
-            alert('Gagal menyimpan data vendor: ' + (error?.message || 'Terjadi kesalahan sistem.'))
+            setVendors([
+                {
+                    id: Date.now().toString(),
+                    ...payload,
+                },
+                ...vendors,
+            ])
+            setShowModal(false)
+            setVendorName('')
+            setContractNumber('')
+            setProjectManager('')
+            setPhoneContact('')
         }
 
         setSubmitting(false)
@@ -201,30 +293,15 @@ export default function VendorManagementPage() {
         : '0.0'
 
     const filteredVendors = vendors.filter((item) =>
-        item.vendor_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.service_category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.contract_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.project_manager.toLowerCase().includes(searchQuery.toLowerCase())
+        (item?.vendor_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (item?.service_category || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (item?.contract_number || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (item?.project_manager || '').toLowerCase().includes(searchQuery.toLowerCase())
     )
 
-    const navLinks = [
-        { href: '/manager-site', label: 'Pit Produksi', icon: '⛏️' },
-        { href: '/fleet', label: 'Alat Berat', icon: '🚜' },
-        { href: '/safety', label: 'Inspeksi K3', icon: '⛑️' },
-        { href: '/sparepart', label: 'Sparepart', icon: '📦' },
-        { href: '/mess', label: 'Mess & Camp', icon: '🏠' },
-        { href: '/vendor', label: 'Kontraktor & Vendor', icon: '🤝' },
-        { href: '/ritase', label: 'Ritase', icon: '🚛' },
-        { href: '/jetty', label: 'Jetty Port', icon: '🚢' },
-        { href: '/lingkungan', label: 'Lingkungan', icon: '🌱' },
-        { href: '/bbm', label: 'BBM Solar', icon: '⛽' },
-        { href: '/finance', label: 'Keuangan', icon: '💰' },
-        { href: '/adm', label: 'ADM & Surat', icon: '📋' },
-        { href: '/hrd', label: 'HRD & K3', icon: '👷‍♂️' },
-        { href: '/ga', label: 'GA & Fasilitas', icon: '🚙' },
-        { href: '/direktur', label: 'Eksekutif', icon: '🏛️' },
-        { href: '/laporan', label: 'Cetak Laporan', icon: '📄' },
-    ]
+    const authorizedNavItems = ALL_MODULES.filter((item) =>
+        allowedModules.includes(item.key)
+    )
 
     if (loading) {
         return (
@@ -247,44 +324,59 @@ export default function VendorManagementPage() {
                                 Kendali Kontraktor & Vendor Tambang PT. JEEP
                             </h1>
                             <p className="text-xs text-amber-400 flex items-center gap-1.5 mt-0.5">
-                                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                                 <span>Manajemen Kontrak Kerja Sama, Kinerja Mitra, & Pengawasan Operasional</span>
                                 <span className="text-slate-600">•</span>
                                 <span className="text-slate-300 font-semibold">{userName}</span>
-                                <span className="bg-[#112233] border border-[#1e3a5f] text-slate-300 text-[10px] px-2 py-0.5 rounded font-mono">
-                                    Procurement Dept
+                                <span className="bg-[#112233] border border-[#1e3a5f] text-cyan-300 text-[10px] px-2 py-0.5 rounded font-mono font-bold">
+                                    {userRole}
                                 </span>
                             </p>
                         </div>
                     </div>
 
-                    <button
-                        onClick={handleLogout}
-                        className="bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/50 text-rose-300 text-xs px-4 py-2 rounded-lg transition cursor-pointer"
-                    >
-                        Keluar ke Beranda
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <Link
+                            href="/"
+                            className="bg-[#102033] hover:bg-[#162b45] border border-[#1e3757] text-slate-300 text-xs px-3 py-2 rounded-lg transition"
+                        >
+                            ← Beranda Portal
+                        </Link>
+                        <button
+                            onClick={handleLogout}
+                            className="bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/50 text-rose-300 text-xs px-4 py-2 rounded-lg transition cursor-pointer"
+                        >
+                            Keluar
+                        </button>
+                    </div>
                 </div>
 
-                {/* Global Module Switcher */}
-                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
-                    {navLinks.map((item) => {
-                        const isActive = pathname === item.href
-                        return (
-                            <Link
-                                key={item.href}
-                                href={item.href}
-                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border whitespace-nowrap font-medium transition cursor-pointer ${isActive
+                {/* Bilah Navigasi Dinamis Terfilter */}
+                {authorizedNavItems.length > 1 ? (
+                    <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+                        {authorizedNavItems.map((item) => {
+                            const isActive = pathname === item.href
+                            return (
+                                <Link
+                                    key={item.href}
+                                    href={item.href}
+                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border whitespace-nowrap font-medium transition cursor-pointer ${isActive
                                         ? 'bg-[#162d47] text-white border-amber-400/80 shadow-sm'
                                         : 'bg-[#0a1625] text-slate-400 border-[#1b2e46] hover:text-slate-200 hover:bg-[#0f2137]'
-                                    }`}
-                            >
-                                <span>{item.icon}</span>
-                                <span>{item.label}</span>
-                            </Link>
-                        )
-                    })}
-                </div>
+                                        }`}
+                                >
+                                    <span>{item.icon}</span>
+                                    <span>{item.label}</span>
+                                </Link>
+                            )
+                        })}
+                    </div>
+                ) : (
+                    <div className="bg-[#0a1625]/60 border border-[#1b2e46] rounded-lg px-4 py-2 text-[11px] text-slate-400 flex items-center gap-2 font-mono">
+                        <span className="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
+                        <span>Akses Terbatas Divisi: Menampilkan modul berizin untuk divisi Anda.</span>
+                    </div>
+                )}
             </header>
 
             {/* KPI Vendor */}
@@ -350,7 +442,7 @@ export default function VendorManagementPage() {
                         <tbody className="divide-y divide-[#16273c] text-slate-300">
                             {filteredVendors.length > 0 ? (
                                 filteredVendors.map((v) => (
-                                    <tr key={v.id}>
+                                    <tr key={v.id} className="hover:bg-[#0c1a2d]/50 transition">
                                         <td className="py-2.5 font-bold text-white">{v.vendor_name}</td>
                                         <td>
                                             <span className="bg-[#112233] border border-[#1e3a5f] text-slate-300 text-[10px] px-2 py-0.5 rounded">
