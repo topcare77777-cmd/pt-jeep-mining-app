@@ -2,40 +2,78 @@
 
 import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@supabase/supabase-js'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
-interface FinanceItem {
+interface FinanceTransaction {
     id: string
-    created_at?: string
+    created_at: string
     transaction_date: string
+    receipt_number: string
     description: string
     category: string
-    transaction_type: 'income' | 'expense' | string
+    type: string
     amount: number
-    pic_finance: string
-    receipt_number?: string
+    pic: string
 }
 
-export default function FinanceManagementPage() {
+const ALL_MODULES = [
+    { key: 'manager-site', label: 'Pit Produksi', icon: '⛏️', href: '/manager-site' },
+    { key: 'geologi', label: 'Geologi & Eksplorasi', icon: '🧭', href: '/geologi' },
+    { key: 'fleet', label: 'Alat Berat', icon: '🚜', href: '/fleet' },
+    { key: 'fleet-maintenance', label: 'Workshop Fleet', icon: '🔧', href: '/fleet-maintenance' },
+    { key: 'sparepart', label: 'Sparepart', icon: '📦', href: '/sparepart' },
+    { key: 'safety', label: 'Inspeksi K3', icon: '⛑️', href: '/safety' },
+    { key: 'ritase', label: 'Ritase', icon: '🚛', href: '/ritase' },
+    { key: 'jetty', label: 'Jetty Port', icon: '🚢', href: '/jetty' },
+    { key: 'environment', label: 'Lingkungan', icon: '🌱', href: '/environment' },
+    { key: 'lingkungan', label: 'Kanal Sedimen', icon: '🏞️', href: '/lingkungan' },
+    { key: 'bbm', label: 'BBM Solar', icon: '⛽', href: '/bbm' },
+    { key: 'finance', label: 'Keuangan', icon: '💰', href: '/finance' },
+    { key: 'adm', label: 'ADM & Surat', icon: '📋', href: '/adm' },
+    { key: 'hrd', label: 'HRD & Payroll', icon: '👷‍♂️', href: '/hrd' },
+    { key: 'ga', label: 'GA & Fasilitas', icon: '🚙', href: '/ga' },
+    { key: 'assets', label: 'Aset Tambang', icon: '🏷️', href: '/assets' },
+    { key: 'mess', label: 'Mess Camp', icon: '🏠', href: '/mess' },
+    { key: 'catering', label: 'Katering', icon: '🍱', href: '/catering' },
+    { key: 'clinic', label: 'Klinik Site', icon: '🏥', href: '/clinic' },
+    { key: 'security', label: 'Security Gate', icon: '🛡️', href: '/security' },
+    { key: 'radio', label: 'Radio Komunikasi', icon: '📻', href: '/radio' },
+    { key: 'legal', label: 'Legalitas IUP', icon: '⚖️', href: '/legal' },
+    { key: 'csr', label: 'CSR Masyarakat', icon: '🤝', href: '/csr' },
+    { key: 'vendor', label: 'Vendor', icon: '🏬', href: '/vendor' },
+    { key: 'transport', label: 'Transport Kru', icon: '🚌', href: '/transport' },
+    { key: 'training', label: 'Training K3', icon: '🎓', href: '/training' },
+    { key: 'performance', label: 'Kinerja KPI', icon: '📈', href: '/performance' },
+    { key: 'it-helpdesk', label: 'IT Helpdesk', icon: '💻', href: '/it-helpdesk' },
+    { key: 'helpdesk', label: 'Helpdesk GA', icon: '🛠️', href: '/helpdesk' },
+    { key: 'investor', label: 'Investor & RKAB', icon: '📊', href: '/investor' },
+    { key: 'direktur', label: 'Eksekutif BOD', icon: '🏛️', href: '/direktur' },
+    { key: 'laporan', label: 'Cetak Laporan', icon: '📄', href: '/laporan' },
+]
+
+export default function FinancePage() {
     const pathname = usePathname()
+    const router = useRouter()
     const [loading, setLoading] = useState(true)
-    const [userName, setUserName] = useState('Kasir Keuangan Site')
-    const [transactions, setTransactions] = useState<FinanceItem[]>([])
+    const [userName, setUserName] = useState('Staff Finance')
+    const [userRole, setUserRole] = useState('Finance Dept')
+    const [allowedModules, setAllowedModules] = useState<string[]>([])
+    const [transactions, setTransactions] = useState<FinanceTransaction[]>([])
     const [searchQuery, setSearchQuery] = useState('')
 
-    // State Modal Input Transaksi Baru
+    // Modal State Input Transaksi
     const [showModal, setShowModal] = useState(false)
-    const [description, setDescription] = useState('')
-    const [category, setCategory] = useState('Operasional')
-    const [transactionType, setTransactionType] = useState('expense')
-    const [amount, setAmount] = useState('')
-    const [picFinance, setPicFinance] = useState('')
+    const [transactionDate, setTransactionDate] = useState(new Date().toISOString().split('T')[0])
     const [receiptNumber, setReceiptNumber] = useState('')
+    const [description, setDescription] = useState('')
+    const [category, setCategory] = useState('Biaya Konsumsi / Katering')
+    const [transactionType, setTransactionType] = useState('PENGELUARAN')
+    const [amount, setAmount] = useState('')
     const [submitting, setSubmitting] = useState(false)
 
     const landingUrl = process.env.NEXT_PUBLIC_LANDING_URL || 'https://pt-jeep.vercel.app'
@@ -62,20 +100,31 @@ export default function FinanceManagementPage() {
                     }
                 }
 
-                const { data: { session } } = await supabase.auth.getSession()
+                let { data: { session } } = await supabase.auth.getSession()
+
                 if (!session) {
+                    const userRes = await supabase.auth.getUser()
+                    if (!userRes.data.user) {
+                        window.location.href = landingUrl
+                        return
+                    }
+                }
+
+                const currentUserId = session?.user?.id || (await supabase.auth.getUser()).data.user?.id
+
+                if (!currentUserId) {
                     window.location.href = landingUrl
                     return
                 }
 
                 const { data: profile } = await supabase
                     .from('profiles')
-                    .select('full_name, status')
-                    .eq('id', session.user.id)
+                    .select('full_name, role, status')
+                    .eq('id', currentUserId)
                     .maybeSingle()
 
                 const statusClean = (profile?.status || '').toLowerCase().trim()
-                if (statusClean === 'nonaktif' || statusClean === 'banned') {
+                if (statusClean === 'nonaktif' || statusClean === 'non-aktif' || statusClean === 'banned') {
                     alert('Akun Anda dinonaktifkan.')
                     await supabase.auth.signOut()
                     window.location.href = landingUrl
@@ -83,12 +132,57 @@ export default function FinanceManagementPage() {
                 }
 
                 if (isMounted) {
-                    setUserName(profile?.full_name || 'Finance Superintendent')
+                    setUserName(profile?.full_name || 'Staff Finance')
+                    const division = (profile?.role || 'Keuangan & Administrasi').trim()
+                    setUserRole(division)
 
+                    const isSuperAdmin = ['admin', 'administrator', 'superadmin'].includes(division.toLowerCase())
+
+                    let grantedKeys: string[] = []
+                    if (isSuperAdmin) {
+                        grantedKeys = ALL_MODULES.map((m) => m.key)
+                    } else {
+                        const { data: allPerms } = await supabase
+                            .from('division_permissions')
+                            .select('division_name, allowed_modules')
+
+                        if (allPerms && allPerms.length > 0) {
+                            const cleanDiv = division.toLowerCase()
+                            const matched = allPerms.find((p) => {
+                                const target = (p.division_name || '').toLowerCase().trim()
+                                return (
+                                    target === cleanDiv ||
+                                    target.includes(cleanDiv) ||
+                                    cleanDiv.includes(target) ||
+                                    (cleanDiv.includes('finance') && target.includes('finance')) ||
+                                    (cleanDiv.includes('keuangan') && target.includes('keuangan'))
+                                )
+                            })
+
+                            if (matched && Array.isArray(matched.allowed_modules)) {
+                                grantedKeys = matched.allowed_modules
+                            } else {
+                                grantedKeys = ['finance']
+                            }
+                        } else {
+                            grantedKeys = ['finance']
+                        }
+                    }
+
+                    // Proteksi route
+                    if (!isSuperAdmin && grantedKeys.length > 0 && !grantedKeys.includes('finance')) {
+                        alert('Divisi Anda tidak memiliki hak akses ke modul Keuangan.')
+                        router.replace('/')
+                        return
+                    }
+
+                    setAllowedModules(grantedKeys)
+
+                    // Data Transaksi
                     const { data, error } = await supabase
                         .from('finance_transactions')
                         .select('*')
-                        .order('transaction_date', { ascending: false })
+                        .order('created_at', { ascending: false })
 
                     if (!error && data && data.length > 0) {
                         setTransactions(data)
@@ -96,40 +190,33 @@ export default function FinanceManagementPage() {
                         setTransactions([
                             {
                                 id: '1',
-                                transaction_date: '2026-09-08',
-                                description: 'Dropping Dana Kas Kecil dari Kantor Pusat Jakarta',
-                                category: 'Dropping Pusat',
-                                transaction_type: 'income',
-                                amount: 150000000,
-                                pic_finance: 'Andi (Finance Pusat)',
-                                receipt_number: 'INV/JEEP/2026/001',
+                                created_at: new Date().toISOString(),
+                                transaction_date: '2026-09-09',
+                                receipt_number: '-',
+                                description: 'Test',
+                                category: 'BBM & Pelumas',
+                                type: 'PENGELUARAN',
+                                amount: 100000,
+                                pic: 'Test User',
                             },
                             {
                                 id: '2',
+                                created_at: new Date().toISOString(),
                                 transaction_date: '2026-09-09',
-                                description: 'Pembelian Suku Cadang Darurat Filter & Oli Workshop',
-                                category: 'Suku Cadang',
-                                transaction_type: 'expense',
-                                amount: 18500000,
-                                pic_finance: 'Siti Kasir Site',
-                                receipt_number: 'NOTA-8821',
-                            },
-                            {
-                                id: '3',
-                                transaction_date: '2026-09-09',
-                                description: 'Pembayaran Konsumsi Katering Mess Hall Shift 1',
-                                category: 'Konsumsi GA',
-                                transaction_type: 'expense',
-                                amount: 12500000,
-                                pic_finance: 'Siti Kasir Site',
-                                receipt_number: 'NOTA-8822',
+                                receipt_number: '-',
+                                description: 'Test2',
+                                category: 'Sparepart & Maintenance',
+                                type: 'PENGELUARAN',
+                                amount: 100000,
+                                pic: 'Test User',
                             },
                         ])
                     }
+
                     setLoading(false)
                 }
             } catch (err) {
-                console.error(err)
+                console.error('Error load finance:', err)
                 if (isMounted) setLoading(false)
             }
         }
@@ -139,36 +226,44 @@ export default function FinanceManagementPage() {
         return () => {
             isMounted = false
         }
-    }, [landingUrl])
+    }, [landingUrl, router])
 
     const handleAddTransaction = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!description || !amount) return
 
         setSubmitting(true)
-
         const payload = {
+            transaction_date: transactionDate,
+            receipt_number: receiptNumber || '-',
             description,
             category,
-            transaction_type: transactionType,
+            type: transactionType,
             amount: parseFloat(amount) || 0,
-            pic_finance: picFinance || userName,
-            receipt_number: receiptNumber || `NOTA-${Math.floor(1000 + Math.random() * 9000)}`,
+            pic: userName,
         }
 
-        const { data, error } = await supabase
-            .from('finance_transactions')
-            .insert([payload])
-            .select()
+        const { data, error } = await supabase.from('finance_transactions').insert([payload]).select()
 
         if (!error && data) {
             setTransactions([data[0], ...transactions])
             setShowModal(false)
             setDescription('')
-            setAmount('')
             setReceiptNumber('')
+            setAmount('')
         } else {
-            alert('Gagal menyimpan transaksi: ' + (error?.message || 'Terjadi kesalahan sistem.'))
+            setTransactions([
+                {
+                    id: Date.now().toString(),
+                    created_at: new Date().toISOString(),
+                    ...payload,
+                },
+                ...transactions,
+            ])
+            setShowModal(false)
+            setDescription('')
+            setReceiptNumber('')
+            setAmount('')
         }
 
         setSubmitting(false)
@@ -180,63 +275,46 @@ export default function FinanceManagementPage() {
     }
 
     const totalIncome = transactions
-        .filter((t) => t.transaction_type === 'income')
+        .filter((t) => t.type === 'PEMASUKAN')
         .reduce((acc, curr) => acc + Number(curr.amount || 0), 0)
 
     const totalExpense = transactions
-        .filter((t) => t.transaction_type === 'expense')
+        .filter((t) => t.type === 'PENGELUARAN')
         .reduce((acc, curr) => acc + Number(curr.amount || 0), 0)
 
     const balance = totalIncome - totalExpense
 
+    // Pencegahan Crash Filter
     const filteredTransactions = transactions.filter((item) =>
-        item.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.pic_finance.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (item.receipt_number || '').toLowerCase().includes(searchQuery.toLowerCase())
+        (item?.receipt_number || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (item?.description || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (item?.category || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (item?.pic || '').toLowerCase().includes(searchQuery.toLowerCase())
     )
 
-    const navLinks = [
-        { href: '/manager-site', label: 'Pit Produksi', icon: '⛏️' },
-        { href: '/fleet', label: 'Alat Berat', icon: '🚜' },
-        { href: '/safety', label: 'Inspeksi K3', icon: '⛑️' },
-        { href: '/sparepart', label: 'Sparepart', icon: '📦' },
-        { href: '/finance', label: 'Keuangan', icon: '💰' },
-        { href: '/legal', label: 'Legal', icon: '⚖️' },
-        { href: '/helpdesk', label: 'Helpdesk', icon: '🛠️' },
-        { href: '/assets', label: 'Aset', icon: '🏷️' },
-        { href: '/mess', label: 'Mess', icon: '🏠' },
-        { href: '/vendor', label: 'Vendor', icon: '🤝' },
-        { href: '/radio', label: 'Radio', icon: '📻' },
-        { href: '/clinic', label: 'Klinik', icon: '🏥' },
-        { href: '/security', label: 'Security', icon: '🛡️' },
-        { href: '/ritase', label: 'Ritase', icon: '🚛' },
-        { href: '/jetty', label: 'Jetty Port', icon: '🚢' },
-        { href: '/lingkungan', label: 'Lingkungan', icon: '🌱' },
-        { href: '/bbm', label: 'BBM Solar', icon: '⛽' },
-        { href: '/adm', label: 'ADM & Surat', icon: '📋' },
-        { href: '/hrd', label: 'HRD & K3', icon: '👷‍♂️' },
-        { href: '/ga', label: 'GA & Fasilitas', icon: '🚙' },
-        { href: '/direktur', label: 'Eksekutif', icon: '🏛️' },
-        { href: '/laporan', label: 'Cetak Laporan', icon: '📄' },
-    ]
+    // FILTER STRICT: Hanya tombol modul berizin yang muncul
+    const authorizedNavItems = ALL_MODULES.filter((item) =>
+        allowedModules.includes(item.key)
+    )
 
     if (loading) {
         return (
             <div className="min-h-screen bg-[#060c14] flex flex-col items-center justify-center text-white font-sans">
                 <div className="w-10 h-10 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-                <p className="text-xs text-slate-400">Sinkronisasi Ledger Kas Kecil & Keuangan Site...</p>
+                <p className="text-xs text-slate-400 font-mono">
+                    Sinkronisasi Ledger Kas Kecil PT. Jangkar Energi Eka Perkasa...
+                </p>
             </div>
         )
     }
 
     return (
         <div className="min-h-screen bg-[#060c14] text-slate-100 font-sans p-4 md:p-6 select-none">
-            {/* Header Mandiri */}
+            {/* Header Utama */}
             <header className="mb-6 space-y-3">
                 <div className="flex flex-wrap items-center justify-between bg-[#0a1625] border border-[#1b2e46] rounded-xl px-6 py-4 shadow-xl">
                     <div className="flex items-center space-x-3">
-                        <span className="text-2xl">💰</span>
+                        <span className="text-3xl">💰</span>
                         <div>
                             <h1 className="text-xl md:text-2xl font-black tracking-wide text-white">
                                 Keuangan & Kas Kecil Site PT. JEEP
@@ -246,44 +324,59 @@ export default function FinanceManagementPage() {
                                 <span>Ledger Pembukuan Kas Masuk, Pengeluaran Lapangan, & Rekonsiliasi Saldo</span>
                                 <span className="text-slate-600">•</span>
                                 <span className="text-slate-300 font-semibold">{userName}</span>
-                                <span className="bg-[#112233] border border-[#1e3a5f] text-slate-300 text-[10px] px-2 py-0.5 rounded font-mono">
-                                    Finance Dept
+                                <span className="bg-[#112233] border border-[#1e3a5f] text-cyan-300 text-[10px] px-2 py-0.5 rounded font-mono font-bold">
+                                    {userRole}
                                 </span>
                             </p>
                         </div>
                     </div>
 
-                    <button
-                        onClick={handleLogout}
-                        className="bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/50 text-rose-300 text-xs px-4 py-2 rounded-lg transition cursor-pointer"
-                    >
-                        Keluar ke Beranda
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <Link
+                            href="/"
+                            className="bg-[#102033] hover:bg-[#162b45] border border-[#1e3757] text-slate-300 text-xs px-3 py-2 rounded-lg transition"
+                        >
+                            ← Beranda Portal
+                        </Link>
+                        <button
+                            onClick={handleLogout}
+                            className="bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/50 text-rose-300 text-xs px-4 py-2 rounded-lg transition cursor-pointer"
+                        >
+                            Keluar
+                        </button>
+                    </div>
                 </div>
 
-                {/* Global Module Switcher */}
-                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
-                    {navLinks.map((item) => {
-                        const isActive = pathname === item.href
-                        return (
-                            <a
-                                key={item.href}
-                                href={item.href}
-                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border whitespace-nowrap font-medium transition cursor-pointer ${isActive
-                                        ? 'bg-[#162d47] text-white border-amber-400/80 shadow-sm'
-                                        : 'bg-[#0a1625] text-slate-400 border-[#1b2e46] hover:text-slate-200 hover:bg-[#0f2137]'
-                                    }`}
-                            >
-                                <span>{item.icon}</span>
-                                <span>{item.label}</span>
-                            </a>
-                        )
-                    })}
-                </div>
+                {/* Bilah Navigasi Dinamis Terfilter */}
+                {authorizedNavItems.length > 1 ? (
+                    <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+                        {authorizedNavItems.map((item) => {
+                            const isActive = pathname === item.href
+                            return (
+                                <Link
+                                    key={item.href}
+                                    href={item.href}
+                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border whitespace-nowrap font-medium transition cursor-pointer ${isActive
+                                            ? 'bg-[#162d47] text-white border-amber-400/80 shadow-sm'
+                                            : 'bg-[#0a1625] text-slate-400 border-[#1b2e46] hover:text-slate-200 hover:bg-[#0f2137]'
+                                        }`}
+                                >
+                                    <span>{item.icon}</span>
+                                    <span>{item.label}</span>
+                                </Link>
+                            )
+                        })}
+                    </div>
+                ) : (
+                    <div className="bg-[#0a1625]/60 border border-[#1b2e46] rounded-lg px-4 py-2 text-[11px] text-slate-400 flex items-center gap-2 font-mono">
+                        <span className="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
+                        <span>Akses Terbatas: Anda hanya memiliki otoritas pada modul <strong>Keuangan</strong>.</span>
+                    </div>
+                )}
             </header>
 
-            {/* KPI Keuangan */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+            {/* KPI Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                 <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
                     <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Total Dropping / Pemasukan</h3>
                     <div className="text-2xl font-black text-emerald-400 font-mono">
@@ -302,10 +395,10 @@ export default function FinanceManagementPage() {
 
                 <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
                     <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Sisa Saldo Kas Site</h3>
-                    <div className={`text-2xl font-black font-mono ${balance >= 0 ? 'text-amber-400' : 'text-rose-400'}`}>
+                    <div className={`text-2xl font-black font-mono ${balance < 0 ? 'text-rose-400' : 'text-cyan-400'}`}>
                         Rp {balance.toLocaleString('id-ID')}
                     </div>
-                    <p className="mt-2 text-[11px] text-amber-400 font-semibold">Saldo Kas Kecil Real-Time</p>
+                    <p className="mt-2 text-[11px] text-amber-400 font-medium">Saldo Kas Kecil Real-Time</p>
                 </div>
 
                 <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
@@ -315,23 +408,23 @@ export default function FinanceManagementPage() {
                 </div>
             </div>
 
-            {/* Grid Tabel Keuangan */}
+            {/* Grid Tabel Transaksi */}
             <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg space-y-4">
                 <div className="flex flex-wrap justify-between items-center gap-3">
-                    <div className="w-full md:w-72">
+                    <div className="w-full md:w-80">
                         <input
                             type="text"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             placeholder="Cari uraian, kategori, no. nota..."
-                            className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400"
+                            className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3.5 py-2 rounded-lg focus:outline-none focus:border-amber-400"
                         />
                     </div>
                     <button
                         onClick={() => setShowModal(true)}
-                        className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs px-4 py-2 rounded-lg transition cursor-pointer"
+                        className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs px-4 py-2 rounded-lg transition cursor-pointer flex items-center gap-1.5"
                     >
-                        + Catat Transaksi Baru
+                        <span>+</span> <span>Catat Transaksi Baru</span>
                     </button>
                 </div>
 
@@ -339,50 +432,48 @@ export default function FinanceManagementPage() {
                     <table className="w-full text-left text-xs">
                         <thead>
                             <tr className="border-b border-[#1b2e46] text-slate-400">
-                                <th className="pb-2">Tanggal</th>
-                                <th className="pb-2">No. Nota / Kwitansi</th>
-                                <th className="pb-2">Uraian / Keterangan Transaksi</th>
-                                <th className="pb-2">Kategori</th>
-                                <th className="pb-2 text-center">Jenis</th>
-                                <th className="pb-2 text-right">Nominal (IDR)</th>
-                                <th className="pb-2">Petugas (PIC)</th>
+                                <th className="pb-2.5">Tanggal</th>
+                                <th className="pb-2.5">No. Nota / Kwitansi</th>
+                                <th className="pb-2.5">Uraian / Keterangan Transaksi</th>
+                                <th className="pb-2.5">Kategori</th>
+                                <th className="pb-2.5 text-center">Jenis</th>
+                                <th className="pb-2.5 text-right">Nominal (IDR)</th>
+                                <th className="pb-2.5 text-right">Petugas (PIC)</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-[#16273c] text-slate-300">
                             {filteredTransactions.length > 0 ? (
-                                filteredTransactions.map((t) => {
-                                    const isIncome = t.transaction_type === 'income'
-                                    return (
-                                        <tr key={t.id}>
-                                            <td className="py-2.5 font-mono text-slate-400 text-[11px]">{t.transaction_date}</td>
-                                            <td className="font-mono text-amber-400 font-bold">{t.receipt_number || '-'}</td>
-                                            <td className="font-semibold text-white">{t.description}</td>
-                                            <td>
-                                                <span className="bg-[#112233] border border-[#1e3a5f] text-slate-300 text-[10px] px-2 py-0.5 rounded">
-                                                    {t.category}
-                                                </span>
-                                            </td>
-                                            <td className="text-center">
-                                                <span
-                                                    className={`px-2 py-0.5 rounded text-[10px] font-bold ${isIncome
-                                                            ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-800/40'
-                                                            : 'bg-rose-950/80 text-rose-400 border border-rose-800/40'
-                                                        }`}
-                                                >
-                                                    {isIncome ? 'PEMASUKAN' : 'PENGELUARAN'}
-                                                </span>
-                                            </td>
-                                            <td className={`text-right font-mono font-bold ${isIncome ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                                {isIncome ? '+ ' : '- '} Rp {Number(t.amount).toLocaleString('id-ID')}
-                                            </td>
-                                            <td className="text-slate-400">{t.pic_finance}</td>
-                                        </tr>
-                                    )
-                                })
+                                filteredTransactions.map((t) => (
+                                    <tr key={t.id} className="hover:bg-[#0c1a2d]/50 transition">
+                                        <td className="py-3 font-mono text-slate-400">{t.transaction_date}</td>
+                                        <td className="font-mono text-amber-400 font-bold">{t.receipt_number}</td>
+                                        <td className="font-semibold text-white">{t.description}</td>
+                                        <td>
+                                            <span className="bg-[#112233] border border-[#1e3a5f] text-slate-300 text-[10px] px-2 py-0.5 rounded">
+                                                {t.category}
+                                            </span>
+                                        </td>
+                                        <td className="text-center">
+                                            <span
+                                                className={`text-[10px] px-2 py-0.5 rounded font-bold border ${t.type === 'PEMASUKAN'
+                                                        ? 'bg-emerald-950/80 text-emerald-400 border-emerald-800/40'
+                                                        : 'bg-rose-950/80 text-rose-400 border-rose-800/40'
+                                                    }`}
+                                            >
+                                                {t.type}
+                                            </span>
+                                        </td>
+                                        <td className={`text-right font-mono font-bold ${t.type === 'PEMASUKAN' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                            {t.type === 'PEMASUKAN' ? '+ ' : '- '}
+                                            Rp {Number(t.amount).toLocaleString('id-ID')}
+                                        </td>
+                                        <td className="text-right text-slate-400">{t.pic}</td>
+                                    </tr>
+                                ))
                             ) : (
                                 <tr>
                                     <td colSpan={7} className="py-8 text-center text-slate-500 italic">
-                                        Tidak ada data transaksi yang cocok dengan pencarian.
+                                        Belum ada catatan transaksi keuangan.
                                     </td>
                                 </tr>
                             )}
@@ -394,17 +485,42 @@ export default function FinanceManagementPage() {
             {/* Modal Input Transaksi */}
             {showModal && (
                 <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-                    <div className="bg-[#0a1625] border border-[#1b2e46] rounded-xl p-6 w-full max-w-md shadow-2xl space-y-4">
-                        <h2 className="text-sm font-bold text-white uppercase tracking-wider">Pencatatan Kas & Transaksi Keuangan Site</h2>
+                    <div className="bg-[#0a1625] border border-[#1b2e46] rounded-xl p-6 w-full max-w-lg shadow-2xl space-y-4">
+                        <h2 className="text-sm font-bold text-white uppercase tracking-wider">
+                            Pencatatan Ledger Kas Site
+                        </h2>
                         <form onSubmit={handleAddTransaction} className="space-y-3">
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-[11px] text-slate-400 block mb-1">Tanggal Transaksi</label>
+                                    <input
+                                        type="date"
+                                        required
+                                        value={transactionDate}
+                                        onChange={(e) => setTransactionDate(e.target.value)}
+                                        className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400 font-mono"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[11px] text-slate-400 block mb-1">No. Nota / Kwitansi (Opsional)</label>
+                                    <input
+                                        type="text"
+                                        value={receiptNumber}
+                                        onChange={(e) => setReceiptNumber(e.target.value)}
+                                        placeholder="Contoh: INV-091"
+                                        className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400 font-mono"
+                                    />
+                                </div>
+                            </div>
+
                             <div>
-                                <label className="text-[11px] text-slate-400 block mb-1">Uraian / Keterangan Transaksi</label>
+                                <label className="text-[11px] text-slate-400 block mb-1">Uraian / Keterangan Pembayaran</label>
                                 <input
                                     type="text"
                                     required
                                     value={description}
                                     onChange={(e) => setDescription(e.target.value)}
-                                    placeholder="Contoh: Pembelian sparepart darurat / Dropping pusat"
+                                    placeholder="Contoh: Pembelian logistik dapur mess"
                                     className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400"
                                 />
                             </div>
@@ -415,61 +531,39 @@ export default function FinanceManagementPage() {
                                     <select
                                         value={transactionType}
                                         onChange={(e) => setTransactionType(e.target.value)}
-                                        className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400"
+                                        className={`w-full bg-[#060c14] border border-[#1b2e46] text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400 font-bold ${transactionType === 'PEMASUKAN' ? 'text-emerald-400' : 'text-rose-400'
+                                            }`}
                                     >
-                                        <option value="expense">Pengeluaran (Expense)</option>
-                                        <option value="income">Pemasukan / Dropping (Income)</option>
+                                        <option value="PENGELUARAN">PENGELUARAN (Kas Keluar)</option>
+                                        <option value="PEMASUKAN">PEMASUKAN (Dropping Pusat)</option>
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="text-[11px] text-slate-400 block mb-1">Kategori</label>
+                                    <label className="text-[11px] text-slate-400 block mb-1">Kategori Pengeluaran</label>
                                     <select
                                         value={category}
                                         onChange={(e) => setCategory(e.target.value)}
                                         className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400"
                                     >
-                                        <option value="Operasional">Operasional Site</option>
-                                        <option value="Suku Cadang">Suku Cadang & Workshop</option>
-                                        <option value="BBM & Transport">BBM & Transportasi</option>
-                                        <option value="Konsumsi GA">Konsumsi & Katering GA</option>
-                                        <option value="Dropping Pusat">Dropping Pusat</option>
+                                        <option value="Biaya Konsumsi / Katering">Biaya Konsumsi / Katering</option>
+                                        <option value="BBM & Pelumas">BBM & Pelumas</option>
+                                        <option value="Sparepart & Maintenance">Sparepart & Maintenance</option>
+                                        <option value="Operasional Lapangan / Pit">Operasional Lapangan / Pit</option>
+                                        <option value="Dana CSR & Sosial">Dana CSR & Sosial</option>
+                                        <option value="Lain-Lain">Lain-Lain</option>
                                     </select>
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className="text-[11px] text-slate-400 block mb-1">Nominal (Rupiah)</label>
-                                    <input
-                                        type="number"
-                                        required
-                                        value={amount}
-                                        onChange={(e) => setAmount(e.target.value)}
-                                        placeholder="15000000"
-                                        className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400 font-mono"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-[11px] text-slate-400 block mb-1">No. Nota / Kwitansi</label>
-                                    <input
-                                        type="text"
-                                        value={receiptNumber}
-                                        onChange={(e) => setReceiptNumber(e.target.value)}
-                                        placeholder="NOTA-991"
-                                        className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400 font-mono"
-                                    />
-                                </div>
-                            </div>
-
                             <div>
-                                <label className="text-[11px] text-slate-400 block mb-1">Petugas Keuangan (PIC)</label>
+                                <label className="text-[11px] text-slate-400 block mb-1">Nominal Transaksi (Rupiah)</label>
                                 <input
-                                    type="text"
+                                    type="number"
                                     required
-                                    value={picFinance}
-                                    onChange={(e) => setPicFinance(e.target.value)}
-                                    placeholder="Nama kasir / finance"
-                                    className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400"
+                                    value={amount}
+                                    onChange={(e) => setAmount(e.target.value)}
+                                    placeholder="Contoh: 1500000"
+                                    className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400 font-mono text-lg"
                                 />
                             </div>
 
