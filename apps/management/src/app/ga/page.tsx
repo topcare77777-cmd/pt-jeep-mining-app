@@ -12,11 +12,11 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey)
 interface VehicleLog {
     id: string
     created_at?: string
-    plate_number: string
-    driver: string
-    destination: string
-    purpose: string
-    status: string
+    plate_number?: string
+    driver?: string
+    destination?: string
+    purpose?: string
+    status?: string
 }
 
 const ALL_MODULES = [
@@ -65,7 +65,7 @@ export default function GaDashboard() {
     const [vehicleLogs, setVehicleLogs] = useState<VehicleLog[]>([])
     const [searchQuery, setSearchQuery] = useState('')
 
-    // Modal State Kendaraan LV
+    // State Modal Input LV
     const [showModal, setShowModal] = useState(false)
     const [plateNumber, setPlateNumber] = useState('')
     const [driver, setDriver] = useState('')
@@ -80,8 +80,36 @@ export default function GaDashboard() {
 
         async function initGa() {
             try {
-                const { data: { session } } = await supabase.auth.getSession()
+                if (typeof window !== 'undefined' && window.location.hash.includes('access_token')) {
+                    const hashClean = window.location.hash.startsWith('#')
+                        ? window.location.hash.substring(1)
+                        : window.location.hash
+                    const hashParams = new URLSearchParams(hashClean)
+                    const accessToken = hashParams.get('access_token')
+                    const refreshToken = hashParams.get('refresh_token')
+
+                    if (accessToken) {
+                        await supabase.auth.setSession({
+                            access_token: accessToken,
+                            refresh_token: refreshToken || '',
+                        })
+                        window.history.replaceState(null, '', window.location.pathname)
+                    }
+                }
+
+                let { data: { session } } = await supabase.auth.getSession()
+
                 if (!session) {
+                    const userRes = await supabase.auth.getUser()
+                    if (!userRes.data.user) {
+                        window.location.href = landingUrl
+                        return
+                    }
+                }
+
+                const currentUserId = session?.user?.id || (await supabase.auth.getUser()).data.user?.id
+
+                if (!currentUserId) {
                     window.location.href = landingUrl
                     return
                 }
@@ -89,7 +117,7 @@ export default function GaDashboard() {
                 const { data: profile } = await supabase
                     .from('profiles')
                     .select('full_name, role, status')
-                    .eq('id', session.user.id)
+                    .eq('id', currentUserId)
                     .maybeSingle()
 
                 const statusClean = (profile?.status || '').toLowerCase().trim()
@@ -138,7 +166,6 @@ export default function GaDashboard() {
                         }
                     }
 
-                    // Proteksi akses jika divisi tidak punya izin modul GA
                     if (!isSuperAdmin && grantedKeys.length > 0 && !grantedKeys.includes('ga')) {
                         alert('Divisi Anda tidak memiliki hak akses ke modul GA & Fasilitas.')
                         router.replace('/')
@@ -147,7 +174,7 @@ export default function GaDashboard() {
 
                     setAllowedModules(grantedKeys)
 
-                    // Data Log Kendaraan dari Supabase
+                    // Data Log Kendaraan
                     const { data, error } = await supabase
                         .from('ga_vehicle_logs')
                         .select('*')
@@ -228,14 +255,14 @@ export default function GaDashboard() {
         window.location.href = landingUrl
     }
 
+    // AMAN DARI NILAI NULL / UNDEFINED
     const filteredLogs = vehicleLogs.filter((item) =>
-        item.plate_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.driver.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.destination.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.purpose.toLowerCase().includes(searchQuery.toLowerCase())
+        (item?.plate_number || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (item?.driver || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (item?.destination || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (item?.purpose || '').toLowerCase().includes(searchQuery.toLowerCase())
     )
 
-    // FILTER STRICT: Hanya modul yang diizinkan yang muncul di navbar
     const authorizedNavItems = ALL_MODULES.filter((item) =>
         allowedModules.includes(item.key)
     )
@@ -290,7 +317,7 @@ export default function GaDashboard() {
                     </div>
                 </div>
 
-                {/* Bilah Navigasi Dinamis: Hanya Modul Berizin yang Dirender */}
+                {/* Bilah Navigasi Dinamis */}
                 {authorizedNavItems.length > 1 ? (
                     <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
                         {authorizedNavItems.map((item) => {
@@ -300,8 +327,8 @@ export default function GaDashboard() {
                                     key={item.href}
                                     href={item.href}
                                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border whitespace-nowrap font-medium transition cursor-pointer ${isActive
-                                        ? 'bg-[#162d47] text-white border-emerald-400/80 shadow-sm'
-                                        : 'bg-[#0a1625] text-slate-400 border-[#1b2e46] hover:text-slate-200 hover:bg-[#0f2137]'
+                                            ? 'bg-[#162d47] text-white border-emerald-400/80 shadow-sm'
+                                            : 'bg-[#0a1625] text-slate-400 border-[#1b2e46] hover:text-slate-200 hover:bg-[#0f2137]'
                                         }`}
                                 >
                                     <span>{item.icon}</span>
@@ -313,7 +340,7 @@ export default function GaDashboard() {
                 ) : (
                     <div className="bg-[#0a1625]/60 border border-[#1b2e46] rounded-lg px-4 py-2 text-[11px] text-slate-400 flex items-center gap-2 font-mono">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                        <span>Akses Terbatas Divisi: Anda hanya memiliki otoritas pada modul <strong>General Affair (GA)</strong>.</span>
+                        <span>Akses Terbatas: Menampilkan modul berizin untuk divisi Anda.</span>
                     </div>
                 )}
             </header>
@@ -330,8 +357,8 @@ export default function GaDashboard() {
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id)}
                         className={`px-4 py-2.5 rounded-lg text-xs font-bold transition flex items-center gap-2 border cursor-pointer ${activeTab === tab.id
-                            ? 'bg-[#1b3b5f] border-emerald-400 text-white shadow-lg'
-                            : 'bg-[#0c1a2d] border-[#1b2e46] text-slate-400 hover:text-white'
+                                ? 'bg-[#1b3b5f] border-emerald-400 text-white shadow-lg'
+                                : 'bg-[#0c1a2d] border-[#1b2e46] text-slate-400 hover:text-white'
                             }`}
                     >
                         <span>{tab.label}</span>
@@ -344,7 +371,7 @@ export default function GaDashboard() {
                 ))}
             </nav>
 
-            {/* Konten Utama GA */}
+            {/* Konten Utama */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 <aside className="lg:col-span-3 space-y-3">
                     <div
@@ -435,13 +462,13 @@ export default function GaDashboard() {
                                     {filteredLogs.length > 0 ? (
                                         filteredLogs.map((log) => (
                                             <tr key={log.id} className="hover:bg-[#0c1a2d]/50 transition">
-                                                <td className="py-3 font-mono font-bold text-amber-400">{log.plate_number}</td>
-                                                <td className="font-semibold text-white">{log.driver}</td>
-                                                <td className="text-slate-300">{log.destination}</td>
-                                                <td className="text-slate-400">{log.purpose}</td>
+                                                <td className="py-3 font-mono font-bold text-amber-400">{log.plate_number || '-'}</td>
+                                                <td className="font-semibold text-white">{log.driver || '-'}</td>
+                                                <td className="text-slate-300">{log.destination || '-'}</td>
+                                                <td className="text-slate-400">{log.purpose || '-'}</td>
                                                 <td>
                                                     <span className="bg-emerald-950/80 text-emerald-400 border border-emerald-800/40 text-[10px] px-2 py-0.5 rounded font-bold">
-                                                        {log.status}
+                                                        {log.status || 'Dipakai'}
                                                     </span>
                                                 </td>
                                             </tr>
@@ -460,7 +487,7 @@ export default function GaDashboard() {
                 </main>
             </div>
 
-            {/* Modal Input Kendaraan Baru */}
+            {/* Modal Input Kendaraan */}
             {showModal && (
                 <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
                     <div className="bg-[#0a1625] border border-[#1b2e46] rounded-xl p-6 w-full max-w-md shadow-2xl space-y-4">
