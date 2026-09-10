@@ -9,14 +9,16 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
-interface VehicleLog {
+interface RadioUnit {
     id: string
     created_at?: string
-    plate_number?: string
-    driver?: string
-    destination?: string
-    purpose?: string
-    status?: string
+    unit_code: string
+    brand_model: string
+    device_type: string
+    holder_dept: string
+    battery_status: string
+    device_condition: string
+    channel_notes: string
 }
 
 const ALL_MODULES = [
@@ -40,7 +42,7 @@ const ALL_MODULES = [
     { key: 'catering', label: 'Katering', icon: '🍱', href: '/catering' },
     { key: 'clinic', label: 'Klinik Site', icon: '🏥', href: '/clinic' },
     { key: 'security', label: 'Security Gate', icon: '🛡️', href: '/security' },
-    { key: 'radio', label: 'Radio Dispatch', icon: '📻', href: '/radio' },
+    { key: 'radio', label: 'Radio Komunikasi', icon: '📻', href: '/radio' },
     { key: 'legal', label: 'Legalitas IUP', icon: '⚖️', href: '/legal' },
     { key: 'csr', label: 'CSR Masyarakat', icon: '🤝', href: '/csr' },
     { key: 'vendor', label: 'Vendor', icon: '🏬', href: '/vendor' },
@@ -54,23 +56,25 @@ const ALL_MODULES = [
     { key: 'laporan', label: 'Cetak Laporan', icon: '📄', href: '/laporan' },
 ]
 
-export default function GaDashboard() {
+export default function RadioManagementPage() {
     const pathname = usePathname()
     const router = useRouter()
     const [loading, setLoading] = useState(true)
-    const [userName, setUserName] = useState('Staff GA')
-    const [userRole, setUserRole] = useState('GA & Facilities')
+    const [userName, setUserName] = useState('Staff Radio')
+    const [userRole, setUserRole] = useState('Communications Dept')
     const [allowedModules, setAllowedModules] = useState<string[]>([])
-    const [activeTab, setActiveTab] = useState('kendaraan')
-    const [vehicleLogs, setVehicleLogs] = useState<VehicleLog[]>([])
+    const [radioUnits, setRadioUnits] = useState<RadioUnit[]>([])
     const [searchQuery, setSearchQuery] = useState('')
 
-    // State Modal Input LV
+    // Modal State Input Radio Baru
     const [showModal, setShowModal] = useState(false)
-    const [plateNumber, setPlateNumber] = useState('')
-    const [driver, setDriver] = useState('')
-    const [destination, setDestination] = useState('')
-    const [purpose, setPurpose] = useState('')
+    const [unitCode, setUnitCode] = useState('')
+    const [brandModel, setBrandModel] = useState('')
+    const [deviceType, setDeviceType] = useState('Handy Talkie (HT)')
+    const [holderDept, setHolderDept] = useState('Pengawas Pit Barat')
+    const [batteryStatus, setBatteryStatus] = useState('NORMAL')
+    const [deviceCondition, setDeviceCondition] = useState('BAIK')
+    const [channelNotes, setChannelNotes] = useState('')
     const [submitting, setSubmitting] = useState(false)
 
     const landingUrl = process.env.NEXT_PUBLIC_LANDING_URL || 'https://pt-jeep.vercel.app'
@@ -78,7 +82,7 @@ export default function GaDashboard() {
     useEffect(() => {
         let isMounted = true
 
-        async function initGa() {
+        async function initRadio() {
             try {
                 if (typeof window !== 'undefined' && window.location.hash.includes('access_token')) {
                     const hashClean = window.location.hash.startsWith('#')
@@ -129,8 +133,8 @@ export default function GaDashboard() {
                 }
 
                 if (isMounted) {
-                    setUserName(profile?.full_name || 'Staff GA & Logistik')
-                    const division = (profile?.role || 'General Affair & Logistik').trim()
+                    setUserName(profile?.full_name || 'Staff Dispatch Radio')
+                    const division = (profile?.role || 'Umum').trim()
                     setUserRole(division)
 
                     const isSuperAdmin = ['admin', 'administrator', 'superadmin'].includes(division.toLowerCase())
@@ -151,46 +155,68 @@ export default function GaDashboard() {
                                     target === cleanDiv ||
                                     target.includes(cleanDiv) ||
                                     cleanDiv.includes(target) ||
-                                    (cleanDiv.includes('ga') && target.includes('ga')) ||
-                                    (cleanDiv.includes('general') && target.includes('general'))
+                                    (cleanDiv.includes('umum') && (target.includes('ga') || target.includes('general') || target.includes('umum'))) ||
+                                    (cleanDiv.includes('ga') && (target.includes('ga') || target.includes('general')))
                                 )
                             })
 
                             if (matched && Array.isArray(matched.allowed_modules)) {
                                 grantedKeys = matched.allowed_modules
                             } else {
-                                grantedKeys = ['ga']
+                                grantedKeys = ['radio', 'ga']
                             }
                         } else {
-                            grantedKeys = ['ga']
+                            grantedKeys = ['radio', 'ga']
                         }
                     }
 
-                    if (!isSuperAdmin && grantedKeys.length > 0 && !grantedKeys.includes('ga')) {
-                        alert('Divisi Anda tidak memiliki hak akses ke modul GA & Fasilitas.')
+                    if (!isSuperAdmin && grantedKeys.length > 0 && !grantedKeys.includes('radio')) {
+                        alert('Divisi Anda tidak memiliki hak akses ke modul Radio Komunikasi.')
                         router.replace('/')
                         return
                     }
 
                     setAllowedModules(grantedKeys)
 
-                    // Data Log Kendaraan
+                    // Data Radio dari Supabase
                     const { data, error } = await supabase
-                        .from('ga_vehicle_logs')
+                        .from('radio_devices')
                         .select('*')
-                        .order('created_at', { ascending: false })
+                        .order('unit_code', { ascending: true })
 
                     if (!error && data && data.length > 0) {
-                        setVehicleLogs(data)
+                        setRadioUnits(data)
                     } else {
-                        setVehicleLogs([
+                        setRadioUnits([
                             {
                                 id: '1',
-                                plate_number: 'KT 8192 YZ (Hilux 4x4)',
-                                driver: 'Rahmat Hidayat',
-                                destination: 'Pit Front A ke Port Jetty',
-                                purpose: 'Antar Inspector K3 & Pengawas Pit',
-                                status: 'Dipakai',
+                                unit_code: 'HT-PIT-01',
+                                brand_model: 'Motorola GP328 VHF',
+                                device_type: 'Handy Talkie (HT)',
+                                holder_dept: 'Pengawas Pit Barat',
+                                battery_status: 'NORMAL',
+                                device_condition: 'BAIK',
+                                channel_notes: 'Frekuensi Kanal 1 (Pit Operation)',
+                            },
+                            {
+                                id: '2',
+                                unit_code: 'RIG-DT-12',
+                                brand_model: 'Icom IC-M2300 / Mobile Rig',
+                                device_type: 'Rig Mobile (Vehicle)',
+                                holder_dept: 'Hauling Contractor',
+                                battery_status: 'NORMAL',
+                                device_condition: 'BAIK',
+                                channel_notes: 'Terpasang di Dump Truck Scania',
+                            },
+                            {
+                                id: '3',
+                                unit_code: 'HT-HSE-03',
+                                brand_model: 'Kenwood TH-K20A',
+                                device_type: 'Handy Talkie (HT)',
+                                holder_dept: 'K3 & Lingkungan (HSE)',
+                                battery_status: 'DROP',
+                                device_condition: 'PERBAIKAN',
+                                channel_notes: 'Ganti baterai cadangan di workshop',
                             },
                         ])
                     }
@@ -198,53 +224,53 @@ export default function GaDashboard() {
                     setLoading(false)
                 }
             } catch (err) {
-                console.error('Error load GA:', err)
+                console.error('Error load radio:', err)
                 if (isMounted) setLoading(false)
             }
         }
 
-        initGa()
+        initRadio()
 
         return () => {
             isMounted = false
         }
     }, [landingUrl, router])
 
-    const handleAddVehicle = async (e: React.FormEvent) => {
+    const handleAddRadio = async (e: React.FormEvent) => {
         e.preventDefault()
-        if (!plateNumber || !driver) return
+        if (!unitCode || !brandModel) return
 
         setSubmitting(true)
         const payload = {
-            plate_number: plateNumber,
-            driver,
-            destination,
-            purpose,
-            status: 'Dipakai',
+            unit_code: unitCode.toUpperCase().trim(),
+            brand_model: brandModel,
+            device_type: deviceType,
+            holder_dept: holderDept,
+            battery_status: batteryStatus,
+            device_condition: deviceCondition,
+            channel_notes: channelNotes || 'Kanal Operasional Utama',
         }
 
-        const { data, error } = await supabase.from('ga_vehicle_logs').insert([payload]).select()
+        const { data, error } = await supabase.from('radio_devices').insert([payload]).select()
 
         if (!error && data) {
-            setVehicleLogs([data[0], ...vehicleLogs])
+            setRadioUnits([...radioUnits, data[0]])
             setShowModal(false)
-            setPlateNumber('')
-            setDriver('')
-            setDestination('')
-            setPurpose('')
+            setUnitCode('')
+            setBrandModel('')
+            setChannelNotes('')
         } else {
-            setVehicleLogs([
+            setRadioUnits([
+                ...radioUnits,
                 {
                     id: Date.now().toString(),
                     ...payload,
                 },
-                ...vehicleLogs,
             ])
             setShowModal(false)
-            setPlateNumber('')
-            setDriver('')
-            setDestination('')
-            setPurpose('')
+            setUnitCode('')
+            setBrandModel('')
+            setChannelNotes('')
         }
 
         setSubmitting(false)
@@ -255,14 +281,18 @@ export default function GaDashboard() {
         window.location.href = landingUrl
     }
 
-    // AMAN DARI NILAI NULL / UNDEFINED
-    const filteredLogs = vehicleLogs.filter((item) =>
-        (item?.plate_number || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (item?.driver || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (item?.destination || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (item?.purpose || '').toLowerCase().includes(searchQuery.toLowerCase())
+    const totalUnits = radioUnits.length
+    const goodUnits = radioUnits.filter((r) => (r.device_condition || '').toUpperCase() === 'BAIK').length
+    const repairUnits = radioUnits.filter((r) => (r.device_condition || '').toUpperCase() !== 'BAIK').length
+
+    const filteredUnits = radioUnits.filter((item) =>
+        (item.unit_code || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (item.brand_model || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (item.holder_dept || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (item.channel_notes || '').toLowerCase().includes(searchQuery.toLowerCase())
     )
 
+    // Hanya tampilkan modul yang berizin
     const authorizedNavItems = ALL_MODULES.filter((item) =>
         allowedModules.includes(item.key)
     )
@@ -270,9 +300,9 @@ export default function GaDashboard() {
     if (loading) {
         return (
             <div className="min-h-screen bg-[#060c14] flex flex-col items-center justify-center text-white font-sans">
-                <div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+                <div className="w-10 h-10 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mb-4"></div>
                 <p className="text-xs text-slate-400 font-mono">
-                    Sinkronisasi Sarana & Fasilitas PT. Jangkar Energi Eka Perkasa...
+                    Sinkronisasi Frekuensi & Perangkat Radio PT. Jangkar Energi Eka Perkasa...
                 </p>
             </div>
         )
@@ -284,14 +314,14 @@ export default function GaDashboard() {
             <header className="mb-6 space-y-3">
                 <div className="flex flex-wrap items-center justify-between bg-[#0a1625] border border-[#1b2e46] rounded-xl px-6 py-4 shadow-xl">
                     <div className="flex items-center space-x-3">
-                        <span className="text-3xl">🚙</span>
+                        <span className="text-3xl">📻</span>
                         <div>
                             <h1 className="text-xl md:text-2xl font-black tracking-wide text-white">
-                                Dashboard General Affair & Logistik (GA) PT. JEEP
+                                Manajemen Radio Komunikasi & HT PT. JEEP
                             </h1>
                             <p className="text-xs text-amber-400 flex items-center gap-1.5 mt-0.5">
                                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                                <span>Armada LV, Tangki BBM, Mess, & Fasilitas Tambang</span>
+                                <span>Frekuensi Kanal VHF/UHF, Handy Talkie, & Rig Mobile Hauling Nikel</span>
                                 <span className="text-slate-600">•</span>
                                 <span className="text-slate-300 font-semibold">{userName}</span>
                                 <span className="bg-[#112233] border border-[#1e3a5f] text-cyan-300 text-[10px] px-2 py-0.5 rounded font-mono font-bold">
@@ -317,7 +347,7 @@ export default function GaDashboard() {
                     </div>
                 </div>
 
-                {/* Bilah Navigasi Dinamis */}
+                {/* Bilah Navigasi Dinamis Terfilter */}
                 {authorizedNavItems.length > 1 ? (
                     <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
                         {authorizedNavItems.map((item) => {
@@ -327,8 +357,8 @@ export default function GaDashboard() {
                                     key={item.href}
                                     href={item.href}
                                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border whitespace-nowrap font-medium transition cursor-pointer ${isActive
-                                            ? 'bg-[#162d47] text-white border-emerald-400/80 shadow-sm'
-                                            : 'bg-[#0a1625] text-slate-400 border-[#1b2e46] hover:text-slate-200 hover:bg-[#0f2137]'
+                                        ? 'bg-[#162d47] text-white border-amber-400/80 shadow-sm'
+                                        : 'bg-[#0a1625] text-slate-400 border-[#1b2e46] hover:text-slate-200 hover:bg-[#0f2137]'
                                         }`}
                                 >
                                     <span>{item.icon}</span>
@@ -339,204 +369,214 @@ export default function GaDashboard() {
                     </div>
                 ) : (
                     <div className="bg-[#0a1625]/60 border border-[#1b2e46] rounded-lg px-4 py-2 text-[11px] text-slate-400 flex items-center gap-2 font-mono">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                        <span>Akses Terbatas: Menampilkan modul berizin untuk divisi Anda.</span>
+                        <span className="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
+                        <span>Akses Terbatas Divisi: Menampilkan modul berizin untuk divisi Anda.</span>
                     </div>
                 )}
             </header>
 
-            {/* Tabs Kategori Sarana GA */}
-            <nav className="flex flex-wrap gap-2 mb-6">
-                {[
-                    { id: 'kendaraan', label: 'LOG KENDARAAN LV', badge: `${vehicleLogs.length} LOG` },
-                    { id: 'mess', label: 'MESS & AKOMODASI', badge: '100% OK' },
-                    { id: 'genset', label: 'GENSET & POMPA AIR' },
-                    { id: 'catering', label: 'CATERING & LOGISTIK' },
-                ].map((tab) => (
-                    <button
-                        key={tab.id}
-                        onClick={() => setActiveTab(tab.id)}
-                        className={`px-4 py-2.5 rounded-lg text-xs font-bold transition flex items-center gap-2 border cursor-pointer ${activeTab === tab.id
-                                ? 'bg-[#1b3b5f] border-emerald-400 text-white shadow-lg'
-                                : 'bg-[#0c1a2d] border-[#1b2e46] text-slate-400 hover:text-white'
-                            }`}
-                    >
-                        <span>{tab.label}</span>
-                        {tab.badge && (
-                            <span className="bg-amber-500 text-slate-950 text-[10px] px-1.5 py-0.5 rounded font-black">
-                                {tab.badge}
-                            </span>
-                        )}
-                    </button>
-                ))}
-            </nav>
+            {/* KPI Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Total Unit Terdaftar</h3>
+                    <div className="text-2xl font-black text-white font-mono">{totalUnits} Unit</div>
+                    <p className="mt-2 text-[11px] text-slate-400">HT, Rig Mobile & Repeater Site</p>
+                </div>
 
-            {/* Konten Utama */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                <aside className="lg:col-span-3 space-y-3">
-                    <div
-                        onClick={() => setShowModal(true)}
-                        className="p-4 rounded-xl border border-dashed border-emerald-500/50 bg-emerald-950/20 hover:bg-emerald-900/30 text-emerald-400 cursor-pointer transition flex items-center gap-3"
-                    >
-                        <span className="text-xl">➕</span>
-                        <div>
-                            <div className="text-xs font-bold">Catat Pemakaian Unit LV</div>
-                            <div className="text-[10px] text-slate-400">Hilux, Triton, atau Bus Kru</div>
-                        </div>
-                    </div>
+                <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Unit Berfungsi Baik</h3>
+                    <div className="text-2xl font-black text-emerald-400 font-mono">{goodUnits} Unit</div>
+                    <p className="mt-2 text-[11px] text-emerald-400 font-medium">Komunikasi Lapangan Lancar</p>
+                </div>
 
-                    <Link
-                        href="/bbm"
-                        className="p-4 rounded-xl border border-[#1b2e46] bg-[#0c1a2d] hover:bg-[#12243d] hover:border-emerald-500/50 text-slate-200 transition flex items-center gap-3 block"
-                    >
-                        <span className="text-xl">⛽</span>
-                        <div>
-                            <div className="text-xs font-bold text-amber-400">Manajemen Tangki Solar</div>
-                            <div className="text-[10px] text-slate-400">Stok Tangki & Pengisian BBM</div>
-                        </div>
-                    </Link>
+                <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Dalam Perbaikan / Drop</h3>
+                    <div className="text-2xl font-black text-rose-400 font-mono">{repairUnits} Unit</div>
+                    <p className="mt-2 text-[11px] text-slate-400">Penanganan Tim IT / Komunikasi</p>
+                </div>
 
-                    <div className="p-4 rounded-xl border border-[#16273c] bg-[#0a1625] text-slate-400 space-y-2">
-                        <span className="text-xs font-bold text-white uppercase tracking-wider block">Status Sarana GA</span>
-                        <div className="text-[11px] flex justify-between">
-                            <span>Tabel Supabase</span>
-                            <span className="text-emerald-400 font-semibold">ga_vehicle_logs</span>
-                        </div>
-                        <div className="text-[11px] flex justify-between">
-                            <span>Total Peminjaman LV</span>
-                            <span className="text-slate-200 font-bold">{vehicleLogs.length} unit</span>
-                        </div>
-                    </div>
-                </aside>
-
-                <main className="lg:col-span-9 space-y-6">
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                        <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-4">
-                            <span className="text-[11px] text-slate-400 block uppercase font-bold">Kesiapan Armada LV</span>
-                            <span className="text-xl font-black text-white font-mono mt-1 block">92% Ready</span>
-                            <span className="text-[10px] text-emerald-400">Siap Operasional Pit & Mess</span>
-                        </div>
-                        <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-4">
-                            <span className="text-[11px] text-slate-400 block uppercase font-bold">Hunian Mess Camp</span>
-                            <span className="text-xl font-black text-amber-400 font-mono mt-1 block">142 / 160 Bed</span>
-                            <span className="text-[10px] text-slate-400">Kapasitas Nyaman Terjaga</span>
-                        </div>
-                        <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-4">
-                            <span className="text-[11px] text-slate-400 block uppercase font-bold">Genset Power Camp</span>
-                            <span className="text-xl font-black text-cyan-400 font-mono mt-1 block">250 kVA</span>
-                            <span className="text-[10px] text-emerald-400">✓ Suplai Listrik 24 Jam Aman</span>
-                        </div>
-                    </div>
-
-                    <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg space-y-4">
-                        <div className="flex flex-wrap justify-between items-center gap-3">
-                            <div className="w-full md:w-80">
-                                <input
-                                    type="text"
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    placeholder="Cari plat, driver, keperluan..."
-                                    className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3.5 py-2 rounded-lg focus:outline-none focus:border-emerald-400"
-                                />
-                            </div>
-                            <button
-                                onClick={() => setShowModal(true)}
-                                className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs px-4 py-2 rounded-lg transition cursor-pointer"
-                            >
-                                + Catat Kendaraan
-                            </button>
-                        </div>
-
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left text-xs">
-                                <thead>
-                                    <tr className="border-b border-[#1b2e46] text-slate-400">
-                                        <th className="pb-2.5">Nomor Unit LV</th>
-                                        <th className="pb-2.5">Driver / Pemakai</th>
-                                        <th className="pb-2.5">Tujuan Lapangan</th>
-                                        <th className="pb-2.5">Keperluan Dinas</th>
-                                        <th className="pb-2.5">Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-[#16273c] text-slate-300">
-                                    {filteredLogs.length > 0 ? (
-                                        filteredLogs.map((log) => (
-                                            <tr key={log.id} className="hover:bg-[#0c1a2d]/50 transition">
-                                                <td className="py-3 font-mono font-bold text-amber-400">{log.plate_number || '-'}</td>
-                                                <td className="font-semibold text-white">{log.driver || '-'}</td>
-                                                <td className="text-slate-300">{log.destination || '-'}</td>
-                                                <td className="text-slate-400">{log.purpose || '-'}</td>
-                                                <td>
-                                                    <span className="bg-emerald-950/80 text-emerald-400 border border-emerald-800/40 text-[10px] px-2 py-0.5 rounded font-bold">
-                                                        {log.status || 'Dipakai'}
-                                                    </span>
-                                                </td>
-                                            </tr>
-                                        ))
-                                    ) : (
-                                        <tr>
-                                            <td colSpan={5} className="py-8 text-center text-slate-500 italic">
-                                                Belum ada data pemakaian kendaraan.
-                                            </td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </main>
+                <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Jangkauan Jaringan</h3>
+                    <div className="text-2xl font-black text-cyan-400 font-mono">VHF / UHF</div>
+                    <p className="mt-2 text-[11px] text-cyan-400 font-medium">✓ Sinyal Jangkauan Seluruh Pit & Jetty</p>
+                </div>
             </div>
 
-            {/* Modal Input Kendaraan */}
+            {/* Grid Tabel Data Radio */}
+            <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg space-y-4">
+                <div className="flex flex-wrap justify-between items-center gap-3">
+                    <div className="w-full md:w-80">
+                        <input
+                            type="text"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder="Cari kode radio, merek, departemen..."
+                            className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3.5 py-2 rounded-lg focus:outline-none focus:border-amber-400"
+                        />
+                    </div>
+                    <button
+                        onClick={() => setShowModal(true)}
+                        className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs px-4 py-2 rounded-lg transition cursor-pointer flex items-center gap-1.5"
+                    >
+                        <span>+</span> <span>Daftarkan Unit Radio Baru</span>
+                    </button>
+                </div>
+
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                        <thead>
+                            <tr className="border-b border-[#1b2e46] text-slate-400">
+                                <th className="pb-2.5">Kode / No. Unit</th>
+                                <th className="pb-2.5">Merek & Tipe Perangkat</th>
+                                <th className="pb-2.5">Jenis Perangkat</th>
+                                <th className="pb-2.5">Departemen / Pemegang</th>
+                                <th className="pb-2.5 text-center">Status Baterai</th>
+                                <th className="pb-2.5 text-center">Kondisi Alat</th>
+                                <th className="pb-2.5">Catatan Kanal</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[#16273c] text-slate-300">
+                            {filteredUnits.length > 0 ? (
+                                filteredUnits.map((item) => (
+                                    <tr key={item.id} className="hover:bg-[#0c1a2d]/50 transition">
+                                        <td className="py-3 font-mono font-bold text-amber-400">{item.unit_code}</td>
+                                        <td className="font-semibold text-white">{item.brand_model}</td>
+                                        <td>
+                                            <span className="bg-[#112233] border border-[#1e3a5f] text-slate-300 text-[10px] px-2 py-0.5 rounded">
+                                                {item.device_type}
+                                            </span>
+                                        </td>
+                                        <td className="text-slate-300">{item.holder_dept}</td>
+                                        <td className="text-center">
+                                            <span
+                                                className={`text-[10px] px-2 py-0.5 rounded border font-bold ${(item.battery_status || '').toUpperCase() === 'NORMAL'
+                                                    ? 'bg-emerald-950/80 text-emerald-400 border-emerald-800/40'
+                                                    : 'bg-rose-950/80 text-rose-400 border-rose-800/40'
+                                                    }`}
+                                            >
+                                                {item.battery_status}
+                                            </span>
+                                        </td>
+                                        <td className="text-center">
+                                            <span
+                                                className={`text-[10px] px-2 py-0.5 rounded border font-bold ${(item.device_condition || '').toUpperCase() === 'BAIK'
+                                                    ? 'bg-emerald-950/80 text-emerald-400 border-emerald-800/40'
+                                                    : 'bg-amber-950/80 text-amber-400 border-amber-800/40'
+                                                    }`}
+                                            >
+                                                {item.device_condition}
+                                            </span>
+                                        </td>
+                                        <td className="text-slate-400 font-mono text-[11px]">{item.channel_notes}</td>
+                                    </tr>
+                                ))
+                            ) : (
+                                <tr>
+                                    <td colSpan={7} className="py-8 text-center text-slate-500 italic">
+                                        Belum ada unit radio yang cocok dengan pencarian.
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            {/* Modal Input Radio */}
             {showModal && (
                 <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-                    <div className="bg-[#0a1625] border border-[#1b2e46] rounded-xl p-6 w-full max-w-md shadow-2xl space-y-4">
+                    <div className="bg-[#0a1625] border border-[#1b2e46] rounded-xl p-6 w-full max-w-lg shadow-2xl space-y-4">
                         <h2 className="text-sm font-bold text-white uppercase tracking-wider">
-                            Pencatatan Peminjaman Unit LV
+                            Registrasi Perangkat Radio Site
                         </h2>
-                        <form onSubmit={handleAddVehicle} className="space-y-3">
-                            <div>
-                                <label className="text-[11px] text-slate-400 block mb-1">Nomor Plat & Tipe LV</label>
-                                <input
-                                    type="text"
-                                    required
-                                    value={plateNumber}
-                                    onChange={(e) => setPlateNumber(e.target.value)}
-                                    placeholder="Contoh: KT 8192 YZ (Hilux 4x4)"
-                                    className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-emerald-400 font-mono"
-                                />
+                        <form onSubmit={handleAddRadio} className="space-y-3">
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-[11px] text-slate-400 block mb-1">Kode / ID Radio</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        value={unitCode}
+                                        onChange={(e) => setUnitCode(e.target.value)}
+                                        placeholder="Contoh: HT-PIT-05"
+                                        className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400 font-mono"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[11px] text-slate-400 block mb-1">Merek & Seri Perangkat</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        value={brandModel}
+                                        onChange={(e) => setBrandModel(e.target.value)}
+                                        placeholder="Contoh: Motorola GP328 VHF"
+                                        className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400"
+                                    />
+                                </div>
                             </div>
-                            <div>
-                                <label className="text-[11px] text-slate-400 block mb-1">Driver / Penanggung Jawab</label>
-                                <input
-                                    type="text"
-                                    required
-                                    value={driver}
-                                    onChange={(e) => setDriver(e.target.value)}
-                                    placeholder="Contoh: Rahmat Hidayat"
-                                    className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-emerald-400"
-                                />
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-[11px] text-slate-400 block mb-1">Jenis Perangkat</label>
+                                    <select
+                                        value={deviceType}
+                                        onChange={(e) => setDeviceType(e.target.value)}
+                                        className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400"
+                                    >
+                                        <option value="Handy Talkie (HT)">Handy Talkie (HT)</option>
+                                        <option value="Rig Mobile (Vehicle)">Rig Mobile (Vehicle)</option>
+                                        <option value="Base Station">Base Station Dispatch</option>
+                                        <option value="Repeater">Repeater Tower</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="text-[11px] text-slate-400 block mb-1">Departemen / Pengguna</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        value={holderDept}
+                                        onChange={(e) => setHolderDept(e.target.value)}
+                                        placeholder="Contoh: Pengawas Pit Barat"
+                                        className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400"
+                                    />
+                                </div>
                             </div>
-                            <div>
-                                <label className="text-[11px] text-slate-400 block mb-1">Rute / Tujuan</label>
-                                <input
-                                    type="text"
-                                    required
-                                    value={destination}
-                                    onChange={(e) => setDestination(e.target.value)}
-                                    placeholder="Contoh: Pit Front A ke Jetty"
-                                    className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-emerald-400"
-                                />
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-[11px] text-slate-400 block mb-1">Status Baterai</label>
+                                    <select
+                                        value={batteryStatus}
+                                        onChange={(e) => setBatteryStatus(e.target.value)}
+                                        className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400"
+                                    >
+                                        <option value="NORMAL">NORMAL</option>
+                                        <option value="DROP">DROP / LEMAH</option>
+                                        <option value="CHARGING">SEDANG CHARGE</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="text-[11px] text-slate-400 block mb-1">Kondisi Alat</label>
+                                    <select
+                                        value={deviceCondition}
+                                        onChange={(e) => setDeviceCondition(e.target.value)}
+                                        className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400"
+                                    >
+                                        <option value="BAIK">BAIK (SIAP PAKAI)</option>
+                                        <option value="PERBAIKAN">RUSAK / PERBAIKAN</option>
+                                        <option value="STANDBY">STANDBY DI GUDANG</option>
+                                    </select>
+                                </div>
                             </div>
+
                             <div>
-                                <label className="text-[11px] text-slate-400 block mb-1">Keperluan Operasional</label>
+                                <label className="text-[11px] text-slate-400 block mb-1">Catatan Kanal Frekuensi</label>
                                 <input
                                     type="text"
-                                    required
-                                    value={purpose}
-                                    onChange={(e) => setPurpose(e.target.value)}
-                                    placeholder="Contoh: Antar Inspector K3"
-                                    className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-emerald-400"
+                                    value={channelNotes}
+                                    onChange={(e) => setChannelNotes(e.target.value)}
+                                    placeholder="Contoh: Kanal 1 (Pit Front), Kanal 2 (Hauling)"
+                                    className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400"
                                 />
                             </div>
 
@@ -551,9 +591,9 @@ export default function GaDashboard() {
                                 <button
                                     type="submit"
                                     disabled={submitting}
-                                    className="px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold text-xs transition cursor-pointer"
+                                    className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs transition cursor-pointer"
                                 >
-                                    {submitting ? 'Menyimpan...' : 'Simpan Log LV'}
+                                    {submitting ? 'Menyimpan...' : 'Simpan Unit Radio'}
                                 </button>
                             </div>
                         </form>
