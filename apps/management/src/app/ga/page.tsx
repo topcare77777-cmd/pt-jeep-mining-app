@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@supabase/supabase-js'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
@@ -12,27 +12,65 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey)
 interface VehicleLog {
     id: string
     created_at?: string
-    vehicle_no: string
-    driver_name: string
-    purpose: string
+    plate_number: string
+    driver: string
     destination: string
+    purpose: string
     status: string
 }
 
+const ALL_MODULES = [
+    { key: 'manager-site', label: 'Pit Produksi', icon: '⛏️', href: '/manager-site' },
+    { key: 'geologi', label: 'Geologi & Eksplorasi', icon: '🧭', href: '/geologi' },
+    { key: 'fleet', label: 'Alat Berat', icon: '🚜', href: '/fleet' },
+    { key: 'fleet-maintenance', label: 'Workshop Fleet', icon: '🔧', href: '/fleet-maintenance' },
+    { key: 'sparepart', label: 'Sparepart', icon: '📦', href: '/sparepart' },
+    { key: 'safety', label: 'Inspeksi K3', icon: '⛑️', href: '/safety' },
+    { key: 'ritase', label: 'Ritase', icon: '🚛', href: '/ritase' },
+    { key: 'jetty', label: 'Jetty Port', icon: '🚢', href: '/jetty' },
+    { key: 'environment', label: 'Lingkungan', icon: '🌱', href: '/environment' },
+    { key: 'lingkungan', label: 'Kanal Sedimen', icon: '🏞️', href: '/lingkungan' },
+    { key: 'bbm', label: 'BBM Solar', icon: '⛽', href: '/bbm' },
+    { key: 'finance', label: 'Keuangan', icon: '💰', href: '/finance' },
+    { key: 'adm', label: 'ADM & Surat', icon: '📋', href: '/adm' },
+    { key: 'hrd', label: 'HRD & Payroll', icon: '👷‍♂️', href: '/hrd' },
+    { key: 'ga', label: 'GA & Fasilitas', icon: '🚙', href: '/ga' },
+    { key: 'assets', label: 'Aset Tambang', icon: '🏷️', href: '/assets' },
+    { key: 'mess', label: 'Mess Camp', icon: '🏠', href: '/mess' },
+    { key: 'catering', label: 'Katering', icon: '🍱', href: '/catering' },
+    { key: 'clinic', label: 'Klinik Site', icon: '🏥', href: '/clinic' },
+    { key: 'security', label: 'Security Gate', icon: '🛡️', href: '/security' },
+    { key: 'radio', label: 'Radio Dispatch', icon: '📻', href: '/radio' },
+    { key: 'legal', label: 'Legalitas IUP', icon: '⚖️', href: '/legal' },
+    { key: 'csr', label: 'CSR Masyarakat', icon: '🤝', href: '/csr' },
+    { key: 'vendor', label: 'Vendor', icon: '🏬', href: '/vendor' },
+    { key: 'transport', label: 'Transport Kru', icon: '🚌', href: '/transport' },
+    { key: 'training', label: 'Training K3', icon: '🎓', href: '/training' },
+    { key: 'performance', label: 'Kinerja KPI', icon: '📈', href: '/performance' },
+    { key: 'it-helpdesk', label: 'IT Helpdesk', icon: '💻', href: '/it-helpdesk' },
+    { key: 'helpdesk', label: 'Helpdesk GA', icon: '🛠️', href: '/helpdesk' },
+    { key: 'investor', label: 'Investor & RKAB', icon: '📊', href: '/investor' },
+    { key: 'direktur', label: 'Eksekutif BOD', icon: '🏛️', href: '/direktur' },
+    { key: 'laporan', label: 'Cetak Laporan', icon: '📄', href: '/laporan' },
+]
+
 export default function GaDashboard() {
     const pathname = usePathname()
+    const router = useRouter()
     const [loading, setLoading] = useState(true)
-    const [userName, setUserName] = useState('Petugas GA')
-    const [activeTab, setActiveTab] = useState('armada')
+    const [userName, setUserName] = useState('Staff GA')
+    const [userRole, setUserRole] = useState('GA & Facilities')
+    const [allowedModules, setAllowedModules] = useState<string[]>([])
+    const [activeTab, setActiveTab] = useState('kendaraan')
     const [vehicleLogs, setVehicleLogs] = useState<VehicleLog[]>([])
     const [searchQuery, setSearchQuery] = useState('')
 
-    // State Modal Peminjaman Kendaraan LV
+    // Modal State Kendaraan LV
     const [showModal, setShowModal] = useState(false)
-    const [vehicleNo, setVehicleNo] = useState('')
-    const [driverName, setDriverName] = useState('')
+    const [plateNumber, setPlateNumber] = useState('')
+    const [driver, setDriver] = useState('')
+    const [destination, setDestination] = useState('')
     const [purpose, setPurpose] = useState('')
-    const [destination, setDestination] = useState('Pit Area Barat')
     const [submitting, setSubmitting] = useState(false)
 
     const landingUrl = process.env.NEXT_PUBLIC_LANDING_URL || 'https://pt-jeep.vercel.app'
@@ -42,23 +80,6 @@ export default function GaDashboard() {
 
         async function initGa() {
             try {
-                if (typeof window !== 'undefined' && window.location.hash.includes('access_token')) {
-                    const hashClean = window.location.hash.startsWith('#')
-                        ? window.location.hash.substring(1)
-                        : window.location.hash
-                    const hashParams = new URLSearchParams(hashClean)
-                    const accessToken = hashParams.get('access_token')
-                    const refreshToken = hashParams.get('refresh_token')
-
-                    if (accessToken) {
-                        await supabase.auth.setSession({
-                            access_token: accessToken,
-                            refresh_token: refreshToken || '',
-                        })
-                        window.history.replaceState(null, '', window.location.pathname)
-                    }
-                }
-
                 const { data: { session } } = await supabase.auth.getSession()
                 if (!session) {
                     window.location.href = landingUrl
@@ -72,7 +93,7 @@ export default function GaDashboard() {
                     .maybeSingle()
 
                 const statusClean = (profile?.status || '').toLowerCase().trim()
-                if (statusClean === 'nonaktif' || statusClean === 'banned') {
+                if (statusClean === 'nonaktif' || statusClean === 'non-aktif' || statusClean === 'banned') {
                     alert('Akun Anda dinonaktifkan.')
                     await supabase.auth.signOut()
                     window.location.href = landingUrl
@@ -80,32 +101,69 @@ export default function GaDashboard() {
                 }
 
                 if (isMounted) {
-                    setUserName(profile?.full_name || 'Petugas GA / Logistik')
+                    setUserName(profile?.full_name || 'Staff GA & Logistik')
+                    const division = (profile?.role || 'General Affair & Logistik').trim()
+                    setUserRole(division)
 
-                    const { data: logsData, error } = await supabase
+                    const isSuperAdmin = ['admin', 'administrator', 'superadmin'].includes(division.toLowerCase())
+
+                    let grantedKeys: string[] = []
+                    if (isSuperAdmin) {
+                        grantedKeys = ALL_MODULES.map((m) => m.key)
+                    } else {
+                        const { data: allPerms } = await supabase
+                            .from('division_permissions')
+                            .select('division_name, allowed_modules')
+
+                        if (allPerms && allPerms.length > 0) {
+                            const cleanDiv = division.toLowerCase()
+                            const matched = allPerms.find((p) => {
+                                const target = (p.division_name || '').toLowerCase().trim()
+                                return (
+                                    target === cleanDiv ||
+                                    target.includes(cleanDiv) ||
+                                    cleanDiv.includes(target) ||
+                                    (cleanDiv.includes('ga') && target.includes('ga')) ||
+                                    (cleanDiv.includes('general') && target.includes('general'))
+                                )
+                            })
+
+                            if (matched && Array.isArray(matched.allowed_modules)) {
+                                grantedKeys = matched.allowed_modules
+                            } else {
+                                grantedKeys = ['ga']
+                            }
+                        } else {
+                            grantedKeys = ['ga']
+                        }
+                    }
+
+                    // Proteksi akses jika divisi tidak punya izin modul GA
+                    if (!isSuperAdmin && grantedKeys.length > 0 && !grantedKeys.includes('ga')) {
+                        alert('Divisi Anda tidak memiliki hak akses ke modul GA & Fasilitas.')
+                        router.replace('/')
+                        return
+                    }
+
+                    setAllowedModules(grantedKeys)
+
+                    // Data Log Kendaraan dari Supabase
+                    const { data, error } = await supabase
                         .from('ga_vehicle_logs')
                         .select('*')
                         .order('created_at', { ascending: false })
 
-                    if (!error && logsData && logsData.length > 0) {
-                        setVehicleLogs(logsData)
+                    if (!error && data && data.length > 0) {
+                        setVehicleLogs(data)
                     } else {
                         setVehicleLogs([
                             {
                                 id: '1',
-                                vehicle_no: 'KT-8842-JP (LV Hilux 01)',
-                                driver_name: 'Dedi Saputra',
-                                purpose: 'Inspeksi Jalur Hauling & Pit Barat',
-                                destination: 'Front Pit Barat',
-                                status: 'Keluar',
-                            },
-                            {
-                                id: '2',
-                                vehicle_no: 'KT-1204-JP (Bus Karyawan 02)',
-                                driver_name: 'Agus Santoso',
-                                purpose: 'Antar Jemput Kru Shift Siang',
-                                destination: 'Mess Camp Utama',
-                                status: 'Selesai',
+                                plate_number: 'KT 8192 YZ (Hilux 4x4)',
+                                driver: 'Rahmat Hidayat',
+                                destination: 'Pit Front A ke Port Jetty',
+                                purpose: 'Antar Inspector K3 & Pengawas Pit',
+                                status: 'Dipakai',
                             },
                         ])
                     }
@@ -113,7 +171,7 @@ export default function GaDashboard() {
                     setLoading(false)
                 }
             } catch (err) {
-                console.error('Error GA init:', err)
+                console.error('Error load GA:', err)
                 if (isMounted) setLoading(false)
             }
         }
@@ -123,45 +181,42 @@ export default function GaDashboard() {
         return () => {
             isMounted = false
         }
-    }, [landingUrl])
+    }, [landingUrl, router])
 
-    const handleAddVehicleLog = async (e: React.FormEvent) => {
+    const handleAddVehicle = async (e: React.FormEvent) => {
         e.preventDefault()
-        if (!vehicleNo || !driverName) return
+        if (!plateNumber || !driver) return
 
         setSubmitting(true)
-
         const payload = {
-            vehicle_no: vehicleNo,
-            driver_name: driverName,
-            purpose,
+            plate_number: plateNumber,
+            driver,
             destination,
-            status: 'Keluar',
+            purpose,
+            status: 'Dipakai',
         }
 
-        const { data, error } = await supabase
-            .from('ga_vehicle_logs')
-            .insert([payload])
-            .select()
+        const { data, error } = await supabase.from('ga_vehicle_logs').insert([payload]).select()
 
         if (!error && data) {
             setVehicleLogs([data[0], ...vehicleLogs])
             setShowModal(false)
-            setVehicleNo('')
-            setDriverName('')
+            setPlateNumber('')
+            setDriver('')
+            setDestination('')
             setPurpose('')
         } else {
             setVehicleLogs([
                 {
-                    id: Math.random().toString(),
-                    created_at: new Date().toISOString(),
+                    id: Date.now().toString(),
                     ...payload,
                 },
                 ...vehicleLogs,
             ])
             setShowModal(false)
-            setVehicleNo('')
-            setDriverName('')
+            setPlateNumber('')
+            setDriver('')
+            setDestination('')
             setPurpose('')
         }
 
@@ -173,104 +228,110 @@ export default function GaDashboard() {
         window.location.href = landingUrl
     }
 
-    const cleanQuery = (searchQuery || '').toLowerCase().trim()
-    const filteredLogs = vehicleLogs.filter((item) => {
-        const vNo = (item.vehicle_no || '').toLowerCase()
-        const dName = (item.driver_name || '').toLowerCase()
-        const purp = (item.purpose || '').toLowerCase()
-        const dest = (item.destination || '').toLowerCase()
+    const filteredLogs = vehicleLogs.filter((item) =>
+        item.plate_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.driver.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.destination.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.purpose.toLowerCase().includes(searchQuery.toLowerCase())
+    )
 
-        return (
-            vNo.includes(cleanQuery) ||
-            dName.includes(cleanQuery) ||
-            purp.includes(cleanQuery) ||
-            dest.includes(cleanQuery)
-        )
-    })
-
-    const navLinks = [
-        { href: '/ga', label: 'GA & Fasilitas', icon: '🚙' },
-        { href: '/manager-site', label: 'Pit Produksi', icon: '⛏️' },
-        { href: '/fleet', label: 'Alat Berat', icon: '🚜' },
-        { href: '/bbm', label: 'Tangki BBM', icon: '⛽' },
-        { href: '/finance', label: 'Keuangan', icon: '💰' },
-        { href: '/hrd', label: 'HRD & K3', icon: '👷‍♂️' },
-        { href: '/direktur', label: 'Eksekutif', icon: '🏛️' },
-        { href: '/laporan', label: 'Cetak Laporan', icon: '📄' },
-    ]
+    // FILTER STRICT: Hanya modul yang diizinkan yang muncul di navbar
+    const authorizedNavItems = ALL_MODULES.filter((item) =>
+        allowedModules.includes(item.key)
+    )
 
     if (loading) {
         return (
             <div className="min-h-screen bg-[#060c14] flex flex-col items-center justify-center text-white font-sans">
-                <div className="w-10 h-10 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-                <p className="text-xs text-slate-400">Sinkronisasi Logistik & Fasilitas GA...</p>
+                <div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+                <p className="text-xs text-slate-400 font-mono">
+                    Sinkronisasi Sarana & Fasilitas PT. Jangkar Energi Eka Perkasa...
+                </p>
             </div>
         )
     }
 
     return (
         <div className="min-h-screen bg-[#060c14] text-slate-100 font-sans p-4 md:p-6 select-none">
-            {/* Header Mandiri */}
+            {/* Header Utama */}
             <header className="mb-6 space-y-3">
                 <div className="flex flex-wrap items-center justify-between bg-[#0a1625] border border-[#1b2e46] rounded-xl px-6 py-4 shadow-xl">
-                    <div>
-                        <h1 className="text-xl md:text-2xl font-black tracking-wide text-white flex items-center gap-2">
-                            Dashboard General Affair & Logistik (GA) PT. JEEP
-                        </h1>
-                        <p className="text-xs text-slate-400 flex items-center gap-2 mt-1">
-                            <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
-                            <span>Armada LV, Tangki BBM, Mess, & Fasilitas Tambang</span>
-                            <span className="text-slate-600">•</span>
-                            <span className="text-slate-300 font-semibold">{userName}</span>
-                            <span className="bg-[#112233] border border-[#1e3a5f] text-slate-300 text-[10px] px-2 py-0.5 rounded font-mono">
-                                GA & Facilities
-                            </span>
-                        </p>
+                    <div className="flex items-center space-x-3">
+                        <span className="text-3xl">🚙</span>
+                        <div>
+                            <h1 className="text-xl md:text-2xl font-black tracking-wide text-white">
+                                Dashboard General Affair & Logistik (GA) PT. JEEP
+                            </h1>
+                            <p className="text-xs text-amber-400 flex items-center gap-1.5 mt-0.5">
+                                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                                <span>Armada LV, Tangki BBM, Mess, & Fasilitas Tambang</span>
+                                <span className="text-slate-600">•</span>
+                                <span className="text-slate-300 font-semibold">{userName}</span>
+                                <span className="bg-[#112233] border border-[#1e3a5f] text-cyan-300 text-[10px] px-2 py-0.5 rounded font-mono font-bold">
+                                    {userRole}
+                                </span>
+                            </p>
+                        </div>
                     </div>
 
-                    <button
-                        onClick={handleLogout}
-                        className="bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/50 text-rose-300 text-xs px-4 py-2 rounded-lg transition cursor-pointer"
-                    >
-                        Keluar ke Beranda
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <Link
+                            href="/"
+                            className="bg-[#102033] hover:bg-[#162b45] border border-[#1e3757] text-slate-300 text-xs px-3 py-2 rounded-lg transition"
+                        >
+                            ← Beranda Portal
+                        </Link>
+                        <button
+                            onClick={handleLogout}
+                            className="bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/50 text-rose-300 text-xs px-4 py-2 rounded-lg transition cursor-pointer"
+                        >
+                            Keluar
+                        </button>
+                    </div>
                 </div>
 
-                {/* Global Module Switcher */}
-                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
-                    {navLinks.map((item) => {
-                        const isActive = pathname === item.href
-                        return (
-                            <Link
-                                key={item.href}
-                                href={item.href}
-                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border whitespace-nowrap font-medium transition cursor-pointer ${isActive
-                                        ? 'bg-[#162d47] text-white border-amber-400/80 shadow-sm'
+                {/* Bilah Navigasi Dinamis: Hanya Modul Berizin yang Dirender */}
+                {authorizedNavItems.length > 1 ? (
+                    <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+                        {authorizedNavItems.map((item) => {
+                            const isActive = pathname === item.href
+                            return (
+                                <Link
+                                    key={item.href}
+                                    href={item.href}
+                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border whitespace-nowrap font-medium transition cursor-pointer ${isActive
+                                        ? 'bg-[#162d47] text-white border-emerald-400/80 shadow-sm'
                                         : 'bg-[#0a1625] text-slate-400 border-[#1b2e46] hover:text-slate-200 hover:bg-[#0f2137]'
-                                    }`}
-                            >
-                                <span>{item.icon}</span>
-                                <span>{item.label}</span>
-                            </Link>
-                        )
-                    })}
-                </div>
+                                        }`}
+                                >
+                                    <span>{item.icon}</span>
+                                    <span>{item.label}</span>
+                                </Link>
+                            )
+                        })}
+                    </div>
+                ) : (
+                    <div className="bg-[#0a1625]/60 border border-[#1b2e46] rounded-lg px-4 py-2 text-[11px] text-slate-400 flex items-center gap-2 font-mono">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                        <span>Akses Terbatas Divisi: Anda hanya memiliki otoritas pada modul <strong>General Affair (GA)</strong>.</span>
+                    </div>
+                )}
             </header>
 
-            {/* Nav Tabs */}
+            {/* Tabs Kategori Sarana GA */}
             <nav className="flex flex-wrap gap-2 mb-6">
                 {[
-                    { id: 'armada', label: 'LOG KENDARAAN LV', badge: `${vehicleLogs.length} LOG` },
+                    { id: 'kendaraan', label: 'LOG KENDARAAN LV', badge: `${vehicleLogs.length} LOG` },
                     { id: 'mess', label: 'MESS & AKOMODASI', badge: '100% OK' },
-                    { id: 'sarana', label: 'GENSET & POMPA AIR', badge: '' },
-                    { id: 'catering', label: 'CATERING & LOGISTIK', badge: '' },
+                    { id: 'genset', label: 'GENSET & POMPA AIR' },
+                    { id: 'catering', label: 'CATERING & LOGISTIK' },
                 ].map((tab) => (
                     <button
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id)}
                         className={`px-4 py-2.5 rounded-lg text-xs font-bold transition flex items-center gap-2 border cursor-pointer ${activeTab === tab.id
-                                ? 'bg-[#1b3b5f] border-amber-400 text-white shadow-lg shadow-amber-950/40'
-                                : 'bg-[#0c1a2d] border-[#1b2e46] text-slate-400 hover:text-white hover:bg-[#12243d]'
+                            ? 'bg-[#1b3b5f] border-emerald-400 text-white shadow-lg'
+                            : 'bg-[#0c1a2d] border-[#1b2e46] text-slate-400 hover:text-white'
                             }`}
                     >
                         <span>{tab.label}</span>
@@ -283,13 +344,12 @@ export default function GaDashboard() {
                 ))}
             </nav>
 
-            {/* Grid Utama */}
+            {/* Konten Utama GA */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                {/* Kolom Kiri: Navigasi Aksi */}
                 <aside className="lg:col-span-3 space-y-3">
                     <div
                         onClick={() => setShowModal(true)}
-                        className="p-4 rounded-xl border border-dashed border-amber-500/50 bg-amber-950/20 hover:bg-amber-900/30 text-amber-400 cursor-pointer transition flex items-center gap-3"
+                        className="p-4 rounded-xl border border-dashed border-emerald-500/50 bg-emerald-950/20 hover:bg-emerald-900/30 text-emerald-400 cursor-pointer transition flex items-center gap-3"
                     >
                         <span className="text-xl">➕</span>
                         <div>
@@ -300,7 +360,7 @@ export default function GaDashboard() {
 
                     <Link
                         href="/bbm"
-                        className="p-4 rounded-xl border border-[#1b2e46] bg-[#0c1a2d] hover:bg-[#12243d] hover:border-amber-500/50 text-slate-200 transition flex items-center gap-3 block"
+                        className="p-4 rounded-xl border border-[#1b2e46] bg-[#0c1a2d] hover:bg-[#12243d] hover:border-emerald-500/50 text-slate-200 transition flex items-center gap-3 block"
                     >
                         <span className="text-xl">⛽</span>
                         <div>
@@ -322,42 +382,39 @@ export default function GaDashboard() {
                     </div>
                 </aside>
 
-                {/* Kolom Kanan: Panel Tabel */}
                 <main className="lg:col-span-9 space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
-                            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Kesiapan Armada LV</h3>
-                            <div className="text-2xl font-black text-white">92% Ready</div>
-                            <p className="mt-2 text-[11px] text-emerald-400 font-semibold">Siap Operasional Pit & Mess</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-4">
+                            <span className="text-[11px] text-slate-400 block uppercase font-bold">Kesiapan Armada LV</span>
+                            <span className="text-xl font-black text-white font-mono mt-1 block">92% Ready</span>
+                            <span className="text-[10px] text-emerald-400">Siap Operasional Pit & Mess</span>
                         </div>
-
-                        <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
-                            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Hunian Mess Camp</h3>
-                            <div className="text-2xl font-black text-amber-400">142 / 160 Bed</div>
-                            <p className="mt-2 text-[11px] text-slate-400">Kapasitas Nyaman Terjaga</p>
+                        <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-4">
+                            <span className="text-[11px] text-slate-400 block uppercase font-bold">Hunian Mess Camp</span>
+                            <span className="text-xl font-black text-amber-400 font-mono mt-1 block">142 / 160 Bed</span>
+                            <span className="text-[10px] text-slate-400">Kapasitas Nyaman Terjaga</span>
                         </div>
-
-                        <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
-                            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Genset Power Camp</h3>
-                            <div className="text-2xl font-black text-emerald-400">250 kVA</div>
-                            <p className="mt-2 text-[11px] text-emerald-400 font-medium">✓ Suplai Listrik 24 Jam Aman</p>
+                        <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-4">
+                            <span className="text-[11px] text-slate-400 block uppercase font-bold">Genset Power Camp</span>
+                            <span className="text-xl font-black text-cyan-400 font-mono mt-1 block">250 kVA</span>
+                            <span className="text-[10px] text-emerald-400">✓ Suplai Listrik 24 Jam Aman</span>
                         </div>
                     </div>
 
                     <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg space-y-4">
                         <div className="flex flex-wrap justify-between items-center gap-3">
-                            <div className="w-full md:w-72">
+                            <div className="w-full md:w-80">
                                 <input
                                     type="text"
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
                                     placeholder="Cari plat, driver, keperluan..."
-                                    className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400"
+                                    className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3.5 py-2 rounded-lg focus:outline-none focus:border-emerald-400"
                                 />
                             </div>
                             <button
                                 onClick={() => setShowModal(true)}
-                                className="bg-amber-500 hover:bg-amber-600 text-slate-950 text-[11px] font-bold px-3.5 py-2 rounded-lg transition cursor-pointer"
+                                className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs px-4 py-2 rounded-lg transition cursor-pointer"
                             >
                                 + Catat Kendaraan
                             </button>
@@ -367,29 +424,24 @@ export default function GaDashboard() {
                             <table className="w-full text-left text-xs">
                                 <thead>
                                     <tr className="border-b border-[#1b2e46] text-slate-400">
-                                        <th className="pb-2">Nomor Unit LV</th>
-                                        <th className="pb-2">Driver / Pemakai</th>
-                                        <th className="pb-2">Tujuan Lapangan</th>
-                                        <th className="pb-2">Keperluan Dinas</th>
-                                        <th className="pb-2">Status</th>
+                                        <th className="pb-2.5">Nomor Unit LV</th>
+                                        <th className="pb-2.5">Driver / Pemakai</th>
+                                        <th className="pb-2.5">Tujuan Lapangan</th>
+                                        <th className="pb-2.5">Keperluan Dinas</th>
+                                        <th className="pb-2.5">Status</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-[#16273c] text-slate-300">
                                     {filteredLogs.length > 0 ? (
-                                        filteredLogs.map((item) => (
-                                            <tr key={item.id}>
-                                                <td className="py-2.5 font-bold font-mono text-amber-400">{item.vehicle_no || '-'}</td>
-                                                <td className="font-semibold text-white">{item.driver_name || '-'}</td>
-                                                <td>{item.destination || '-'}</td>
-                                                <td className="text-slate-400">{item.purpose || '-'}</td>
+                                        filteredLogs.map((log) => (
+                                            <tr key={log.id} className="hover:bg-[#0c1a2d]/50 transition">
+                                                <td className="py-3 font-mono font-bold text-amber-400">{log.plate_number}</td>
+                                                <td className="font-semibold text-white">{log.driver}</td>
+                                                <td className="text-slate-300">{log.destination}</td>
+                                                <td className="text-slate-400">{log.purpose}</td>
                                                 <td>
-                                                    <span
-                                                        className={`px-2 py-0.5 rounded text-[10px] font-bold ${(item.status || '') === 'Keluar'
-                                                                ? 'bg-amber-950/80 text-amber-400 border border-amber-800/40'
-                                                                : 'bg-emerald-950/80 text-emerald-400 border border-emerald-800/40'
-                                                            }`}
-                                                    >
-                                                        {item.status || 'Aktif'}
+                                                    <span className="bg-emerald-950/80 text-emerald-400 border border-emerald-800/40 text-[10px] px-2 py-0.5 rounded font-bold">
+                                                        {log.status}
                                                     </span>
                                                 </td>
                                             </tr>
@@ -397,7 +449,7 @@ export default function GaDashboard() {
                                     ) : (
                                         <tr>
                                             <td colSpan={5} className="py-8 text-center text-slate-500 italic">
-                                                Tidak ada catatan unit yang cocok.
+                                                Belum ada data pemakaian kendaraan.
                                             </td>
                                         </tr>
                                     )}
@@ -408,54 +460,56 @@ export default function GaDashboard() {
                 </main>
             </div>
 
-            {/* Modal Tambah Log Kendaraan */}
+            {/* Modal Input Kendaraan Baru */}
             {showModal && (
                 <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
                     <div className="bg-[#0a1625] border border-[#1b2e46] rounded-xl p-6 w-full max-w-md shadow-2xl space-y-4">
-                        <h2 className="text-sm font-bold text-white uppercase tracking-wider">Catat Pemakaian Unit Kendaraan LV</h2>
-                        <form onSubmit={handleAddVehicleLog} className="space-y-3">
+                        <h2 className="text-sm font-bold text-white uppercase tracking-wider">
+                            Pencatatan Peminjaman Unit LV
+                        </h2>
+                        <form onSubmit={handleAddVehicle} className="space-y-3">
                             <div>
-                                <label className="text-[11px] text-slate-400 block mb-1">Nomor Unit / Plat</label>
+                                <label className="text-[11px] text-slate-400 block mb-1">Nomor Plat & Tipe LV</label>
                                 <input
                                     type="text"
                                     required
-                                    value={vehicleNo}
-                                    onChange={(e) => setVehicleNo(e.target.value)}
-                                    placeholder="Contoh: KT-8842-JP (LV Hilux 01)"
-                                    className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400 font-mono"
+                                    value={plateNumber}
+                                    onChange={(e) => setPlateNumber(e.target.value)}
+                                    placeholder="Contoh: KT 8192 YZ (Hilux 4x4)"
+                                    className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-emerald-400 font-mono"
                                 />
                             </div>
                             <div>
-                                <label className="text-[11px] text-slate-400 block mb-1">Nama Driver / Pemakai</label>
+                                <label className="text-[11px] text-slate-400 block mb-1">Driver / Penanggung Jawab</label>
                                 <input
                                     type="text"
                                     required
-                                    value={driverName}
-                                    onChange={(e) => setDriverName(e.target.value)}
-                                    placeholder="Contoh: Dedi Saputra"
-                                    className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400"
+                                    value={driver}
+                                    onChange={(e) => setDriver(e.target.value)}
+                                    placeholder="Contoh: Rahmat Hidayat"
+                                    className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-emerald-400"
                                 />
                             </div>
                             <div>
-                                <label className="text-[11px] text-slate-400 block mb-1">Tujuan</label>
+                                <label className="text-[11px] text-slate-400 block mb-1">Rute / Tujuan</label>
                                 <input
                                     type="text"
                                     required
                                     value={destination}
                                     onChange={(e) => setDestination(e.target.value)}
-                                    placeholder="Contoh: Pit Front Barat / Pelabuhan Jetty"
-                                    className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400"
+                                    placeholder="Contoh: Pit Front A ke Jetty"
+                                    className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-emerald-400"
                                 />
                             </div>
                             <div>
-                                <label className="text-[11px] text-slate-400 block mb-1">Keperluan Pemakaian</label>
+                                <label className="text-[11px] text-slate-400 block mb-1">Keperluan Operasional</label>
                                 <input
                                     type="text"
                                     required
                                     value={purpose}
                                     onChange={(e) => setPurpose(e.target.value)}
-                                    placeholder="Contoh: Antar Logistik Part Excavator"
-                                    className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400"
+                                    placeholder="Contoh: Antar Inspector K3"
+                                    className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-emerald-400"
                                 />
                             </div>
 
@@ -470,9 +524,9 @@ export default function GaDashboard() {
                                 <button
                                     type="submit"
                                     disabled={submitting}
-                                    className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs transition cursor-pointer"
+                                    className="px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold text-xs transition cursor-pointer"
                                 >
-                                    {submitting ? 'Menyimpan...' : 'Simpan Data'}
+                                    {submitting ? 'Menyimpan...' : 'Simpan Log LV'}
                                 </button>
                             </div>
                         </form>
