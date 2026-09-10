@@ -9,16 +9,16 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
-interface EmployeeItem {
+interface PerformanceItem {
     id: string
     created_at?: string
-    nik: string
-    full_name: string
+    employee_name: string
     department: string
-    position: string
-    roster: string
-    salary: number
-    status: string
+    review_period: string
+    productivity_score: number
+    k3_compliance_score: number
+    grade: string
+    evaluator: string
 }
 
 const ALL_MODULES = [
@@ -56,24 +56,24 @@ const ALL_MODULES = [
     { key: 'laporan', label: 'Cetak Laporan', icon: '📄', href: '/laporan' },
 ]
 
-export default function HrdManagementPage() {
+export default function PerformancePage() {
     const pathname = usePathname()
     const router = useRouter()
     const [loading, setLoading] = useState(true)
     const [userName, setUserName] = useState('Staff HRD')
     const [userRole, setUserRole] = useState('HRD Dept')
     const [allowedModules, setAllowedModules] = useState<string[]>([])
-    const [employees, setEmployees] = useState<EmployeeItem[]>([])
+    const [evaluations, setEvaluations] = useState<PerformanceItem[]>([])
     const [searchQuery, setSearchQuery] = useState('')
 
-    // State Modal Input Karyawan
+    // State Modal Input Penilaian Kinerja Baru
     const [showModal, setShowModal] = useState(false)
-    const [nik, setNik] = useState('')
-    const [fullName, setFullName] = useState('')
+    const [employeeName, setEmployeeName] = useState('')
     const [department, setDepartment] = useState('Produksi Pit')
-    const [position, setPosition] = useState('')
-    const [roster, setRoster] = useState('8:2 (8 Minggu Kerja, 2 Minggu Off)')
-    const [salary, setSalary] = useState('10000000')
+    const [reviewPeriod, setReviewPeriod] = useState('Semester I – 2026')
+    const [productivityScore, setProductivityScore] = useState('90.0')
+    const [k3ComplianceScore, setK3ComplianceScore] = useState('95.0')
+    const [evaluator, setEvaluator] = useState('')
     const [submitting, setSubmitting] = useState(false)
 
     const landingUrl = process.env.NEXT_PUBLIC_LANDING_URL || 'https://pt-jeep.vercel.app'
@@ -81,7 +81,7 @@ export default function HrdManagementPage() {
     useEffect(() => {
         let isMounted = true
 
-        async function initHrd() {
+        async function initPerformance() {
             try {
                 const { data: { session } } = await supabase.auth.getSession()
                 if (!session) {
@@ -134,60 +134,51 @@ export default function HrdManagementPage() {
                             if (matched && Array.isArray(matched.allowed_modules)) {
                                 grantedKeys = matched.allowed_modules
                             } else {
-                                grantedKeys = ['hrd']
+                                grantedKeys = ['performance', 'hrd']
                             }
                         } else {
-                            grantedKeys = ['hrd']
+                            grantedKeys = ['performance', 'hrd']
                         }
                     }
 
-                    if (!isSuperAdmin && grantedKeys.length > 0 && !grantedKeys.includes('hrd')) {
-                        alert('Divisi Anda tidak memiliki hak akses ke modul HRD.')
+                    // Route Guard jika akun tidak memiliki izin modul kinerja
+                    if (!isSuperAdmin && grantedKeys.length > 0 && !grantedKeys.includes('performance')) {
+                        alert('Divisi Anda tidak memiliki hak akses ke modul Penilaian Kinerja.')
                         router.replace('/')
                         return
                     }
 
                     setAllowedModules(grantedKeys)
 
-                    // Ambil data karyawan aktual dari Supabase
+                    // Ambil data evaluasi dari Supabase
                     const { data, error } = await supabase
-                        .from('employees')
+                        .from('performance_evaluations')
                         .select('*')
-                        .order('nik', { ascending: true })
+                        .order('created_at', { ascending: false })
 
                     if (!error && data && data.length > 0) {
-                        setEmployees(data)
+                        setEvaluations(data)
                     } else {
-                        setEmployees([
+                        setEvaluations([
                             {
                                 id: '1',
-                                nik: 'JEEP-2026-001',
-                                full_name: 'Slamet Riyadi',
+                                employee_name: 'Budi Santoso',
                                 department: 'Produksi Pit',
-                                position: 'Supervisor Pit Penambangan',
-                                roster: '8:2 (8 Minggu Kerja, 2 Minggu Off)',
-                                salary: 12500000,
-                                status: 'AKTIF',
+                                review_period: 'Semester I – 2026',
+                                productivity_score: 92.5,
+                                k3_compliance_score: 96.0,
+                                grade: 'GRADE A',
+                                evaluator: 'Mine Operation Manager',
                             },
                             {
                                 id: '2',
-                                nik: 'JEEP-2026-002',
-                                full_name: 'Budi Santoso',
+                                employee_name: 'Joko Widodo',
                                 department: 'Plant & Workshop',
-                                position: 'Mekanik Kepala Alat Berat',
-                                roster: '8:2 (8 Minggu Kerja, 2 Minggu Off)',
-                                salary: 10500000,
-                                status: 'AKTIF',
-                            },
-                            {
-                                id: '3',
-                                nik: 'JEEP-2026-003',
-                                full_name: 'Joko Widodo',
-                                department: 'HSE & K3',
-                                position: 'Safety Officer Lapangan',
-                                roster: '8:2 (8 Minggu Kerja, 2 Minggu Off)',
-                                salary: 9500000,
-                                status: 'AKTIF',
+                                review_period: 'Semester I – 2026',
+                                productivity_score: 88.0,
+                                k3_compliance_score: 90.0,
+                                grade: 'GRADE B',
+                                evaluator: 'Plant Superintendent',
                             },
                         ])
                     }
@@ -195,55 +186,64 @@ export default function HrdManagementPage() {
                     setLoading(false)
                 }
             } catch (err) {
-                console.error('Error load HRD:', err)
+                console.error('Error load performance:', err)
                 if (isMounted) setLoading(false)
             }
         }
 
-        initHrd()
+        initPerformance()
 
         return () => {
             isMounted = false
         }
     }, [landingUrl, router])
 
-    const handleAddEmployee = async (e: React.FormEvent) => {
+    const calculateGrade = (prod: number, k3: number) => {
+        const avg = (prod + k3) / 2
+        if (avg >= 90) return 'GRADE A'
+        if (avg >= 80) return 'GRADE B'
+        if (avg >= 70) return 'GRADE C'
+        return 'GRADE D'
+    }
+
+    const handleAddEvaluation = async (e: React.FormEvent) => {
         e.preventDefault()
-        if (!fullName || !position) return
+        if (!employeeName) return
 
         setSubmitting(true)
-        const generatedNik = nik || `JEEP-2026-${String(employees.length + 1).padStart(3, '0')}`
+        const prod = parseFloat(productivityScore) || 0
+        const k3 = parseFloat(k3ComplianceScore) || 0
+        const finalGrade = calculateGrade(prod, k3)
 
         const payload = {
-            nik: generatedNik,
-            full_name: fullName,
+            employee_name: employeeName,
             department,
-            position,
-            roster,
-            salary: parseFloat(salary) || 0,
-            status: 'AKTIF',
+            review_period: reviewPeriod,
+            productivity_score: prod,
+            k3_compliance_score: k3,
+            grade: finalGrade,
+            evaluator: evaluator || userName,
         }
 
-        const { data, error } = await supabase.from('employees').insert([payload]).select()
+        const { data, error } = await supabase
+            .from('performance_evaluations')
+            .insert([payload])
+            .select()
 
         if (!error && data) {
-            setEmployees([...employees, data[0]])
+            setEvaluations([data[0], ...evaluations])
             setShowModal(false)
-            setNik('')
-            setFullName('')
-            setPosition('')
+            setEmployeeName('')
         } else {
-            setEmployees([
-                ...employees,
+            setEvaluations([
                 {
                     id: Date.now().toString(),
                     ...payload,
                 },
+                ...evaluations,
             ])
             setShowModal(false)
-            setNik('')
-            setFullName('')
-            setPosition('')
+            setEmployeeName('')
         }
 
         setSubmitting(false)
@@ -254,18 +254,20 @@ export default function HrdManagementPage() {
         window.location.href = landingUrl
     }
 
-    const totalEmployees = employees.length
-    const activeEmployees = employees.filter((e) => e.status === 'AKTIF').length
-    const totalPayroll = employees.reduce((acc, curr) => acc + Number(curr.salary || 0), 0)
+    const totalEvaluated = evaluations.length
+    const avgProductivity = totalEvaluated > 0
+        ? (evaluations.reduce((acc, curr) => acc + Number(curr.productivity_score || 0), 0) / totalEvaluated).toFixed(1)
+        : '0.0'
+    const gradeACount = evaluations.filter((e) => e.grade === 'GRADE A').length
 
-    const filteredEmployees = employees.filter((item) =>
-        item.nik.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    const filteredEvaluations = evaluations.filter((item) =>
+        item.employee_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         item.department.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.position.toLowerCase().includes(searchQuery.toLowerCase())
+        item.review_period.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.evaluator.toLowerCase().includes(searchQuery.toLowerCase())
     )
 
-    // HANYA modul yang diizinkan untuk akun ini yang dirender di navbar
+    // Hanya modul yang diizinkan untuk divisi pengguna yang dirender
     const authorizedNavItems = ALL_MODULES.filter((item) =>
         allowedModules.includes(item.key)
     )
@@ -275,7 +277,7 @@ export default function HrdManagementPage() {
             <div className="min-h-screen bg-[#060c14] flex flex-col items-center justify-center text-white font-sans">
                 <div className="w-10 h-10 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mb-4"></div>
                 <p className="text-xs text-slate-400 font-mono">
-                    Sinkronisasi Data Personalia & Payroll PT. Jangkar Energi Eka Perkasa...
+                    Sinkronisasi Matriks Evaluasi & Kinerja Karyawan...
                 </p>
             </div>
         )
@@ -287,14 +289,14 @@ export default function HrdManagementPage() {
             <header className="mb-6 space-y-3">
                 <div className="flex flex-wrap items-center justify-between bg-[#0a1625] border border-[#1b2e46] rounded-xl px-6 py-4 shadow-xl">
                     <div className="flex items-center space-x-3">
-                        <span className="text-3xl">👷‍♂️</span>
+                        <span className="text-3xl">⭐</span>
                         <div>
                             <h1 className="text-xl md:text-2xl font-black tracking-wide text-white">
-                                Manajemen HRD & Penggajian Karyawan PT. Jangkar Energi Eka Perkasa
+                                Penilaian Kinerja Karyawan PT. Jangkar Energi Eka Perkasa
                             </h1>
                             <p className="text-xs text-amber-400 flex items-center gap-1.5 mt-0.5">
                                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                                <span>Kontrol Database Karyawan, Roster Kerja, & Rekapitulasi Payroll Site Nikel</span>
+                                <span>Evaluasi Produktivitas, Kepatuhan K3, & Grade Penilaian Kru Site Nikel</span>
                                 <span className="text-slate-600">•</span>
                                 <span className="text-slate-300 font-semibold">{userName}</span>
                                 <span className="bg-[#112233] border border-[#1e3a5f] text-cyan-300 text-[10px] px-2 py-0.5 rounded font-mono font-bold">
@@ -330,8 +332,8 @@ export default function HrdManagementPage() {
                                     key={item.href}
                                     href={item.href}
                                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border whitespace-nowrap font-medium transition cursor-pointer ${isActive
-                                            ? 'bg-[#162d47] text-white border-amber-400/80 shadow-sm'
-                                            : 'bg-[#0a1625] text-slate-400 border-[#1b2e46] hover:text-slate-200 hover:bg-[#0f2137]'
+                                        ? 'bg-[#162d47] text-white border-amber-400/80 shadow-sm'
+                                        : 'bg-[#0a1625] text-slate-400 border-[#1b2e46] hover:text-slate-200 hover:bg-[#0f2137]'
                                         }`}
                                 >
                                     <span>{item.icon}</span>
@@ -343,41 +345,39 @@ export default function HrdManagementPage() {
                 ) : (
                     <div className="bg-[#0a1625]/60 border border-[#1b2e46] rounded-lg px-4 py-2 text-[11px] text-slate-400 flex items-center gap-2 font-mono">
                         <span className="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
-                        <span>Akses Terbatas Divisi: Anda hanya memiliki otoritas pada modul <strong>HRD & Payroll</strong>.</span>
+                        <span>Akses Terbatas: Menampilkan modul berizin untuk divisi Anda.</span>
                     </div>
                 )}
             </header>
 
-            {/* KPI Cards */}
+            {/* KPI Kinerja */}
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                 <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
-                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Total Tenaga Kerja Site</h3>
-                    <div className="text-2xl font-black text-white font-mono">{totalEmployees} Orang</div>
-                    <p className="mt-2 text-[11px] text-slate-400">Terdaftar di Sistem HRD Site</p>
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Total Karyawan Dievaluasi</h3>
+                    <div className="text-2xl font-black text-white font-mono">{totalEvaluated} Orang</div>
+                    <p className="mt-2 text-[11px] text-slate-400">Pencatatan Penilaian Site Nikel</p>
                 </div>
 
                 <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
-                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Karyawan Aktif Shift On</h3>
-                    <div className="text-2xl font-black text-emerald-400 font-mono">{activeEmployees} Orang</div>
-                    <p className="mt-2 text-[11px] text-emerald-400 font-medium">Bertugas di Area Penambangan Nikel</p>
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Rata-Rata Produktivitas</h3>
+                    <div className="text-2xl font-black text-cyan-400 font-mono">{avgProductivity} / 100</div>
+                    <p className="mt-2 text-[11px] text-emerald-400 font-semibold">Standar Kinerja Unggul</p>
                 </div>
 
                 <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
-                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Akumulasi Payroll Bulanan</h3>
-                    <div className="text-2xl font-black text-amber-400 font-mono">
-                        Rp {(totalPayroll / 1000000).toFixed(1)} Juta
-                    </div>
-                    <p className="mt-2 text-[11px] text-slate-400">Estimasi Penggajian Rutin</p>
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Grade A (Excellent)</h3>
+                    <div className="text-2xl font-black text-amber-400 font-mono">{gradeACount} Karyawan</div>
+                    <p className="mt-2 text-[11px] text-slate-400">Memenuhi Target Tertinggi</p>
                 </div>
 
                 <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
-                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Kepatuhan Ketenagakerjaan</h3>
-                    <div className="text-2xl font-black text-cyan-400 font-mono">100% Sesuai</div>
-                    <p className="mt-2 text-[11px] text-cyan-400 font-medium">✓ Standar UU Ketenagakerjaan & K3</p>
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Status Penilaian HRD</h3>
+                    <div className="text-2xl font-black text-emerald-400 font-mono">Tervalidasi</div>
+                    <p className="mt-2 text-[11px] text-emerald-400 font-medium">✓ Sesuai Standar Kompetensi</p>
                 </div>
             </div>
 
-            {/* Grid Tabel Data Karyawan */}
+            {/* Grid Tabel Penilaian Kinerja */}
             <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg space-y-4">
                 <div className="flex flex-wrap justify-between items-center gap-3">
                     <div className="w-full md:w-80">
@@ -385,7 +385,7 @@ export default function HrdManagementPage() {
                             type="text"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            placeholder="Cari NIK, nama, jabatan, departemen..."
+                            placeholder="Cari nama karyawan, departemen, periode..."
                             className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3.5 py-2 rounded-lg focus:outline-none focus:border-amber-400"
                         />
                     </div>
@@ -393,7 +393,7 @@ export default function HrdManagementPage() {
                         onClick={() => setShowModal(true)}
                         className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs px-4 py-2 rounded-lg transition cursor-pointer flex items-center gap-1.5"
                     >
-                        <span>+</span> <span>Daftarkan Karyawan Baru</span>
+                        <span>+</span> <span>Tambah Penilaian Kinerja Baru</span>
                     </button>
                 </div>
 
@@ -401,42 +401,49 @@ export default function HrdManagementPage() {
                     <table className="w-full text-left text-xs">
                         <thead>
                             <tr className="border-b border-[#1b2e46] text-slate-400">
-                                <th className="pb-2.5">Nomor Induk (NIK)</th>
-                                <th className="pb-2.5">Nama Lengkap Karyawan</th>
+                                <th className="pb-2.5">Nama Karyawan</th>
                                 <th className="pb-2.5">Departemen</th>
-                                <th className="pb-2.5">Jabatan / Posisi</th>
-                                <th className="pb-2.5">Roster Kerja</th>
-                                <th className="pb-2.5 text-right">Gaji & Tunjangan (IDR)</th>
-                                <th className="pb-2.5 text-center">Status</th>
+                                <th className="pb-2.5">Periode Review</th>
+                                <th className="pb-2.5 text-center">Produktivitas</th>
+                                <th className="pb-2.5 text-center">Kepatuhan K3</th>
+                                <th className="pb-2.5 text-center">Grade</th>
+                                <th className="pb-2.5">Atasan Penilai</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-[#16273c] text-slate-300">
-                            {filteredEmployees.length > 0 ? (
-                                filteredEmployees.map((e) => (
-                                    <tr key={e.id} className="hover:bg-[#0c1a2d]/50 transition">
-                                        <td className="py-3 font-mono font-bold text-amber-400">{e.nik}</td>
-                                        <td className="font-bold text-white">{e.full_name}</td>
+                            {filteredEvaluations.length > 0 ? (
+                                filteredEvaluations.map((item) => (
+                                    <tr key={item.id} className="hover:bg-[#0c1a2d]/50 transition">
+                                        <td className="py-3 font-bold text-white">{item.employee_name}</td>
                                         <td>
                                             <span className="bg-[#112233] border border-[#1e3a5f] text-slate-300 text-[10px] px-2 py-0.5 rounded">
-                                                {e.department}
+                                                {item.department}
                                             </span>
                                         </td>
-                                        <td className="text-slate-300">{e.position}</td>
-                                        <td className="font-mono text-slate-400 text-[11px]">{e.roster}</td>
-                                        <td className="text-right font-mono text-emerald-400 font-bold">
-                                            Rp {Number(e.salary).toLocaleString('id-ID')}
+                                        <td className="font-mono text-slate-400 text-[11px]">{item.review_period}</td>
+                                        <td className="text-center font-mono font-bold text-cyan-400">
+                                            {Number(item.productivity_score).toFixed(1)}
+                                        </td>
+                                        <td className="text-center font-mono font-bold text-amber-400">
+                                            {Number(item.k3_compliance_score).toFixed(1)}
                                         </td>
                                         <td className="text-center">
-                                            <span className="bg-emerald-950/80 text-emerald-400 border border-emerald-800/40 text-[10px] px-2 py-0.5 rounded font-bold">
-                                                {e.status}
+                                            <span
+                                                className={`text-[10px] px-2 py-0.5 rounded border font-bold ${item.grade === 'GRADE A'
+                                                    ? 'bg-emerald-950/80 text-emerald-400 border-emerald-800/40'
+                                                    : 'bg-cyan-950/80 text-cyan-400 border-cyan-800/40'
+                                                    }`}
+                                            >
+                                                {item.grade}
                                             </span>
                                         </td>
+                                        <td className="text-slate-300">{item.evaluator}</td>
                                     </tr>
                                 ))
                             ) : (
                                 <tr>
                                     <td colSpan={7} className="py-8 text-center text-slate-500 italic">
-                                        Belum ada data karyawan yang cocok dengan pencarian.
+                                        Belum ada data evaluasi kinerja yang cocok dengan pencarian.
                                     </td>
                                 </tr>
                             )}
@@ -445,41 +452,28 @@ export default function HrdManagementPage() {
                 </div>
             </div>
 
-            {/* Modal Tambah Karyawan */}
+            {/* Modal Input Penilaian Baru */}
             {showModal && (
                 <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
                     <div className="bg-[#0a1625] border border-[#1b2e46] rounded-xl p-6 w-full max-w-lg shadow-2xl space-y-4">
                         <h2 className="text-sm font-bold text-white uppercase tracking-wider">
-                            Pendaftaran Personalia PT. Jangkar Energi Eka Perkasa
+                            Input Penilaian Kinerja & KPI Karyawan
                         </h2>
-                        <form onSubmit={handleAddEmployee} className="space-y-3">
+                        <form onSubmit={handleAddEvaluation} className="space-y-3">
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className="text-[11px] text-slate-400 block mb-1">NIK (Kosongkan jika otomatis)</label>
-                                    <input
-                                        type="text"
-                                        value={nik}
-                                        onChange={(e) => setNik(e.target.value)}
-                                        placeholder="JEEP-2026-..."
-                                        className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400 font-mono"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-[11px] text-slate-400 block mb-1">Nama Lengkap</label>
+                                    <label className="text-[11px] text-slate-400 block mb-1">Nama Lengkap Karyawan</label>
                                     <input
                                         type="text"
                                         required
-                                        value={fullName}
-                                        onChange={(e) => setFullName(e.target.value)}
-                                        placeholder="Contoh: Ahmad Yani"
+                                        value={employeeName}
+                                        onChange={(e) => setEmployeeName(e.target.value)}
+                                        placeholder="Contoh: Budi Santoso"
                                         className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400"
                                     />
                                 </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className="text-[11px] text-slate-400 block mb-1">Departemen / Divisi</label>
+                                    <label className="text-[11px] text-slate-400 block mb-1">Departemen</label>
                                     <select
                                         value={department}
                                         onChange={(e) => setDepartment(e.target.value)}
@@ -489,49 +483,61 @@ export default function HrdManagementPage() {
                                         <option value="Geologi & Eksplorasi">Geologi & Eksplorasi</option>
                                         <option value="Plant & Workshop">Plant & Workshop</option>
                                         <option value="HSE & K3">HSE & K3 Tambang</option>
-                                        <option value="Logistik & BBM">Logistik & Fuel BBM</option>
+                                        <option value="Human Resources">Human Resources (HRD)</option>
                                         <option value="Finance & ADM">Finance & ADM</option>
-                                        <option value="General Affair">General Affair & Camp</option>
                                     </select>
                                 </div>
+                            </div>
+
+                            <div className="grid grid-cols-3 gap-3">
                                 <div>
-                                    <label className="text-[11px] text-slate-400 block mb-1">Jabatan / Posisi</label>
+                                    <label className="text-[11px] text-slate-400 block mb-1">Periode Evaluasi</label>
                                     <input
                                         type="text"
                                         required
-                                        value={position}
-                                        onChange={(e) => setPosition(e.target.value)}
-                                        placeholder="Contoh: Operator Excavator PC200"
-                                        className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400"
+                                        value={reviewPeriod}
+                                        onChange={(e) => setReviewPeriod(e.target.value)}
+                                        placeholder="Semester I – 2026"
+                                        className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400 font-mono"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[11px] text-slate-400 block mb-1">Skor Produktivitas (0–100)</label>
+                                    <input
+                                        type="number"
+                                        step="0.1"
+                                        min="0"
+                                        max="100"
+                                        required
+                                        value={productivityScore}
+                                        onChange={(e) => setProductivityScore(e.target.value)}
+                                        className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400 font-mono"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[11px] text-slate-400 block mb-1">Skor Kepatuhan K3 (0–100)</label>
+                                    <input
+                                        type="number"
+                                        step="0.1"
+                                        min="0"
+                                        max="100"
+                                        required
+                                        value={k3ComplianceScore}
+                                        onChange={(e) => setK3ComplianceScore(e.target.value)}
+                                        className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400 font-mono"
                                     />
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className="text-[11px] text-slate-400 block mb-1">Skema Roster Kerja</label>
-                                    <select
-                                        value={roster}
-                                        onChange={(e) => setRoster(e.target.value)}
-                                        className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400"
-                                    >
-                                        <option value="8:2 (8 Minggu Kerja, 2 Minggu Off)">8:2 (8 Minggu On, 2 Off)</option>
-                                        <option value="10:2 (10 Minggu Kerja, 2 Minggu Off)">10:2 (10 Minggu On, 2 Off)</option>
-                                        <option value="6:2 (6 Minggu Kerja, 2 Minggu Off)">6:2 (6 Minggu On, 2 Off)</option>
-                                        <option value="5:2 (Non-Roster Site Kantor)">5:2 (Non-Roster Kantor)</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="text-[11px] text-slate-400 block mb-1">Gaji Pokok & Tunjangan (IDR)</label>
-                                    <input
-                                        type="number"
-                                        required
-                                        value={salary}
-                                        onChange={(e) => setSalary(e.target.value)}
-                                        placeholder="10000000"
-                                        className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400 font-mono"
-                                    />
-                                </div>
+                            <div>
+                                <label className="text-[11px] text-slate-400 block mb-1">Atasan Penilai (Evaluator)</label>
+                                <input
+                                    type="text"
+                                    value={evaluator}
+                                    onChange={(e) => setEvaluator(e.target.value)}
+                                    placeholder="Contoh: Mine Operation Manager (Otomatis nama Anda jika kosong)"
+                                    className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400"
+                                />
                             </div>
 
                             <div className="flex justify-end gap-2 pt-2">
@@ -547,7 +553,7 @@ export default function HrdManagementPage() {
                                     disabled={submitting}
                                     className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs transition cursor-pointer"
                                 >
-                                    {submitting ? 'Menyimpan...' : 'Simpan Karyawan'}
+                                    {submitting ? 'Menyimpan...' : 'Simpan Penilaian'}
                                 </button>
                             </div>
                         </form>
