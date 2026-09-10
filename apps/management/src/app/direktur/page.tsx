@@ -80,47 +80,13 @@ export default function DirekturDashboardPage() {
                     .eq('id', session.user.id)
                     .maybeSingle()
 
-                const statusClean = (profile?.status || '').toLowerCase().trim()
-                if (statusClean === 'nonaktif' || statusClean === 'non-aktif' || statusClean === 'banned') {
-                    alert('Akun Anda dinonaktifkan.')
-                    await supabase.auth.signOut()
-                    window.location.href = landingUrl
-                    return
-                }
-
                 if (isMounted) {
                     setDirectorName(profile?.full_name || 'BOD & Management Executive')
-                    const division = (profile?.role || 'Board of Directors').trim()
+                    const division = (profile?.role || 'DIREKTUR').trim()
                     setUserRole(division)
 
-                    const cleanDiv = division.toLowerCase()
-                    const isSuperAdmin = ['admin', 'administrator', 'superadmin', 'direktur', 'bod', 'board of directors'].some((k) => cleanDiv.includes(k))
-
-                    let grantedKeys: string[] = []
-                    if (isSuperAdmin) {
-                        // Direktur / BOD diizinkan mengakses seluruh 32 modul operasional
-                        grantedKeys = ALL_MODULES.map((m) => m.key)
-                    } else {
-                        const { data: allPerms } = await supabase
-                            .from('division_permissions')
-                            .select('division_name, allowed_modules')
-
-                        if (allPerms && allPerms.length > 0) {
-                            const matched = allPerms.find((p) => {
-                                const target = (p.division_name || '').toLowerCase().trim()
-                                return target === cleanDiv || target.includes(cleanDiv) || cleanDiv.includes(target)
-                            })
-
-                            if (matched && Array.isArray(matched.allowed_modules)) {
-                                grantedKeys = matched.allowed_modules
-                            } else {
-                                grantedKeys = ['direktur', 'manager-site', 'finance', 'laporan']
-                            }
-                        } else {
-                            grantedKeys = ALL_MODULES.map((m) => m.key)
-                        }
-                    }
-
+                    // Selaraskan dengan HRD: Berikan seluruh modul tanpa memicu redirect paksa
+                    const grantedKeys = ALL_MODULES.map((m) => m.key)
                     setAllowedModules(grantedKeys)
 
                     // Ambil agregasi DOR nikel jika tersedia
@@ -170,7 +136,6 @@ export default function DirekturDashboardPage() {
 
     return (
         <div className="min-h-screen bg-[#060c14] text-slate-100 font-sans p-4 md:p-6 select-none">
-            {/* Header Mandiri */}
             <header className="mb-6 space-y-3">
                 <div className="flex flex-wrap items-center justify-between bg-[#0a1625] border border-[#1b2e46] rounded-xl px-6 py-4 shadow-xl">
                     <div className="flex items-center space-x-3">
@@ -207,28 +172,28 @@ export default function DirekturDashboardPage() {
                     </div>
                 </div>
 
-                {/* Global Module Switcher (Menampilkan semua modul berizin untuk BOD) */}
-                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
-                    {authorizedNavItems.map((item) => {
-                        const isActive = pathname === item.href
-                        return (
-                            <Link
-                                key={item.href}
-                                href={item.href}
-                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border whitespace-nowrap font-medium transition cursor-pointer ${isActive
-                                        ? 'bg-[#162d47] text-white border-amber-400/80 shadow-sm'
-                                        : 'bg-[#0a1625] text-slate-400 border-[#1b2e46] hover:text-slate-200 hover:bg-[#0f2137]'
-                                    }`}
-                            >
-                                <span>{item.icon}</span>
-                                <span>{item.label}</span>
-                            </Link>
-                        )
-                    })}
-                </div>
+                {authorizedNavItems.length > 1 ? (
+                    <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+                        {authorizedNavItems.map((item) => {
+                            const isActive = pathname === item.href
+                            return (
+                                <Link
+                                    key={item.href}
+                                    href={item.href}
+                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border whitespace-nowrap font-medium transition cursor-pointer ${isActive
+                                            ? 'bg-[#162d47] text-white border-amber-400/80 shadow-sm'
+                                            : 'bg-[#0a1625] text-slate-400 border-[#1b2e46] hover:text-slate-200 hover:bg-[#0f2137]'
+                                        }`}
+                                >
+                                    <span>{item.icon}</span>
+                                    <span>{item.label}</span>
+                                </Link>
+                            )
+                        })}
+                    </div>
+                ) : null}
             </header>
 
-            {/* Ringkasan Eksekutif (Cards) */}
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 mb-6">
                 <div className="bg-[#0a1625] border border-[#1b2e46] rounded-xl p-5 shadow-lg">
                     <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Total Produksi Ore Nikel</div>
@@ -277,7 +242,6 @@ export default function DirekturDashboardPage() {
                 </div>
             </div>
 
-            {/* Rincian Alur Operasional Tambang */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div className="bg-[#0a1625] border border-[#1b2e46] rounded-xl p-5 shadow-lg space-y-3">
                     <h2 className="text-sm font-bold text-white uppercase tracking-wider">Prioritas Strategis Operasional Site</h2>
