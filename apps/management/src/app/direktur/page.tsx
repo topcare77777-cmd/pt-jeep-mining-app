@@ -2,17 +2,56 @@
 
 import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@supabase/supabase-js'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
+// 32 Modul Lengkap Tambang Nikel PT. Jangkar Energi Eka Perkasa
+const ALL_MODULES = [
+    { key: 'manager-site', label: 'Pit Produksi', icon: '⛏️', href: '/manager-site' },
+    { key: 'geologi', label: 'Geologi & Eksplorasi', icon: '🧭', href: '/geologi' },
+    { key: 'fleet', label: 'Alat Berat', icon: '🚜', href: '/fleet' },
+    { key: 'fleet-maintenance', label: 'Workshop Fleet', icon: '🔧', href: '/fleet-maintenance' },
+    { key: 'sparepart', label: 'Sparepart Gudang', icon: '📦', href: '/sparepart' },
+    { key: 'safety', label: 'Inspeksi K3 (HSE)', icon: '⛑️', href: '/safety' },
+    { key: 'ritase', label: 'Ritase', icon: '🚛', href: '/ritase' },
+    { key: 'jetty', label: 'Jetty Port', icon: '🚢', href: '/jetty' },
+    { key: 'environment', label: 'Lingkungan', icon: '🌱', href: '/environment' },
+    { key: 'lingkungan', label: 'Kanal Sedimen', icon: '🏞️', href: '/lingkungan' },
+    { key: 'bbm', label: 'BBM Solar', icon: '⛽', href: '/bbm' },
+    { key: 'finance', label: 'Keuangan', icon: '💰', href: '/finance' },
+    { key: 'adm', label: 'ADM & Surat', icon: '📋', href: '/adm' },
+    { key: 'hrd', label: 'HRD & Payroll', icon: '👷‍♂️', href: '/hrd' },
+    { key: 'ga', label: 'GA & Fasilitas', icon: '🚙', href: '/ga' },
+    { key: 'assets', label: 'Aset Tambang', icon: '🏷️', href: '/assets' },
+    { key: 'mess', label: 'Mess Camp', icon: '🏠', href: '/mess' },
+    { key: 'catering', label: 'Katering', icon: '🍱', href: '/catering' },
+    { key: 'clinic', label: 'Klinik Site', icon: '🏥', href: '/clinic' },
+    { key: 'security', label: 'Security Gate', icon: '🛡️', href: '/security' },
+    { key: 'radio', label: 'Radio Komunikasi', icon: '📻', href: '/radio' },
+    { key: 'legal', label: 'Legalitas IUP', icon: '⚖️', href: '/legal' },
+    { key: 'csr', label: 'CSR Masyarakat', icon: '🤝', href: '/csr' },
+    { key: 'vendor', label: 'Vendor', icon: '🏬', href: '/vendor' },
+    { key: 'transport', label: 'Transport Kru', icon: '🚌', href: '/transport' },
+    { key: 'training', label: 'Training K3', icon: '🎓', href: '/training' },
+    { key: 'performance', label: 'Kinerja KPI', icon: '📈', href: '/performance' },
+    { key: 'it-helpdesk', label: 'IT Helpdesk', icon: '💻', href: '/it-helpdesk' },
+    { key: 'helpdesk', label: 'Helpdesk GA', icon: '🛠️', href: '/helpdesk' },
+    { key: 'investor', label: 'Investor & RKAB', icon: '📊', href: '/investor' },
+    { key: 'direktur', label: 'Eksekutif BOD', icon: '🏛️', href: '/direktur' },
+    { key: 'laporan', label: 'Cetak Laporan', icon: '📄', href: '/laporan' },
+]
+
 export default function DirekturDashboardPage() {
     const pathname = usePathname()
+    const router = useRouter()
     const [loading, setLoading] = useState(true)
     const [directorName, setDirectorName] = useState('Direktur Operasional')
+    const [userRole, setUserRole] = useState('Board of Directors')
+    const [allowedModules, setAllowedModules] = useState<string[]>([])
     const [stats, setStats] = useState({
         totalOreTon: 42500,
         totalOverburdenBcm: 118000,
@@ -37,12 +76,12 @@ export default function DirekturDashboardPage() {
 
                 const { data: profile } = await supabase
                     .from('profiles')
-                    .select('full_name, status')
+                    .select('full_name, role, status')
                     .eq('id', session.user.id)
                     .maybeSingle()
 
                 const statusClean = (profile?.status || '').toLowerCase().trim()
-                if (statusClean === 'nonaktif' || statusClean === 'banned') {
+                if (statusClean === 'nonaktif' || statusClean === 'non-aktif' || statusClean === 'banned') {
                     alert('Akun Anda dinonaktifkan.')
                     await supabase.auth.signOut()
                     window.location.href = landingUrl
@@ -51,6 +90,38 @@ export default function DirekturDashboardPage() {
 
                 if (isMounted) {
                     setDirectorName(profile?.full_name || 'BOD & Management Executive')
+                    const division = (profile?.role || 'Board of Directors').trim()
+                    setUserRole(division)
+
+                    const cleanDiv = division.toLowerCase()
+                    const isSuperAdmin = ['admin', 'administrator', 'superadmin', 'direktur', 'bod', 'board of directors'].some((k) => cleanDiv.includes(k))
+
+                    let grantedKeys: string[] = []
+                    if (isSuperAdmin) {
+                        // Direktur / BOD diizinkan mengakses seluruh 32 modul operasional
+                        grantedKeys = ALL_MODULES.map((m) => m.key)
+                    } else {
+                        const { data: allPerms } = await supabase
+                            .from('division_permissions')
+                            .select('division_name, allowed_modules')
+
+                        if (allPerms && allPerms.length > 0) {
+                            const matched = allPerms.find((p) => {
+                                const target = (p.division_name || '').toLowerCase().trim()
+                                return target === cleanDiv || target.includes(cleanDiv) || cleanDiv.includes(target)
+                            })
+
+                            if (matched && Array.isArray(matched.allowed_modules)) {
+                                grantedKeys = matched.allowed_modules
+                            } else {
+                                grantedKeys = ['direktur', 'manager-site', 'finance', 'laporan']
+                            }
+                        } else {
+                            grantedKeys = ALL_MODULES.map((m) => m.key)
+                        }
+                    }
+
+                    setAllowedModules(grantedKeys)
 
                     // Ambil agregasi DOR nikel jika tersedia
                     const { data: dorData } = await supabase
@@ -84,16 +155,9 @@ export default function DirekturDashboardPage() {
         window.location.href = landingUrl
     }
 
-    const navLinks = [
-        { href: '/direktur', label: 'Eksekutif BOD', icon: '🏛️' },
-        { href: '/manager-site', label: 'Pit Produksi', icon: '⛏️' },
-        { href: '/fleet', label: 'Alat Berat', icon: '🚜' },
-        { href: '/fleet-maintenance', label: 'Workshop Fleet', icon: '🔧' },
-        { href: '/bbm', label: 'BBM Solar', icon: '⛽' },
-        { href: '/finance', label: 'Keuangan Site', icon: '💰' },
-        { href: '/safety', label: 'Inspeksi K3', icon: '⛑️' },
-        { href: '/laporan', label: 'Cetak Laporan', icon: '📄' },
-    ]
+    const authorizedNavItems = ALL_MODULES.filter((item) =>
+        allowedModules.includes(item.key)
+    )
 
     if (loading) {
         return (
@@ -120,24 +184,32 @@ export default function DirekturDashboardPage() {
                                 <span>Konsolidasi Produksi Tambang Nikel, Kesiapan Armada, & Pengawasan Finansial</span>
                                 <span className="text-slate-600">•</span>
                                 <span className="text-slate-300 font-semibold">{directorName}</span>
-                                <span className="bg-[#112233] border border-[#1e3a5f] text-slate-300 text-[10px] px-2 py-0.5 rounded font-mono">
-                                    Board of Directors
+                                <span className="bg-[#112233] border border-[#1e3a5f] text-amber-300 text-[10px] px-2 py-0.5 rounded font-mono font-bold">
+                                    {userRole}
                                 </span>
                             </p>
                         </div>
                     </div>
 
-                    <button
-                        onClick={handleLogout}
-                        className="bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/50 text-rose-300 text-xs px-4 py-2 rounded-lg transition cursor-pointer"
-                    >
-                        Keluar ke Beranda
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <Link
+                            href="/"
+                            className="bg-[#102033] hover:bg-[#162b45] border border-[#1e3757] text-slate-300 text-xs px-3 py-2 rounded-lg transition"
+                        >
+                            ← Beranda Portal
+                        </Link>
+                        <button
+                            onClick={handleLogout}
+                            className="bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/50 text-rose-300 text-xs px-4 py-2 rounded-lg transition cursor-pointer"
+                        >
+                            Keluar
+                        </button>
+                    </div>
                 </div>
 
-                {/* Global Module Switcher */}
+                {/* Global Module Switcher (Menampilkan semua modul berizin untuk BOD) */}
                 <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
-                    {navLinks.map((item) => {
+                    {authorizedNavItems.map((item) => {
                         const isActive = pathname === item.href
                         return (
                             <Link

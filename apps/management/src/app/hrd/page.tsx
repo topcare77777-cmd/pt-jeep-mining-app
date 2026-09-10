@@ -9,25 +9,26 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
-interface PerformanceItem {
+interface HrdEmployeeItem {
     id: string
     created_at?: string
-    employee_name: string
+    full_name: string
+    nik: string
     department: string
-    review_period: string
-    productivity_score: number
-    k3_compliance_score: number
-    grade: string
-    evaluator: string
+    position: string
+    employment_status: string
+    join_date: string
+    phone: string
 }
 
+// 32 Modul Lengkap Tambang Nikel PT. Jangkar Energi Eka Perkasa
 const ALL_MODULES = [
     { key: 'manager-site', label: 'Pit Produksi', icon: '⛏️', href: '/manager-site' },
     { key: 'geologi', label: 'Geologi & Eksplorasi', icon: '🧭', href: '/geologi' },
     { key: 'fleet', label: 'Alat Berat', icon: '🚜', href: '/fleet' },
     { key: 'fleet-maintenance', label: 'Workshop Fleet', icon: '🔧', href: '/fleet-maintenance' },
-    { key: 'sparepart', label: 'Sparepart', icon: '📦', href: '/sparepart' },
-    { key: 'safety', label: 'Inspeksi K3', icon: '⛑️', href: '/safety' },
+    { key: 'sparepart', label: 'Sparepart Gudang', icon: '📦', href: '/sparepart' },
+    { key: 'safety', label: 'Inspeksi K3 (HSE)', icon: '⛑️', href: '/safety' },
     { key: 'ritase', label: 'Ritase', icon: '🚛', href: '/ritase' },
     { key: 'jetty', label: 'Jetty Port', icon: '🚢', href: '/jetty' },
     { key: 'environment', label: 'Lingkungan', icon: '🌱', href: '/environment' },
@@ -42,7 +43,7 @@ const ALL_MODULES = [
     { key: 'catering', label: 'Katering', icon: '🍱', href: '/catering' },
     { key: 'clinic', label: 'Klinik Site', icon: '🏥', href: '/clinic' },
     { key: 'security', label: 'Security Gate', icon: '🛡️', href: '/security' },
-    { key: 'radio', label: 'Radio Dispatch', icon: '📻', href: '/radio' },
+    { key: 'radio', label: 'Radio Komunikasi', icon: '📻', href: '/radio' },
     { key: 'legal', label: 'Legalitas IUP', icon: '⚖️', href: '/legal' },
     { key: 'csr', label: 'CSR Masyarakat', icon: '🤝', href: '/csr' },
     { key: 'vendor', label: 'Vendor', icon: '🏬', href: '/vendor' },
@@ -56,24 +57,25 @@ const ALL_MODULES = [
     { key: 'laporan', label: 'Cetak Laporan', icon: '📄', href: '/laporan' },
 ]
 
-export default function PerformancePage() {
+export default function HrdManagementPage() {
     const pathname = usePathname()
     const router = useRouter()
     const [loading, setLoading] = useState(true)
-    const [userName, setUserName] = useState('Staff HRD')
-    const [userRole, setUserRole] = useState('HRD Dept')
+    const [userName, setUserName] = useState('HRD Manager')
+    const [userRole, setUserRole] = useState('HRD & Payroll')
     const [allowedModules, setAllowedModules] = useState<string[]>([])
-    const [evaluations, setEvaluations] = useState<PerformanceItem[]>([])
+    const [employees, setEmployees] = useState<HrdEmployeeItem[]>([])
     const [searchQuery, setSearchQuery] = useState('')
 
-    // State Modal Input Penilaian Kinerja Baru
+    // State Modal Input Karyawan Baru
     const [showModal, setShowModal] = useState(false)
-    const [employeeName, setEmployeeName] = useState('')
+    const [fullName, setFullName] = useState('')
+    const [nik, setNik] = useState('')
     const [department, setDepartment] = useState('Produksi Pit')
-    const [reviewPeriod, setReviewPeriod] = useState('Semester I – 2026')
-    const [productivityScore, setProductivityScore] = useState('90.0')
-    const [k3ComplianceScore, setK3ComplianceScore] = useState('95.0')
-    const [evaluator, setEvaluator] = useState('')
+    const [position, setPosition] = useState('Operator Excavator')
+    const [employmentStatus, setEmploymentStatus] = useState('Tetap')
+    const [joinDate, setJoinDate] = useState(new Date().toISOString().split('T')[0])
+    const [phone, setPhone] = useState('')
     const [submitting, setSubmitting] = useState(false)
 
     const landingUrl = process.env.NEXT_PUBLIC_LANDING_URL || 'https://pt-jeep.vercel.app'
@@ -81,7 +83,7 @@ export default function PerformancePage() {
     useEffect(() => {
         let isMounted = true
 
-        async function initPerformance() {
+        async function initHrd() {
             try {
                 const { data: { session } } = await supabase.auth.getSession()
                 if (!session) {
@@ -104,11 +106,12 @@ export default function PerformancePage() {
                 }
 
                 if (isMounted) {
-                    setUserName(profile?.full_name || 'Staff HRD')
-                    const division = (profile?.role || 'Human Resources (HRD)').trim()
+                    setUserName(profile?.full_name || 'HRD Superintendent')
+                    const division = (profile?.role || 'HRD & Payroll').trim()
                     setUserRole(division)
 
-                    const isSuperAdmin = ['admin', 'administrator', 'superadmin'].includes(division.toLowerCase())
+                    const cleanDiv = division.toLowerCase()
+                    const isSuperAdmin = ['admin', 'administrator', 'superadmin', 'direktur', 'bod'].some((k) => cleanDiv.includes(k))
 
                     let grantedKeys: string[] = []
                     if (isSuperAdmin) {
@@ -119,66 +122,61 @@ export default function PerformancePage() {
                             .select('division_name, allowed_modules')
 
                         if (allPerms && allPerms.length > 0) {
-                            const cleanDiv = division.toLowerCase()
                             const matched = allPerms.find((p) => {
                                 const target = (p.division_name || '').toLowerCase().trim()
-                                return (
-                                    target === cleanDiv ||
-                                    target.includes(cleanDiv) ||
-                                    cleanDiv.includes(target) ||
-                                    (cleanDiv.includes('hrd') && target.includes('hrd')) ||
-                                    (cleanDiv.includes('human') && target.includes('human'))
-                                )
+                                return target === cleanDiv || target.includes(cleanDiv) || cleanDiv.includes(target)
                             })
 
                             if (matched && Array.isArray(matched.allowed_modules)) {
                                 grantedKeys = matched.allowed_modules
                             } else {
-                                grantedKeys = ['performance', 'hrd']
+                                // Default izinkan modul HRD, Kinerja, dan Laporan untuk staf HRD
+                                grantedKeys = ['hrd', 'performance', 'laporan', 'manager-site']
                             }
                         } else {
-                            grantedKeys = ['performance', 'hrd']
+                            grantedKeys = ALL_MODULES.map((m) => m.key)
                         }
                     }
 
-                    // Route Guard jika akun tidak memiliki izin modul kinerja
-                    if (!isSuperAdmin && grantedKeys.length > 0 && !grantedKeys.includes('performance')) {
-                        alert('Divisi Anda tidak memiliki hak akses ke modul Penilaian Kinerja.')
+                    // Fleksibel Route Guard untuk HRD
+                    const isAllowedHrd = isSuperAdmin || grantedKeys.includes('hrd') || cleanDiv.includes('hrd') || cleanDiv.includes('human')
+                    if (!isAllowedHrd) {
+                        alert('Divisi Anda tidak memiliki hak akses ke modul HRD & Payroll.')
                         router.replace('/')
                         return
                     }
 
                     setAllowedModules(grantedKeys)
 
-                    // Ambil data evaluasi dari Supabase
+                    // Ambil data karyawan dari Supabase
                     const { data, error } = await supabase
-                        .from('performance_evaluations')
+                        .from('hrd_employees')
                         .select('*')
                         .order('created_at', { ascending: false })
 
                     if (!error && data && data.length > 0) {
-                        setEvaluations(data)
+                        setEmployees(data)
                     } else {
-                        setEvaluations([
+                        setEmployees([
                             {
                                 id: '1',
-                                employee_name: 'Budi Santoso',
+                                full_name: 'Budi Santoso',
+                                nik: 'JEEP-2024-001',
                                 department: 'Produksi Pit',
-                                review_period: 'Semester I – 2026',
-                                productivity_score: 92.5,
-                                k3_compliance_score: 96.0,
-                                grade: 'GRADE A',
-                                evaluator: 'Mine Operation Manager',
+                                position: 'Senior Operator Excavator',
+                                employment_status: 'Tetap',
+                                join_date: '2023-01-15',
+                                phone: '081234567890',
                             },
                             {
                                 id: '2',
-                                employee_name: 'Joko Widodo',
-                                department: 'Plant & Workshop',
-                                review_period: 'Semester I – 2026',
-                                productivity_score: 88.0,
-                                k3_compliance_score: 90.0,
-                                grade: 'GRADE B',
-                                evaluator: 'Plant Superintendent',
+                                full_name: 'Siti Rahmawati',
+                                nik: 'JEEP-2024-045',
+                                department: 'Human Resources',
+                                position: 'HRD & Payroll Officer',
+                                employment_status: 'Tetap',
+                                join_date: '2023-05-10',
+                                phone: '082198765432',
                             },
                         ])
                     }
@@ -186,64 +184,48 @@ export default function PerformancePage() {
                     setLoading(false)
                 }
             } catch (err) {
-                console.error('Error load performance:', err)
+                console.error('Error load hrd:', err)
                 if (isMounted) setLoading(false)
             }
         }
 
-        initPerformance()
-
-        return () => {
-            isMounted = false
-        }
+        initHrd()
+        return () => { isMounted = false }
     }, [landingUrl, router])
 
-    const calculateGrade = (prod: number, k3: number) => {
-        const avg = (prod + k3) / 2
-        if (avg >= 90) return 'GRADE A'
-        if (avg >= 80) return 'GRADE B'
-        if (avg >= 70) return 'GRADE C'
-        return 'GRADE D'
-    }
-
-    const handleAddEvaluation = async (e: React.FormEvent) => {
+    const handleAddEmployee = async (e: React.FormEvent) => {
         e.preventDefault()
-        if (!employeeName) return
+        if (!fullName || !nik) return
 
         setSubmitting(true)
-        const prod = parseFloat(productivityScore) || 0
-        const k3 = parseFloat(k3ComplianceScore) || 0
-        const finalGrade = calculateGrade(prod, k3)
-
         const payload = {
-            employee_name: employeeName,
+            full_name: fullName,
+            nik: nik.toUpperCase(),
             department,
-            review_period: reviewPeriod,
-            productivity_score: prod,
-            k3_compliance_score: k3,
-            grade: finalGrade,
-            evaluator: evaluator || userName,
+            position,
+            employment_status: employmentStatus,
+            join_date: joinDate,
+            phone: phone || '-',
         }
 
-        const { data, error } = await supabase
-            .from('performance_evaluations')
-            .insert([payload])
-            .select()
+        const { data, error } = await supabase.from('hrd_employees').insert([payload]).select()
 
         if (!error && data) {
-            setEvaluations([data[0], ...evaluations])
+            setEmployees([data[0], ...employees])
             setShowModal(false)
-            setEmployeeName('')
+            setFullName('')
+            setNik('')
         } else {
-            setEvaluations([
+            setEmployees([
                 {
                     id: Date.now().toString(),
                     ...payload,
                 },
-                ...evaluations,
+                ...employees,
             ])
             setShowModal(false)
-            setEmployeeName('')
+            setFullName('')
+            setNik('')
         }
 
         setSubmitting(false)
@@ -254,20 +236,16 @@ export default function PerformancePage() {
         window.location.href = landingUrl
     }
 
-    const totalEvaluated = evaluations.length
-    const avgProductivity = totalEvaluated > 0
-        ? (evaluations.reduce((acc, curr) => acc + Number(curr.productivity_score || 0), 0) / totalEvaluated).toFixed(1)
-        : '0.0'
-    const gradeACount = evaluations.filter((e) => e.grade === 'GRADE A').length
+    const totalEmployees = employees.length
+    const permanentCount = employees.filter((e) => (e?.employment_status || '').toLowerCase() === 'tetap').length
 
-    const filteredEvaluations = evaluations.filter((item) =>
-        item.employee_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.department.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.review_period.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.evaluator.toLowerCase().includes(searchQuery.toLowerCase())
+    const filteredEmployees = employees.filter((item) =>
+        (item?.full_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (item?.nik || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (item?.department || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (item?.position || '').toLowerCase().includes(searchQuery.toLowerCase())
     )
 
-    // Hanya modul yang diizinkan untuk divisi pengguna yang dirender
     const authorizedNavItems = ALL_MODULES.filter((item) =>
         allowedModules.includes(item.key)
     )
@@ -277,7 +255,7 @@ export default function PerformancePage() {
             <div className="min-h-screen bg-[#060c14] flex flex-col items-center justify-center text-white font-sans">
                 <div className="w-10 h-10 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mb-4"></div>
                 <p className="text-xs text-slate-400 font-mono">
-                    Sinkronisasi Matriks Evaluasi & Kinerja Karyawan...
+                    Sinkronisasi Data Personalia & Payroll PT. Jangkar Energi Eka Perkasa...
                 </p>
             </div>
         )
@@ -289,14 +267,14 @@ export default function PerformancePage() {
             <header className="mb-6 space-y-3">
                 <div className="flex flex-wrap items-center justify-between bg-[#0a1625] border border-[#1b2e46] rounded-xl px-6 py-4 shadow-xl">
                     <div className="flex items-center space-x-3">
-                        <span className="text-3xl">⭐</span>
+                        <span className="text-3xl">👷‍♂️</span>
                         <div>
                             <h1 className="text-xl md:text-2xl font-black tracking-wide text-white">
-                                Penilaian Kinerja Karyawan PT. Jangkar Energi Eka Perkasa
+                                Manajemen HRD & Payroll PT. Jangkar Energi Eka Perkasa
                             </h1>
                             <p className="text-xs text-amber-400 flex items-center gap-1.5 mt-0.5">
                                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                                <span>Evaluasi Produktivitas, Kepatuhan K3, & Grade Penilaian Kru Site Nikel</span>
+                                <span>Database Karyawan Site, Absensi, Penggajian, & Hubungan Industrial</span>
                                 <span className="text-slate-600">•</span>
                                 <span className="text-slate-300 font-semibold">{userName}</span>
                                 <span className="bg-[#112233] border border-[#1e3a5f] text-cyan-300 text-[10px] px-2 py-0.5 rounded font-mono font-bold">
@@ -322,7 +300,7 @@ export default function PerformancePage() {
                     </div>
                 </div>
 
-                {/* Bilah Navigasi Dinamis Terfilter Sesuai Izin Divisi */}
+                {/* Bilah Navigasi Dinamis Terfilter Sesuai Akses Divisi */}
                 {authorizedNavItems.length > 1 ? (
                     <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
                         {authorizedNavItems.map((item) => {
@@ -332,8 +310,8 @@ export default function PerformancePage() {
                                     key={item.href}
                                     href={item.href}
                                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border whitespace-nowrap font-medium transition cursor-pointer ${isActive
-                                        ? 'bg-[#162d47] text-white border-amber-400/80 shadow-sm'
-                                        : 'bg-[#0a1625] text-slate-400 border-[#1b2e46] hover:text-slate-200 hover:bg-[#0f2137]'
+                                            ? 'bg-[#162d47] text-white border-amber-400/80 shadow-sm'
+                                            : 'bg-[#0a1625] text-slate-400 border-[#1b2e46] hover:text-slate-200 hover:bg-[#0f2137]'
                                         }`}
                                 >
                                     <span>{item.icon}</span>
@@ -350,34 +328,34 @@ export default function PerformancePage() {
                 )}
             </header>
 
-            {/* KPI Kinerja */}
+            {/* KPI Cards HRD */}
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                 <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
-                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Total Karyawan Dievaluasi</h3>
-                    <div className="text-2xl font-black text-white font-mono">{totalEvaluated} Orang</div>
-                    <p className="mt-2 text-[11px] text-slate-400">Pencatatan Penilaian Site Nikel</p>
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Total Karyawan Site</h3>
+                    <div className="text-2xl font-black text-white font-mono">{totalEmployees} Orang</div>
+                    <p className="mt-2 text-[11px] text-slate-400">Kru Operasional & Staff Tambang</p>
                 </div>
 
                 <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
-                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Rata-Rata Produktivitas</h3>
-                    <div className="text-2xl font-black text-cyan-400 font-mono">{avgProductivity} / 100</div>
-                    <p className="mt-2 text-[11px] text-emerald-400 font-semibold">Standar Kinerja Unggul</p>
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Karyawan Tetap</h3>
+                    <div className="text-2xl font-black text-emerald-400 font-mono">{permanentCount} Orang</div>
+                    <p className="mt-2 text-[11px] text-emerald-400 font-semibold">Status PKWTT Aktif</p>
                 </div>
 
                 <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
-                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Grade A (Excellent)</h3>
-                    <div className="text-2xl font-black text-amber-400 font-mono">{gradeACount} Karyawan</div>
-                    <p className="mt-2 text-[11px] text-slate-400">Memenuhi Target Tertinggi</p>
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Payroll & Gaji</h3>
+                    <div className="text-2xl font-black text-amber-400 font-mono">On Schedule</div>
+                    <p className="mt-2 text-[11px] text-slate-400">Periode Penggajian Bulanan</p>
                 </div>
 
                 <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg">
-                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Status Penilaian HRD</h3>
-                    <div className="text-2xl font-black text-emerald-400 font-mono">Tervalidasi</div>
-                    <p className="mt-2 text-[11px] text-emerald-400 font-medium">✓ Sesuai Standar Kompetensi</p>
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Kepatuhan Ketenagakerjaan</h3>
+                    <div className="text-2xl font-black text-cyan-400 font-mono">100% BPJS</div>
+                    <p className="mt-2 text-[11px] text-cyan-400 font-medium">✓ Jamsostek & Kesehatan Aman</p>
                 </div>
             </div>
 
-            {/* Grid Tabel Penilaian Kinerja */}
+            {/* Grid Tabel Karyawan */}
             <div className="bg-[#0a1625] border border-[#16273c] rounded-xl p-5 shadow-lg space-y-4">
                 <div className="flex flex-wrap justify-between items-center gap-3">
                     <div className="w-full md:w-80">
@@ -385,7 +363,7 @@ export default function PerformancePage() {
                             type="text"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            placeholder="Cari nama karyawan, departemen, periode..."
+                            placeholder="Cari nama, NIK, departemen, jabatan..."
                             className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3.5 py-2 rounded-lg focus:outline-none focus:border-amber-400"
                         />
                     </div>
@@ -393,7 +371,7 @@ export default function PerformancePage() {
                         onClick={() => setShowModal(true)}
                         className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs px-4 py-2 rounded-lg transition cursor-pointer flex items-center gap-1.5"
                     >
-                        <span>+</span> <span>Tambah Penilaian Kinerja Baru</span>
+                        <span>+</span> <span>Tambah Data Karyawan Baru</span>
                     </button>
                 </div>
 
@@ -401,49 +379,45 @@ export default function PerformancePage() {
                     <table className="w-full text-left text-xs">
                         <thead>
                             <tr className="border-b border-[#1b2e46] text-slate-400">
-                                <th className="pb-2.5">Nama Karyawan</th>
+                                <th className="pb-2.5">NIK Karyawan</th>
+                                <th className="pb-2.5">Nama Lengkap</th>
                                 <th className="pb-2.5">Departemen</th>
-                                <th className="pb-2.5">Periode Review</th>
-                                <th className="pb-2.5 text-center">Produktivitas</th>
-                                <th className="pb-2.5 text-center">Kepatuhan K3</th>
-                                <th className="pb-2.5 text-center">Grade</th>
-                                <th className="pb-2.5">Atasan Penilai</th>
+                                <th className="pb-2.5">Jabatan / Posisi</th>
+                                <th className="pb-2.5 text-center">Status</th>
+                                <th className="pb-2.5">Tanggal Gabung</th>
+                                <th className="pb-2.5">No. Telepon / WA</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-[#16273c] text-slate-300">
-                            {filteredEvaluations.length > 0 ? (
-                                filteredEvaluations.map((item) => (
-                                    <tr key={item.id} className="hover:bg-[#0c1a2d]/50 transition">
-                                        <td className="py-3 font-bold text-white">{item.employee_name}</td>
+                            {filteredEmployees.length > 0 ? (
+                                filteredEmployees.map((emp) => (
+                                    <tr key={emp.id} className="hover:bg-[#0c1a2d]/50 transition">
+                                        <td className="py-3 font-mono text-amber-400 font-bold">{emp.nik}</td>
+                                        <td className="font-bold text-white">{emp.full_name}</td>
                                         <td>
                                             <span className="bg-[#112233] border border-[#1e3a5f] text-slate-300 text-[10px] px-2 py-0.5 rounded">
-                                                {item.department}
+                                                {emp.department}
                                             </span>
                                         </td>
-                                        <td className="font-mono text-slate-400 text-[11px]">{item.review_period}</td>
-                                        <td className="text-center font-mono font-bold text-cyan-400">
-                                            {Number(item.productivity_score).toFixed(1)}
-                                        </td>
-                                        <td className="text-center font-mono font-bold text-amber-400">
-                                            {Number(item.k3_compliance_score).toFixed(1)}
-                                        </td>
+                                        <td className="text-slate-300">{emp.position}</td>
                                         <td className="text-center">
                                             <span
-                                                className={`text-[10px] px-2 py-0.5 rounded border font-bold ${item.grade === 'GRADE A'
-                                                    ? 'bg-emerald-950/80 text-emerald-400 border-emerald-800/40'
-                                                    : 'bg-cyan-950/80 text-cyan-400 border-cyan-800/40'
+                                                className={`text-[10px] px-2 py-0.5 rounded font-bold border ${emp.employment_status === 'Tetap'
+                                                        ? 'bg-emerald-950/80 text-emerald-400 border-emerald-800/40'
+                                                        : 'bg-amber-950/80 text-amber-400 border-amber-800/40'
                                                     }`}
                                             >
-                                                {item.grade}
+                                                {emp.employment_status}
                                             </span>
                                         </td>
-                                        <td className="text-slate-300">{item.evaluator}</td>
+                                        <td className="font-mono text-slate-400">{emp.join_date}</td>
+                                        <td className="font-mono text-slate-300">{emp.phone}</td>
                                     </tr>
                                 ))
                             ) : (
                                 <tr>
                                     <td colSpan={7} className="py-8 text-center text-slate-500 italic">
-                                        Belum ada data evaluasi kinerja yang cocok dengan pencarian.
+                                        Tidak ada data karyawan yang cocok dengan pencarian.
                                     </td>
                                 </tr>
                             )}
@@ -452,26 +426,40 @@ export default function PerformancePage() {
                 </div>
             </div>
 
-            {/* Modal Input Penilaian Baru */}
+            {/* Modal Input Karyawan Baru */}
             {showModal && (
                 <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
                     <div className="bg-[#0a1625] border border-[#1b2e46] rounded-xl p-6 w-full max-w-lg shadow-2xl space-y-4">
                         <h2 className="text-sm font-bold text-white uppercase tracking-wider">
-                            Input Penilaian Kinerja & KPI Karyawan
+                            Tambah Data Karyawan Baru Site PT. JEEP
                         </h2>
-                        <form onSubmit={handleAddEvaluation} className="space-y-3">
+                        <form onSubmit={handleAddEmployee} className="space-y-3">
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className="text-[11px] text-slate-400 block mb-1">Nama Lengkap Karyawan</label>
+                                    <label className="text-[11px] text-slate-400 block mb-1">Nama Lengkap</label>
                                     <input
                                         type="text"
                                         required
-                                        value={employeeName}
-                                        onChange={(e) => setEmployeeName(e.target.value)}
+                                        value={fullName}
+                                        onChange={(e) => setFullName(e.target.value)}
                                         placeholder="Contoh: Budi Santoso"
                                         className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400"
                                     />
                                 </div>
+                                <div>
+                                    <label className="text-[11px] text-slate-400 block mb-1">Nomor Induk Karyawan (NIK)</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        value={nik}
+                                        onChange={(e) => setNik(e.target.value)}
+                                        placeholder="Contoh: JEEP-2024-099"
+                                        className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400 font-mono"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
                                 <div>
                                     <label className="text-[11px] text-slate-400 block mb-1">Departemen</label>
                                     <select
@@ -479,65 +467,60 @@ export default function PerformancePage() {
                                         onChange={(e) => setDepartment(e.target.value)}
                                         className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400 font-bold"
                                     >
-                                        <option value="Produksi Pit">Produksi Pit Nikel</option>
-                                        <option value="Geologi & Eksplorasi">Geologi & Eksplorasi</option>
+                                        <option value="Produksi Pit">Produksi Pit</option>
                                         <option value="Plant & Workshop">Plant & Workshop</option>
                                         <option value="HSE & K3">HSE & K3 Tambang</option>
                                         <option value="Human Resources">Human Resources (HRD)</option>
+                                        <option value="Jetty Port">Jetty Port</option>
                                         <option value="Finance & ADM">Finance & ADM</option>
                                     </select>
+                                </div>
+                                <div>
+                                    <label className="text-[11px] text-slate-400 block mb-1">Jabatan / Posisi</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        value={position}
+                                        onChange={(e) => setPosition(e.target.value)}
+                                        placeholder="Contoh: Operator Excavator"
+                                        className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400"
+                                    />
                                 </div>
                             </div>
 
                             <div className="grid grid-cols-3 gap-3">
                                 <div>
-                                    <label className="text-[11px] text-slate-400 block mb-1">Periode Evaluasi</label>
+                                    <label className="text-[11px] text-slate-400 block mb-1">Status Karyawan</label>
+                                    <select
+                                        value={employmentStatus}
+                                        onChange={(e) => setEmploymentStatus(e.target.value)}
+                                        className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400 font-bold"
+                                    >
+                                        <option value="Tetap">Tetap (PKWTT)</option>
+                                        <option value="Kontrak">Kontrak (PKWT)</option>
+                                        <option value="Probation">Probation (Percobaan)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="text-[11px] text-slate-400 block mb-1">Tanggal Bergabung</label>
+                                    <input
+                                        type="date"
+                                        required
+                                        value={joinDate}
+                                        onChange={(e) => setJoinDate(e.target.value)}
+                                        className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400 font-mono"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[11px] text-slate-400 block mb-1">No. Telepon / WA</label>
                                     <input
                                         type="text"
-                                        required
-                                        value={reviewPeriod}
-                                        onChange={(e) => setReviewPeriod(e.target.value)}
-                                        placeholder="Semester I – 2026"
+                                        value={phone}
+                                        onChange={(e) => setPhone(e.target.value)}
+                                        placeholder="0812xxxx"
                                         className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400 font-mono"
                                     />
                                 </div>
-                                <div>
-                                    <label className="text-[11px] text-slate-400 block mb-1">Skor Produktivitas (0–100)</label>
-                                    <input
-                                        type="number"
-                                        step="0.1"
-                                        min="0"
-                                        max="100"
-                                        required
-                                        value={productivityScore}
-                                        onChange={(e) => setProductivityScore(e.target.value)}
-                                        className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400 font-mono"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-[11px] text-slate-400 block mb-1">Skor Kepatuhan K3 (0–100)</label>
-                                    <input
-                                        type="number"
-                                        step="0.1"
-                                        min="0"
-                                        max="100"
-                                        required
-                                        value={k3ComplianceScore}
-                                        onChange={(e) => setK3ComplianceScore(e.target.value)}
-                                        className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400 font-mono"
-                                    />
-                                </div>
-                            </div>
-
-                            <div>
-                                <label className="text-[11px] text-slate-400 block mb-1">Atasan Penilai (Evaluator)</label>
-                                <input
-                                    type="text"
-                                    value={evaluator}
-                                    onChange={(e) => setEvaluator(e.target.value)}
-                                    placeholder="Contoh: Mine Operation Manager (Otomatis nama Anda jika kosong)"
-                                    className="w-full bg-[#060c14] border border-[#1b2e46] text-white text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-400"
-                                />
                             </div>
 
                             <div className="flex justify-end gap-2 pt-2">
@@ -553,7 +536,7 @@ export default function PerformancePage() {
                                     disabled={submitting}
                                     className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs transition cursor-pointer"
                                 >
-                                    {submitting ? 'Menyimpan...' : 'Simpan Penilaian'}
+                                    {submitting ? 'Menyimpan...' : 'Simpan Karyawan'}
                                 </button>
                             </div>
                         </form>
