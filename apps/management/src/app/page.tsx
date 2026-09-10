@@ -9,7 +9,7 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
-// Daftar lengkap modul operasional tambang nikel PT. Jangkar Energi Eka Perkasa
+// 32 Modul Operasional Tambang Nikel PT. Jangkar Energi Eka Perkasa
 const OPERATIONAL_MODULES = [
     {
         key: 'manager-site',
@@ -274,6 +274,7 @@ export default function PortalDashboard() {
     const [loading, setLoading] = useState(true)
     const [userProfile, setUserProfile] = useState<any>(null)
     const [allowedModules, setAllowedModules] = useState<string[]>([])
+    const [isSuperAdminUser, setIsSuperAdminUser] = useState(false)
 
     const landingUrl = process.env.NEXT_PUBLIC_LANDING_URL || 'https://pt-jeep.vercel.app'
 
@@ -310,6 +311,7 @@ export default function PortalDashboard() {
                 }
 
                 const currentUserId = session?.user?.id || (await supabase.auth.getUser()).data.user?.id
+                const userEmail = (session?.user?.email || (await supabase.auth.getUser()).data.user?.email || '').toLowerCase().trim()
 
                 if (!currentUserId) {
                     window.location.href = landingUrl
@@ -331,14 +333,28 @@ export default function PortalDashboard() {
                 }
 
                 if (isMounted) {
-                    setUserProfile(profile || { full_name: 'Karyawan Site', role: 'Staff' })
                     const division = (profile?.role || '').trim().toLowerCase()
 
-                    const isSuperAdmin = ['admin', 'administrator', 'superadmin'].includes(division)
+                    // ATURAN EKSKLUSIF: topcare77777@gmail.com adalah Superadmin penuh
+                    const isExplicitSuperAdmin = userEmail === 'topcare77777@gmail.com'
+                    const isRoleSuperAdmin = ['admin', 'administrator', 'superadmin'].includes(division)
+                    const isDirector = ['direktur', 'bod', 'board of directors'].some((k) => division.includes(k))
 
-                    if (isSuperAdmin) {
+                    if (isExplicitSuperAdmin || isRoleSuperAdmin) {
+                        setIsSuperAdminUser(true)
+                        setUserProfile({
+                            full_name: profile?.full_name || 'Super Administrator',
+                            role: 'Superadmin Konsol',
+                        })
+                        setAllowedModules(OPERATIONAL_MODULES.map((m) => m.key))
+                    } else if (isDirector) {
+                        setUserProfile(profile || { full_name: 'Direktur Operasional', role: 'Board of Directors' })
+                        // Direksi diberikan seluruh modul eksekutif & operasional
                         setAllowedModules(OPERATIONAL_MODULES.map((m) => m.key))
                     } else {
+                        // User biasa: Sesuai modul akses divisi yang diberikan di Supabase
+                        setUserProfile(profile || { full_name: 'Karyawan Site', role: profile?.role || 'Staff' })
+
                         const { data: perms } = await supabase
                             .from('division_permissions')
                             .select('division_name, allowed_modules')
@@ -351,8 +367,9 @@ export default function PortalDashboard() {
                                     target === division ||
                                     target.includes(division) ||
                                     division.includes(target) ||
-                                    (division === 'finance' && target.includes('keuangan')) ||
-                                    (division === 'adm' && (target.includes('administrasi') || target.includes('adm')))
+                                    (division.includes('hrd') && target.includes('hrd')) ||
+                                    (division.includes('human') && target.includes('human')) ||
+                                    (division.includes('finance') && target.includes('keuangan'))
                                 )
                             })
 
@@ -362,7 +379,12 @@ export default function PortalDashboard() {
                         }
 
                         if (granted.length === 0) {
-                            granted = [division || 'manager-site']
+                            // Fallback jika belum terdaftar di tabel division_permissions
+                            if (division.includes('hrd') || division.includes('human')) {
+                                granted = ['hrd', 'performance', 'laporan']
+                            } else {
+                                granted = ['manager-site', 'laporan']
+                            }
                         }
 
                         setAllowedModules(granted)
@@ -417,7 +439,10 @@ export default function PortalDashboard() {
                             <p className="text-xs text-slate-400 mt-1 flex flex-wrap items-center gap-2">
                                 <span>Terhubung sebagai</span>
                                 <strong className="text-white">{userProfile?.full_name || 'Karyawan Site'}</strong>
-                                <span className="bg-[#122236] border border-[#1b3659] text-cyan-300 text-[10px] px-2 py-0.5 rounded font-mono font-bold">
+                                <span className={`border text-[10px] px-2 py-0.5 rounded font-mono font-bold ${isSuperAdminUser
+                                        ? 'bg-amber-950/70 border-amber-500 text-amber-300'
+                                        : 'bg-[#122236] border-[#1b3659] text-cyan-300'
+                                    }`}>
                                     {userProfile?.role || 'Staff'}
                                 </span>
                                 <span>• Site Konawe Utara / IUP-OP Nikel</span>
@@ -425,6 +450,11 @@ export default function PortalDashboard() {
                         </div>
 
                         <div className="flex items-center gap-3">
+                            {isSuperAdminUser && (
+                                <span className="bg-amber-500/10 border border-amber-500/40 text-amber-400 text-xs font-bold px-3 py-2 rounded-lg">
+                                    👑 Konsol Superadmin Aktif
+                                </span>
+                            )}
                             <Link
                                 href="/laporan"
                                 className="bg-[#132238] hover:bg-[#1a2f4d] border border-[#213a5e] text-slate-200 text-xs font-semibold px-4 py-2.5 rounded-lg transition"
