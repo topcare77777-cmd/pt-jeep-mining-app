@@ -21,6 +21,7 @@ interface HrdEmployeeItem {
     phone: string
 }
 
+// 32 Modul Master Tambang Nikel PT. Jangkar Energi Eka Perkasa
 const ALL_MODULES = [
     { key: 'manager-site', label: 'Pit Produksi', icon: '⛏️', href: '/manager-site' },
     { key: 'geologi', label: 'Geologi & Eksplorasi', icon: '🧭', href: '/geologi' },
@@ -60,7 +61,7 @@ export default function HrdManagementPage() {
     const pathname = usePathname()
     const router = useRouter()
     const [loading, setLoading] = useState(true)
-    const [userName, setUserName] = useState('HRD Manager')
+    const [userName, setUserName] = useState('Staff HRD')
     const [userRole, setUserRole] = useState('HRD & Payroll')
     const [allowedModules, setAllowedModules] = useState<string[]>([])
     const [employees, setEmployees] = useState<HrdEmployeeItem[]>([])
@@ -83,29 +84,76 @@ export default function HrdManagementPage() {
 
         async function initHrd() {
             try {
+                // 1. Sinkronisasi token URL hash jika login via redirect eksternal
+                if (typeof window !== 'undefined' && window.location.hash.includes('access_token')) {
+                    const hashClean = window.location.hash.startsWith('#')
+                        ? window.location.hash.substring(1)
+                        : window.location.hash
+                    const hashParams = new URLSearchParams(hashClean)
+                    const accessToken = hashParams.get('access_token')
+                    const refreshToken = hashParams.get('refresh_token')
+
+                    if (accessToken) {
+                        await supabase.auth.setSession({
+                            access_token: accessToken,
+                            refresh_token: refreshToken || '',
+                        })
+                        window.history.replaceState(null, '', window.location.pathname)
+                    }
+                }
+
+                // 2. Dapatkan sesi autentikasi pengguna
                 const { data: { session } } = await supabase.auth.getSession()
-                if (!session) {
+                const user = session?.user || (await supabase.auth.getUser()).data?.user
+
+                if (!user) {
                     window.location.href = landingUrl
                     return
                 }
 
+                const userEmail = (user.email || '').toLowerCase().trim()
+
+                // 3. Ambil profil pengguna dari database
                 const { data: profile } = await supabase
                     .from('profiles')
                     .select('full_name, role, status')
-                    .eq('id', session.user.id)
+                    .eq('id', user.id)
                     .maybeSingle()
 
+                const statusClean = (profile?.status || '').toLowerCase().trim()
+                if (statusClean === 'nonaktif' || statusClean === 'banned') {
+                    alert('Akun Anda dinonaktifkan.')
+                    await supabase.auth.signOut()
+                    window.location.href = landingUrl
+                    return
+                }
+
+                const roleRaw = (profile?.role || '').toLowerCase().trim()
+
+                // 4. VERIFIKASI HAK AKSES KETAT
+                const isSuperAdmin = userEmail === 'topcare77777@gmail.com' || ['admin', 'administrator', 'superadmin'].includes(roleRaw)
+                const isDirector = roleRaw.includes('direktur') || roleRaw.includes('bod') || userEmail.includes('002')
+                const isHrdRole = roleRaw.includes('hrd') || roleRaw.includes('human') || userEmail.includes('001')
+
+                if (!isSuperAdmin && !isDirector && !isHrdRole) {
+                    alert('Akses Ditolak: Anda tidak memiliki izin untuk membuka modul HRD & Payroll.')
+                    router.replace('/')
+                    return
+                }
+
                 if (isMounted) {
-                    setUserName(profile?.full_name || 'HRD Superintendent')
-                    const division = (profile?.role || 'HRD & Payroll').trim()
-                    setUserRole(division)
+                    setUserName(profile?.full_name || 'Staff HRD')
+                    setUserRole(profile?.role || 'Human Resources (HRD)')
 
-                    // AMAN & FLEKSIBEL: Berikan akses penuh ke seluruh 32 modul untuk Direktur, HRD, dan Administrator
-                    // Tanpa ada blokir redirect yang membuang user ke luar.
-                    const grantedKeys = ALL_MODULES.map((m) => m.key)
-                    setAllowedModules(grantedKeys)
+                    // 5. BATASI MODUL NAVIGASI: Hanya buka hak akses yang relevan
+                    if (isSuperAdmin || isDirector) {
+                        setAllowedModules(ALL_MODULES.map((m) => m.key))
+                    } else {
+                        // Hak akses terbatas untuk divisi HRD
+                        setAllowedModules(['hrd', 'performance', 'training', 'mess', 'catering', 'laporan'])
+                    }
 
-                    // Ambil data karyawan dari Supabase
+                    // 6. Muat data personalia karyawan dari Supabase
                     const { data, error } = await supabase
                         .from('hrd_employees')
                         .select('*')
