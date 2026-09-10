@@ -9,7 +9,7 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
-// 30 Modul Tambang Nikel PT. Jangkar Energi Eka Perkasa
+// 31 Modul Tambang Nikel PT. Jangkar Energi Eka Perkasa
 const OPERATIONAL_MODULES = [
     {
         key: 'manager-site',
@@ -18,6 +18,14 @@ const OPERATIONAL_MODULES = [
         desc: 'Monitoring ritase bijih nikel, pengupasan overburden (OB), dan laporan shift DOR.',
         icon: '⛏️',
         href: '/manager-site',
+    },
+    {
+        key: 'geologi',
+        title: 'Geologi & Eksplorasi',
+        badge: 'Grade Control',
+        desc: 'Database titik pemboran, uji assay (%Ni, %Fe), dan pemodelan cadangan nikel.',
+        icon: '🧭',
+        href: '/geologi',
     },
     {
         key: 'fleet',
@@ -122,6 +130,14 @@ const OPERATIONAL_MODULES = [
         desc: 'Manajemen armada LV operasional, sarana genset site, dan fasilitas camp.',
         icon: '🚙',
         href: '/ga',
+    },
+    {
+        key: 'assets',
+        title: 'Manajemen Aset Tambang',
+        badge: 'Asset Management',
+        desc: 'Inventarisasi fisik fasilitas, penomoran kode barcode aset, dan audit depresiasi.',
+        icon: '🏷️',
+        href: '/assets',
     },
     {
         key: 'mess',
@@ -231,7 +247,7 @@ const OPERATIONAL_MODULES = [
         key: 'investor',
         title: 'Portal Investor Tambang',
         badge: 'Investor Relations',
-        desc: 'Transparansi pengapalan ore nikel, pendapatan, dan kepatuhan kuota RKAB.',
+        desc: 'Transparansi pengapalan ore nikel, pendapatan, dan kepatuhan kuota RKAB ESDM.',
         icon: '📊',
         href: '/investor',
     },
@@ -293,7 +309,7 @@ export default function PortalDashboard() {
                     const isSuperAdmin = ['admin', 'administrator', 'superadmin'].includes(division)
 
                     if (isSuperAdmin) {
-                        setAllowedModules(OPERATIONAL_MODULE_CARDS.map((m) => m.key))
+                        setAllowedModules(OPERATIONAL_MODULES.map((m) => m.key))
                     } else {
                         const { data: perms } = await supabase
                             .from('division_permissions')
@@ -317,7 +333,6 @@ export default function PortalDashboard() {
                             }
                         }
 
-                        // Jika belum ada matriks izin, buka modul yang sesuai dengan role-nya
                         if (granted.length === 0) {
                             granted = [division]
                         }
@@ -345,7 +360,6 @@ export default function PortalDashboard() {
         window.location.href = landingUrl
     }
 
-    // Filter modul: hanya yang diizinkan untuk divisi pengguna yang ditampilkan di kartu portal
     const visibleCards = OPERATIONAL_MODULES.filter((mod) =>
         allowedModules.includes(mod.key)
     )
@@ -362,7 +376,6 @@ export default function PortalDashboard() {
     return (
         <div className="min-h-screen bg-[#070b12] text-slate-100 font-sans p-6 md:p-8 select-none">
             <div className="max-w-7xl mx-auto space-y-6">
-                {/* Banner Utama */}
                 <div className="bg-[#0b1320] border border-[#1b2a40] rounded-2xl p-6 md:p-8 shadow-2xl relative overflow-hidden">
                     <div className="relative z-10 flex flex-wrap items-center justify-between gap-4">
                         <div>
@@ -400,7 +413,6 @@ export default function PortalDashboard() {
                     </div>
                 </div>
 
-                {/* Grid Modul Sesuai Hak Akses Divisi */}
                 <div>
                     <div className="flex items-center justify-between mb-4">
                         <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider">
