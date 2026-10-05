@@ -14,10 +14,30 @@ export default function UpdatePasswordPage() {
     const [ready, setReady] = useState(false)
 
     useEffect(() => {
-        supabase.auth.getSession().then(({ data }) => {
-            setReady(Boolean(data.session))
-            if (!data.session) setError('Link reset tidak valid atau sudah kedaluwarsa.')
+        let active = true
+
+        const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+            if (!active) return
+            if (session && (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN' || event === 'INITIAL_SESSION')) {
+                setReady(true)
+                setError('')
+            }
         })
+
+        supabase.auth.getSession().then(({ data }) => {
+            if (!active) return
+            if (data.session) {
+                setReady(true)
+                setError('')
+            } else {
+                setError('Link reset tidak valid atau sudah kedaluwarsa. Silakan minta link reset baru.')
+            }
+        })
+
+        return () => {
+            active = false
+            listener.subscription.unsubscribe()
+        }
     }, [])
 
     async function handleSubmit(event: FormEvent) {
