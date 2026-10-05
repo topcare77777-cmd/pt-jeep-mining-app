@@ -1,3 +1,33 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+.admin-light {
+    background-color: #f4f7fb !important;
+    color: #172033 !important;
+}
+
+.admin-light aside,
+.admin-light main,
+.admin-light [class~="bg-[#070b12]"],
+.admin-light [class~="bg-[#0c121e]"],
+.admin-light [class~="bg-[#090d17]"],
+.admin-light [class~="bg-[#111]"] {
+    background-color: #ffffff !important;
+}
+
+.admin-light [class~="text-white"] {
+    color: #172033 !important;
+}
+
+.admin-light [class~="text-slate-200"],
+.admin-light [class~="text-slate-300"],
+.admin-light [class~="text-slate-400"] {
+    color: #475569 !important;
+}
+
+.admin-light [class~="border-[#1a2333]"],
+.admin-light [class~="border-[#1a273b]"],
+.admin-light [class~="border-[#222]"] {
+    border-color: #cbd5e1 !important;
+}

@@ -1,3 +1,31 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+.hrd-light {
+    background-color: #f4f7fb !important;
+    color: #172033 !important;
+}
+
+.hrd-light [class~="bg-[#060c14]"],
+.hrd-light [class~="bg-[#0a1625]"],
+.hrd-light [class~="bg-[#102033]"],
+.hrd-light [class~="bg-[#112233]"] {
+    background-color: #ffffff !important;
+}
+
+.hrd-light [class~="text-white"] {
+    color: #172033 !important;
+}
+
+.hrd-light [class~="text-slate-100"],
+.hrd-light [class~="text-slate-200"],
+.hrd-light [class~="text-slate-300"] {
+    color: #334155 !important;
+}
+
+.hrd-light [class~="border-[#16273c]"],
+.hrd-light [class~="border-[#1b2e46]"],
+.hrd-light [class~="border-[#1e3757]"] {
+    border-color: #cbd5e1 !important;
+}

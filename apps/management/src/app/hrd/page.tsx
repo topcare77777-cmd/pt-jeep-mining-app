@@ -11,6 +11,7 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 interface HrdEmployeeItem {
     id: string
+    company_id?: string
     created_at?: string
     full_name: string
     nik: string
@@ -64,6 +65,8 @@ export default function HrdManagementPage() {
     const [userName, setUserName] = useState('Staff HRD')
     const [userRole, setUserRole] = useState('HRD & Payroll')
     const [allowedModules, setAllowedModules] = useState<string[]>([])
+    const [userCompanyId, setUserCompanyId] = useState<string | null>(null)
+    const [theme, setTheme] = useState<'dark' | 'light'>('dark')
     const [employees, setEmployees] = useState<HrdEmployeeItem[]>([])
     const [searchQuery, setSearchQuery] = useState('')
 
@@ -78,6 +81,17 @@ export default function HrdManagementPage() {
     const [submitting, setSubmitting] = useState(false)
 
     const landingUrl = process.env.NEXT_PUBLIC_LANDING_URL || 'https://pt-jeep.vercel.app'
+
+    useEffect(() => {
+        const savedTheme = window.localStorage.getItem('pt-jeep-theme')
+        if (savedTheme === 'light' || savedTheme === 'dark') setTheme(savedTheme)
+    }, [])
+
+    const toggleTheme = () => {
+        const nextTheme = theme === 'dark' ? 'light' : 'dark'
+        setTheme(nextTheme)
+        window.localStorage.setItem('pt-jeep-theme', nextTheme)
+    }
 
     useEffect(() => {
         let isMounted = true
@@ -116,9 +130,11 @@ export default function HrdManagementPage() {
                 // 3. Ambil profil pengguna dari database
                 const { data: profile } = await supabase
                     .from('profiles')
-                    .select('full_name, role, status')
+                    .select('full_name, role, status, company_id')
                     .eq('id', user.id)
                     .maybeSingle()
+                const profileCompanyId = profile?.company_id || null
+                setUserCompanyId(profileCompanyId)
 
                 const statusClean = (profile?.status || '').toLowerCase().trim()
                 if (statusClean === 'nonaktif' || statusClean === 'banned') {
@@ -154,26 +170,14 @@ export default function HrdManagementPage() {
                     }
 
                     // 6. Muat data personalia karyawan dari Supabase
-                    const { data, error } = await supabase
-                        .from('hrd_employees')
-                        .select('*')
-                        .order('created_at', { ascending: false })
+                    let employeeQuery = supabase.from('hrd_employees').select('*')
+                    if (profileCompanyId) employeeQuery = employeeQuery.eq('company_id', profileCompanyId)
+                    const { data, error } = await employeeQuery.order('created_at', { ascending: false })
 
                     if (!error && data && data.length > 0) {
                         setEmployees(data)
                     } else {
-                        setEmployees([
-                            {
-                                id: '1',
-                                full_name: 'Budi Santoso',
-                                nik: 'JEEP-2024-001',
-                                department: 'Produksi Pit',
-                                position: 'Senior Operator Excavator',
-                                employment_status: 'Tetap',
-                                join_date: '2023-01-15',
-                                phone: '081234567890',
-                            },
-                        ])
+                        setEmployees([])
                     }
 
                     setLoading(false)
@@ -201,6 +205,7 @@ export default function HrdManagementPage() {
             employment_status: employmentStatus,
             join_date: joinDate,
             phone: phone || '-',
+            ...(userCompanyId ? { company_id: userCompanyId } : {}),
         }
 
         const { data, error } = await supabase.from('hrd_employees').insert([payload]).select()
@@ -257,7 +262,7 @@ export default function HrdManagementPage() {
     }
 
     return (
-        <div className="min-h-screen bg-[#060c14] text-slate-100 font-sans p-4 md:p-6 select-none">
+        <div className={`hrd-page min-h-screen bg-[#060c14] text-slate-100 font-sans p-4 md:p-6 select-none ${theme === 'light' ? 'hrd-light' : ''}`}>
             <header className="mb-6 space-y-3">
                 <div className="flex flex-wrap items-center justify-between bg-[#0a1625] border border-[#1b2e46] rounded-xl px-6 py-4 shadow-xl">
                     <div className="flex items-center space-x-3">
@@ -279,6 +284,13 @@ export default function HrdManagementPage() {
                     </div>
 
                     <div className="flex items-center gap-2">
+                        <button
+                            onClick={toggleTheme}
+                            aria-label={`Aktifkan mode ${theme === 'dark' ? 'terang' : 'gelap'}`}
+                            className="bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/40 text-amber-300 text-xs px-3 py-2 rounded-lg transition cursor-pointer"
+                        >
+                            {theme === 'dark' ? '☀️ Terang' : '🌙 Gelap'}
+                        </button>
                         <Link
                             href="/"
                             className="bg-[#102033] hover:bg-[#162b45] border border-[#1e3757] text-slate-300 text-xs px-3 py-2 rounded-lg transition"
@@ -303,8 +315,8 @@ export default function HrdManagementPage() {
                                     key={item.href}
                                     href={item.href}
                                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border whitespace-nowrap font-medium transition cursor-pointer ${isActive
-                                            ? 'bg-[#162d47] text-white border-amber-400/80 shadow-sm'
-                                            : 'bg-[#0a1625] text-slate-400 border-[#1b2e46] hover:text-slate-200 hover:bg-[#0f2137]'
+                                        ? 'bg-[#162d47] text-white border-amber-400/80 shadow-sm'
+                                        : 'bg-[#0a1625] text-slate-400 border-[#1b2e46] hover:text-slate-200 hover:bg-[#0f2137]'
                                         }`}
                                 >
                                     <span>{item.icon}</span>
@@ -358,7 +370,15 @@ export default function HrdManagementPage() {
                     </button>
                 </div>
 
-                <div className="overflow-x-auto">
+                <div className="md:hidden space-y-3">
+                    {filteredEmployees.length > 0 ? filteredEmployees.map((emp) => (
+                        <article key={emp.id} className="rounded-xl border border-[#1b2e46] bg-[#060c14] p-4 space-y-3">
+                            <div className="flex items-start justify-between gap-3"><div><div className="text-amber-400 font-mono font-bold text-xs">{emp.nik}</div><div className="text-white font-bold mt-1">{emp.full_name}</div></div><span className="text-[10px] px-2 py-1 rounded font-bold border border-emerald-800/40 text-emerald-400">{emp.employment_status}</span></div>
+                            <div className="grid grid-cols-2 gap-3 text-[11px]"><div><div className="text-slate-500">Departemen</div><div className="text-slate-200">{emp.department}</div></div><div><div className="text-slate-500">Jabatan</div><div className="text-slate-200">{emp.position}</div></div><div><div className="text-slate-500">Tanggal Gabung</div><div className="text-slate-200 font-mono">{emp.join_date}</div></div><div><div className="text-slate-500">Telepon</div><div className="text-slate-200 font-mono">{emp.phone}</div></div></div>
+                        </article>
+                    )) : <div className="py-8 text-center text-slate-500 italic text-xs">Tidak ada data karyawan yang cocok dengan pencarian.</div>}
+                </div>
+                <div className="hidden md:block overflow-x-auto">
                     <table className="w-full text-left text-xs">
                         <thead>
                             <tr className="border-b border-[#1b2e46] text-slate-400">
@@ -386,8 +406,8 @@ export default function HrdManagementPage() {
                                         <td className="text-center">
                                             <span
                                                 className={`text-[10px] px-2 py-0.5 rounded font-bold border ${emp.employment_status === 'Tetap'
-                                                        ? 'bg-emerald-950/80 text-emerald-400 border-emerald-800/40'
-                                                        : 'bg-amber-950/80 text-amber-400 border-amber-800/40'
+                                                    ? 'bg-emerald-950/80 text-emerald-400 border-emerald-800/40'
+                                                    : 'bg-amber-950/80 text-amber-400 border-amber-800/40'
                                                     }`}
                                             >
                                                 {emp.employment_status}

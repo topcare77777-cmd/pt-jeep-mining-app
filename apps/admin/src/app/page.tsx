@@ -242,9 +242,18 @@ interface CustomField {
 }
 
 export default function SuperAdminConsole() {
-    const [activeMenu, setActiveMenu] = useState<'permissions' | 'form_builder' | 'users' | 'roles' | 'system' | 'audit'>('permissions')
+    const [activeMenu, setActiveMenu] = useState<'permissions' | 'form_builder' | 'users' | 'roles' | 'companies' | 'system' | 'audit'>('permissions')
     const [users, setUsers] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
+    const [companies, setCompanies] = useState<any[]>([])
+    const [companyName, setCompanyName] = useState('')
+    const [companySlug, setCompanySlug] = useState('')
+    const [companyLogoUrl, setCompanyLogoUrl] = useState('')
+    const [companyUserLimit, setCompanyUserLimit] = useState(25)
+    const [companyAdminUserId, setCompanyAdminUserId] = useState('')
+    const [companyIupStatus, setCompanyIupStatus] = useState('Belum Diverifikasi')
+    const [companyRkabStatus, setCompanyRkabStatus] = useState('Belum Diverifikasi')
+    const [savingCompany, setSavingCompany] = useState(false)
 
     // State Pengguna Baru
     const [isModalOpen, setIsModalOpen] = useState(false)
@@ -304,12 +313,21 @@ export default function SuperAdminConsole() {
     const [newFieldPlaceholder, setNewFieldPlaceholder] = useState('')
     const [newFieldRequired, setNewFieldRequired] = useState(false)
     const [savingField, setSavingField] = useState(false)
+    const [auditLogs, setAuditLogs] = useState<AuditLog[]>([])
+    const [theme, setTheme] = useState<'dark' | 'light'>('dark')
 
     useEffect(() => {
         fetchUsers()
+        fetchCompanies()
         fetchRoles()
         fetchPermissions()
         fetchCustomFields()
+        fetchAuditLogs()
+    }, [])
+
+    useEffect(() => {
+        const savedTheme = window.localStorage.getItem('pt-jeep-admin-theme')
+        if (savedTheme === 'light' || savedTheme === 'dark') setTheme(savedTheme)
     }, [])
 
     useEffect(() => {
@@ -337,6 +355,60 @@ export default function SuperAdminConsole() {
             }
         }
         setRolesLoading(false)
+    }
+
+    async function fetchCompanies() {
+        const { data, error } = await supabase.from('companies').select('*').order('created_at', { ascending: false })
+        if (!error && data) setCompanies(data)
+    }
+
+    async function fetchAuditLogs() {
+        const { data, error } = await supabase
+            .from('audit_logs')
+            .select('id, action, module, entity_type, entity_id, actor_email, actor_role, details, created_at')
+            .order('created_at', { ascending: false })
+            .limit(100)
+        if (!error && data) setAuditLogs(data as AuditLog[])
+    }
+
+    const toggleTheme = () => {
+        const nextTheme = theme === 'dark' ? 'light' : 'dark'
+        setTheme(nextTheme)
+        window.localStorage.setItem('pt-jeep-admin-theme', nextTheme)
+    }
+
+    async function handleCreateCompany(e: React.FormEvent) {
+        e.preventDefault()
+        if (!companyName.trim() || !companySlug.trim()) return
+        setSavingCompany(true)
+        try {
+            const { data, error } = await supabase.rpc('create_company', {
+                company_name: companyName.trim(),
+                company_slug: companySlug.trim().toLowerCase(),
+                company_logo_url: companyLogoUrl.trim() || null,
+                company_user_limit: companyUserLimit,
+                company_iup_status: companyIupStatus,
+                company_rkab_status: companyRkabStatus,
+            })
+            if (error) throw error
+            const createdCompany = Array.isArray(data) ? data[0] : data
+            if (createdCompany?.id && companyAdminUserId) {
+                const { error: mappingError } = await supabase.from('profiles').update({ company_id: createdCompany.id }).eq('id', companyAdminUserId)
+                if (mappingError) throw mappingError
+            }
+            setCompanyName('')
+            setCompanySlug('')
+            setCompanyLogoUrl('')
+            setCompanyUserLimit(25)
+            setCompanyAdminUserId('')
+            await fetchCompanies()
+            await fetchAuditLogs()
+            alert('Perusahaan baru berhasil dibuat dan siap dikonfigurasi.')
+        } catch (err: any) {
+            alert('Gagal membuat perusahaan: ' + (err?.message || 'Periksa migrasi dan hak akses superadmin.'))
+        } finally {
+            setSavingCompany(false)
+        }
     }
 
     async function fetchPermissions() {
@@ -629,7 +701,7 @@ export default function SuperAdminConsole() {
     const currentAllowed = divisionPermissions[selectedDivisionForPermission] || []
 
     return (
-        <div className="flex h-screen bg-[#070b12] text-slate-200 font-sans overflow-hidden select-none">
+        <div className={`admin-page flex h-screen bg-[#070b12] text-slate-200 font-sans overflow-hidden select-none ${theme === 'light' ? 'admin-light' : ''}`}>
             {/* Sidebar Navigasi Konsol */}
             <aside className="w-64 bg-[#0c121e] border-r border-[#1a2333] flex flex-col">
                 <div className="p-5 border-b border-[#1a2333]">
@@ -691,6 +763,15 @@ export default function SuperAdminConsole() {
                     >
                         <span>🛡️</span> <span>Divisi & Jabatan</span>
                     </button>
+                    <button
+                        onClick={() => setActiveMenu('companies')}
+                        className={`w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-lg text-xs font-bold transition cursor-pointer ${activeMenu === 'companies'
+                            ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20'
+                            : 'text-slate-400 hover:bg-[#131d2e] hover:text-white'
+                            }`}
+                    >
+                        <span>🏢</span> <span>Perusahaan / Tenant</span>
+                    </button>
 
                     <p className="px-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 mt-5">Sistem Inti</p>
                     <button
@@ -714,6 +795,12 @@ export default function SuperAdminConsole() {
                 </nav>
 
                 <div className="p-4 border-t border-[#1a2333] bg-[#090d17] space-y-3">
+                    <button
+                        onClick={toggleTheme}
+                        className="w-full bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 py-2 rounded-lg text-xs font-semibold transition cursor-pointer"
+                    >
+                        {theme === 'dark' ? '☀️ Aktifkan Mode Terang' : '🌙 Aktifkan Mode Gelap'}
+                    </button>
                     <div className="text-xs text-slate-400 font-mono flex items-center gap-2">
                         <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                         <span>Supabase Terhubung</span>
@@ -941,6 +1028,35 @@ export default function SuperAdminConsole() {
                     </div>
                 )}
 
+                {activeMenu === 'companies' && (
+                    <div className="space-y-6 max-w-6xl mx-auto">
+                        <div>
+                            <h2 className="text-2xl font-black text-white flex items-center gap-2.5"><span>🏢</span> Perusahaan / Tenant</h2>
+                            <p className="text-xs text-slate-400 mt-1">Buat platform terpisah untuk perusahaan tambang baru tanpa mencampur data tenant lain.</p>
+                        </div>
+                        <form onSubmit={handleCreateCompany} className="bg-[#0b1320] border border-emerald-500/30 rounded-xl p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="md:col-span-2 text-sm font-bold text-emerald-300">Buat Perusahaan Baru</div>
+                            <input required value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder="Nama perusahaan, contoh: PT. Vidia Indo Samudera" className="bg-[#060a10] border border-[#1f2f47] rounded-lg px-3 py-2.5 text-xs text-white" />
+                            <input required value={companySlug} onChange={(e) => setCompanySlug(e.target.value.replace(/[^a-zA-Z0-9-]/g, '-'))} placeholder="Slug URL, contoh: pt-vidia-indo-samudera" className="bg-[#060a10] border border-[#1f2f47] rounded-lg px-3 py-2.5 text-xs text-white font-mono" />
+                            <input value={companyLogoUrl} onChange={(e) => setCompanyLogoUrl(e.target.value)} placeholder="URL logo (opsional)" className="bg-[#060a10] border border-[#1f2f47] rounded-lg px-3 py-2.5 text-xs text-white" />
+                            <input type="number" min={1} value={companyUserLimit} onChange={(e) => setCompanyUserLimit(Number(e.target.value))} placeholder="Batas pengguna" className="bg-[#060a10] border border-[#1f2f47] rounded-lg px-3 py-2.5 text-xs text-white" />
+                            <select value={companyAdminUserId} onChange={(e) => setCompanyAdminUserId(e.target.value)} className="bg-[#060a10] border border-[#1f2f47] rounded-lg px-3 py-2.5 text-xs text-white">
+                                <option value="">Pilih admin awal (opsional)</option>
+                                {users.map((user) => <option key={user.id} value={user.id}>{user.full_name || user.email || user.id}</option>)}
+                            </select>
+                            <div className="grid grid-cols-2 gap-3">
+                                <select value={companyIupStatus} onChange={(e) => setCompanyIupStatus(e.target.value)} className="bg-[#060a10] border border-[#1f2f47] rounded-lg px-3 py-2.5 text-xs text-white"><option>Belum Diverifikasi</option><option>Dalam Verifikasi</option><option>Terverifikasi</option><option>Ditolak</option></select>
+                                <select value={companyRkabStatus} onChange={(e) => setCompanyRkabStatus(e.target.value)} className="bg-[#060a10] border border-[#1f2f47] rounded-lg px-3 py-2.5 text-xs text-white"><option>Belum Diverifikasi</option><option>Dalam Verifikasi</option><option>Terverifikasi</option><option>Ditolak</option></select>
+                            </div>
+                            <button type="submit" disabled={savingCompany} className="md:col-span-2 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-slate-950 font-black px-5 py-2.5 rounded-lg text-xs">{savingCompany ? 'Membuat perusahaan...' : '＋ Buat Platform Perusahaan'}</button>
+                        </form>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {companies.map((company) => <div key={company.id} className="bg-[#0b1320] border border-[#1a273b] rounded-xl p-5"><div className="flex justify-between gap-3"><div><div className="font-bold text-white">{company.name}</div><div className="text-[11px] text-slate-500 font-mono mt-1">/{company.slug}</div></div><span className="text-[10px] text-emerald-300 border border-emerald-500/30 rounded px-2 py-1 h-fit">{company.status}</span></div><div className="grid grid-cols-3 gap-2 mt-4 text-[10px] text-slate-400"><div>IUP<br /><strong className="text-slate-200">{company.iup_status}</strong></div><div>RKAB<br /><strong className="text-slate-200">{company.rkab_status}</strong></div><div>Limit user<br /><strong className="text-slate-200">{company.user_limit}</strong></div></div></div>)}
+                            {companies.length === 0 && <div className="text-xs text-slate-500">Belum ada data perusahaan atau migrasi belum dijalankan.</div>}
+                        </div>
+                    </div>
+                )}
+
                 {/* TAB: MANAJEMEN PENGGUNA */}
                 {activeMenu === 'users' && (
                     <div className="space-y-6 max-w-6xl mx-auto">
@@ -1136,9 +1252,12 @@ export default function SuperAdminConsole() {
                 {/* TAB: LOG AUDIT */}
                 {activeMenu === 'audit' && (
                     <div className="max-w-4xl mx-auto space-y-4">
-                        <h2 className="text-2xl font-bold text-white mb-2">Log Audit Sistem</h2>
-                        <div className="p-6 bg-[#111] border border-[#222] rounded-xl text-xs text-slate-400">
-                            Perubahan matriks akses dan kustomisasi formulir operasional tambang nikel terekam di database.
+                        <div className="flex items-center justify-between gap-3">
+                            <div><h2 className="text-2xl font-bold text-white">Log Audit Sistem</h2><p className="text-xs text-slate-400 mt-1">Aktivitas nyata user, admin, dan perubahan data dari database.</p></div>
+                            <button onClick={fetchAuditLogs} className="bg-[#16233a] border border-[#2a3d5f] text-cyan-300 rounded-lg px-3 py-2 text-xs">↻ Refresh</button>
+                        </div>
+                        <div className="bg-[#111] border border-[#222] rounded-xl overflow-hidden">
+                            {auditLogs.length === 0 ? <div className="p-6 text-xs text-slate-500">Belum ada log. Jalankan migrasi audit lalu lakukan aktivitas di aplikasi.</div> : <div className="divide-y divide-[#222]">{auditLogs.map((log) => <div key={log.id} className="p-4 flex flex-wrap items-center justify-between gap-3 text-xs"><div><div className="text-white font-semibold">{log.action.toUpperCase()} · {log.module}</div><div className="text-slate-500 mt-1">{log.entity_type || 'system'} {log.entity_id ? `#${log.entity_id}` : ''} · {log.actor_email || 'system'}{log.actor_role ? ` (${log.actor_role})` : ''}</div></div><time className="text-slate-500 font-mono">{new Date(log.created_at).toLocaleString('id-ID')}</time></div>)}</div>}
                         </div>
                     </div>
                 )}
@@ -1378,4 +1497,16 @@ export default function SuperAdminConsole() {
             )}
         </div>
     )
+}
+
+interface AuditLog {
+    id: string
+    action: string
+    module: string
+    entity_type: string | null
+    entity_id: string | null
+    actor_email: string | null
+    actor_role: string | null
+    details: Record<string, unknown>
+    created_at: string
 }
