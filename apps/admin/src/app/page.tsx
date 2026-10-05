@@ -248,6 +248,7 @@ export default function SuperAdminConsole() {
     const [authEmail, setAuthEmail] = useState('')
     const [authPassword, setAuthPassword] = useState('')
     const [authError, setAuthError] = useState('')
+    const [resetNotice, setResetNotice] = useState('')
     const [authSubmitting, setAuthSubmitting] = useState(false)
     const [activeMenu, setActiveMenu] = useState<'permissions' | 'form_builder' | 'users' | 'roles' | 'companies' | 'system' | 'audit'>('permissions')
     const [users, setUsers] = useState<any[]>([])
@@ -369,6 +370,19 @@ export default function SuperAdminConsole() {
         }
         setAuthPassword('')
         setAuthSubmitting(false)
+    }
+
+    async function handlePasswordReset() {
+        if (!authEmail.trim()) {
+            setAuthError('Masukkan email terlebih dahulu.')
+            return
+        }
+        setAuthError('')
+        setResetNotice('')
+        const redirectTo = `${window.location.origin}/auth/update-password`
+        const { error } = await supabase.auth.resetPasswordForEmail(authEmail.trim(), { redirectTo })
+        if (error) setAuthError(error.message)
+        else setResetNotice('Link reset password sudah dikirim. Buka email lalu buat password baru.')
     }
 
     useEffect(() => {
@@ -767,7 +781,9 @@ export default function SuperAdminConsole() {
                     <input type="email" required autoComplete="username" value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} placeholder="Email superadmin" className="w-full bg-[#070b12] border border-[#263752] rounded-lg px-3 py-2.5 text-sm text-white" />
                     <input type="password" required autoComplete="current-password" value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} placeholder="Password" className="w-full bg-[#070b12] border border-[#263752] rounded-lg px-3 py-2.5 text-sm text-white" />
                     {authError && <p className="text-xs text-rose-300 bg-rose-950/30 border border-rose-800/40 rounded-lg p-3">{authError}</p>}
+                    {resetNotice && <p className="text-xs text-emerald-300 bg-emerald-950/30 border border-emerald-800/40 rounded-lg p-3">{resetNotice}</p>}
                     <button type="submit" disabled={authSubmitting} className="w-full bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-slate-950 font-black py-2.5 rounded-lg text-sm">{authSubmitting ? 'Memverifikasi...' : 'Masuk'}</button>
+                    <button type="button" onClick={handlePasswordReset} className="w-full text-xs text-cyan-300 hover:text-cyan-200 py-2">Lupa password? Kirim link reset</button>
                 </form>
             </main>
         )
