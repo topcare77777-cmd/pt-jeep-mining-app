@@ -242,6 +242,13 @@ interface CustomField {
 }
 
 export default function SuperAdminConsole() {
+    const allowedSuperadminEmail = (process.env.NEXT_PUBLIC_SUPERADMIN_EMAIL || 'topcare77777@gmail.com').toLowerCase()
+    const [authReady, setAuthReady] = useState(false)
+    const [isAuthorized, setIsAuthorized] = useState(false)
+    const [authEmail, setAuthEmail] = useState('')
+    const [authPassword, setAuthPassword] = useState('')
+    const [authError, setAuthError] = useState('')
+    const [authSubmitting, setAuthSubmitting] = useState(false)
     const [activeMenu, setActiveMenu] = useState<'permissions' | 'form_builder' | 'users' | 'roles' | 'companies' | 'system' | 'audit'>('permissions')
     const [users, setUsers] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
@@ -315,6 +322,54 @@ export default function SuperAdminConsole() {
     const [savingField, setSavingField] = useState(false)
     const [auditLogs, setAuditLogs] = useState<AuditLog[]>([])
     const [theme, setTheme] = useState<'dark' | 'light'>('dark')
+
+    useEffect(() => {
+        verifyAdminSession()
+    }, [])
+
+    async function verifyAdminSession() {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session?.user) await authorizeAdmin(session.user)
+        setAuthReady(true)
+    }
+
+    async function authorizeAdmin(user: { id: string; email?: string }) {
+        const email = (user.email || '').toLowerCase().trim()
+        if (email !== allowedSuperadminEmail) {
+            await supabase.auth.signOut()
+            setAuthError('Akun ini tidak memiliki akses developer.')
+            setIsAuthorized(false)
+            return false
+        }
+
+        const { data: profile } = await supabase.from('profiles').select('role, status').eq('id', user.id).maybeSingle()
+        const role = (profile?.role || '').toLowerCase().trim()
+        const active = (profile?.status || 'Aktif').toLowerCase() !== 'nonaktif'
+        if (!active || !['admin', 'administrator', 'superadmin'].includes(role)) {
+            await supabase.auth.signOut()
+            setAuthError('Akun belum memiliki role superadmin yang aktif.')
+            setIsAuthorized(false)
+            return false
+        }
+
+        setAuthError('')
+        setIsAuthorized(true)
+        return true
+    }
+
+    async function handleAdminLogin(e: React.FormEvent) {
+        e.preventDefault()
+        setAuthSubmitting(true)
+        setAuthError('')
+        const { data, error } = await supabase.auth.signInWithPassword({ email: authEmail.trim(), password: authPassword })
+        if (error || !data.user) {
+            setAuthError('Email atau password tidak valid.')
+        } else {
+            await authorizeAdmin(data.user)
+        }
+        setAuthPassword('')
+        setAuthSubmitting(false)
+    }
 
     useEffect(() => {
         fetchUsers()
@@ -699,6 +754,24 @@ export default function SuperAdminConsole() {
     }
 
     const currentAllowed = divisionPermissions[selectedDivisionForPermission] || []
+
+    if (!authReady) {
+        return <div className="min-h-screen bg-[#070b12] text-white flex items-center justify-center text-sm">Memverifikasi akses developer...</div>
+    }
+
+    if (!isAuthorized) {
+        return (
+            <main className="min-h-screen bg-[#070b12] text-white flex items-center justify-center p-5">
+                <form onSubmit={handleAdminLogin} className="w-full max-w-sm bg-[#0c121e] border border-[#263752] rounded-2xl p-6 shadow-2xl space-y-4">
+                    <div className="text-center"><div className="text-3xl mb-2">🔐</div><h1 className="text-xl font-black">Akses Internal Developer</h1><p className="text-xs text-slate-400 mt-2">Halaman ini hanya untuk akun superadmin yang terdaftar.</p></div>
+                    <input type="email" required autoComplete="username" value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} placeholder="Email superadmin" className="w-full bg-[#070b12] border border-[#263752] rounded-lg px-3 py-2.5 text-sm text-white" />
+                    <input type="password" required autoComplete="current-password" value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} placeholder="Password" className="w-full bg-[#070b12] border border-[#263752] rounded-lg px-3 py-2.5 text-sm text-white" />
+                    {authError && <p className="text-xs text-rose-300 bg-rose-950/30 border border-rose-800/40 rounded-lg p-3">{authError}</p>}
+                    <button type="submit" disabled={authSubmitting} className="w-full bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-slate-950 font-black py-2.5 rounded-lg text-sm">{authSubmitting ? 'Memverifikasi...' : 'Masuk'}</button>
+                </form>
+            </main>
+        )
+    }
 
     return (
         <div className={`admin-page flex h-screen bg-[#070b12] text-slate-200 font-sans overflow-hidden select-none ${theme === 'light' ? 'admin-light' : ''}`}>

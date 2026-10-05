@@ -125,7 +125,7 @@ export default function LandingPage() {
                         rel="noopener noreferrer"
                         className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold px-4 py-2 rounded-lg text-sm transition shadow-lg shadow-amber-500/10 inline-block"
                     >
-                        Konsol Superadmin
+                        🔐 Akses Internal
                     </a>
                 </div>
             </nav>
