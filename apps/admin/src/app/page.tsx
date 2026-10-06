@@ -451,14 +451,28 @@ export default function SuperAdminConsole() {
         if (!companyName.trim() || !companySlug.trim()) return
         setSavingCompany(true)
         try {
-            const { data, error } = await supabase.rpc('create_company', {
-                company_name: companyName.trim(),
-                company_slug: companySlug.trim().toLowerCase(),
-                company_logo_url: companyLogoUrl.trim() || null,
-                company_user_limit: companyUserLimit,
-                company_iup_status: companyIupStatus,
-                company_rkab_status: companyRkabStatus,
-            })
+            const baseSlug = companySlug.trim().toLowerCase().replace(/-+/g, '-').replace(/^-|-$/g, '')
+            let createdSlug = baseSlug
+            let data: any
+            let error: any
+
+            // Slug harus unik. Jika sudah dipakai, coba suffix angka secara otomatis.
+            for (let suffix = 0; suffix <= 20; suffix += 1) {
+                createdSlug = suffix === 0 ? baseSlug : `${baseSlug}-${suffix + 1}`
+                const result = await supabase.rpc('create_company', {
+                    company_name: companyName.trim(),
+                    company_slug: createdSlug,
+                    company_logo_url: companyLogoUrl.trim() || null,
+                    company_user_limit: companyUserLimit,
+                    company_iup_status: companyIupStatus,
+                    company_rkab_status: companyRkabStatus,
+                })
+                data = result.data
+                error = result.error
+                if (!error) break
+                const duplicateSlug = error.message?.includes('companies_slug_key') || error.code === '23505'
+                if (!duplicateSlug) throw error
+            }
             if (error) throw error
             const createdCompany = Array.isArray(data) ? data[0] : data
             if (createdCompany?.id && companyAdminUserId) {
@@ -472,7 +486,9 @@ export default function SuperAdminConsole() {
             setCompanyAdminUserId('')
             await fetchCompanies()
             await fetchAuditLogs()
-            alert('Perusahaan baru berhasil dibuat dan siap dikonfigurasi.')
+            alert(createdSlug === baseSlug
+                ? 'Perusahaan baru berhasil dibuat dan siap dikonfigurasi.'
+                : `Slug ${baseSlug} sudah dipakai. Perusahaan berhasil dibuat dengan slug otomatis: ${createdSlug}`)
         } catch (err: any) {
             alert('Gagal membuat perusahaan: ' + (err?.message || 'Periksa migrasi dan hak akses superadmin.'))
         } finally {
